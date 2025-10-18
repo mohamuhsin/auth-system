@@ -9,12 +9,11 @@ router.post("/", async (req, res) => {
     const cookieName =
       process.env.SESSION_COOKIE_NAME || "__Secure-iventics_session";
     const cookie = req.cookies?.[cookieName];
-
     if (cookie) {
       try {
         const decoded = await admin.auth().verifySessionCookie(cookie, true);
         await admin.auth().revokeRefreshTokens(decoded.sub);
-      } catch (err) {
+      } catch {
         console.warn("Logout: invalid or expired cookie");
       }
     }

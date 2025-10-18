@@ -27,8 +27,8 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const setCookie = await makeSessionCookie(idToken);
-    res.setHeader("Set-Cookie", setCookie);
+    const cookie = await makeSessionCookie(idToken);
+    res.setHeader("Set-Cookie", cookie);
 
     res.status(200).json({
       message: "Session created",
