@@ -1,35 +1,64 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import admin from "../../services/firebaseAdmin";
 import prisma from "../../prisma/client";
 import { makeSessionCookie } from "../../utils/cookies";
+import { logAudit } from "../../utils/audit";
 
 const router = Router();
 
-router.post("/", async (req, res) => {
+/**
+ * 🔐 POST /api/auth/session
+ * Exchanges Firebase ID token → Secure session cookie.
+ * Creates a user if missing and delegates errors to the global errorHandler.
+ */
+router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { idToken } = req.body;
-    if (!idToken) return res.status(400).json({ message: "Missing idToken" });
+    if (!idToken) {
+      const error = new Error("Missing idToken");
+      (error as any).status = 400;
+      throw error;
+    }
 
+    // 🔎 Verify Firebase ID token
     const decoded = await admin.auth().verifyIdToken(idToken);
+    const email = decoded.email || "";
+    const name = decoded.name || null;
+    const avatarUrl = decoded.picture || null;
 
+    // 🔧 Find or create user in Prisma
     let user = await prisma.user.findUnique({
       where: { firebaseUid: decoded.uid },
     });
+
     if (!user) {
       user = await prisma.user.create({
         data: {
           firebaseUid: decoded.uid,
-          email: decoded.email || "",
-          name: decoded.name || null,
-          avatarUrl: decoded.picture || null,
+          email,
+          name,
+          avatarUrl,
           role: "USER",
         },
       });
+
+      // 🧾 Audit: user creation
+      await logAudit(
+        "USER_CREATED",
+        user.id,
+        req.ip,
+        req.headers["user-agent"]
+      );
     }
 
+    // 🍪 Create secure session cookie
     const cookie = await makeSessionCookie(idToken);
     res.setHeader("Set-Cookie", cookie);
 
+    // 🧾 Audit: successful login
+    await logAudit("LOGIN", user.id, req.ip, req.headers["user-agent"]);
+
+    // ✅ Respond
     res.status(200).json({
       message: "Session created",
       user: {
@@ -41,8 +70,14 @@ router.post("/", async (req, res) => {
       },
     });
   } catch (err: any) {
-    console.error("Session error:", err.message);
-    res.status(401).json({ message: "Invalid or expired ID token" });
+    // 🧾 Log the failed attempt (but don’t block next())
+    await logAudit(
+      "LOGIN_FAILED",
+      undefined,
+      req.ip,
+      req.headers["user-agent"]
+    );
+    next(err);
   }
 });
 
