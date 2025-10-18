@@ -30,7 +30,6 @@ export function authGuard(requiredRole?: "USER" | "ADMIN") {
       const dbUser = await prisma.user.findUnique({
         where: { firebaseUid: decoded.uid },
       });
-
       if (!dbUser) return res.status(403).json({ message: "User not found" });
 
       req.authUser = {
@@ -41,9 +40,7 @@ export function authGuard(requiredRole?: "USER" | "ADMIN") {
       };
 
       if (requiredRole && dbUser.role !== requiredRole)
-        return res
-          .status(403)
-          .json({ message: "Forbidden: insufficient permissions" });
+        return res.status(403).json({ message: "Forbidden" });
 
       next();
     } catch (err: any) {
