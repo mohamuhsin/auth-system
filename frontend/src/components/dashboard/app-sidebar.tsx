@@ -29,48 +29,46 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-provider/theme-toggle";
 
 /* ============================================================
-   🧭 Navigation Data (Level 2 – Optimized)
+   🧭 Navigation Structure
 ============================================================ */
-const data = {
-  sections: [
-    {
-      title: "General",
-      items: [
-        { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-        { title: "Users", url: "/dashboard/users", icon: Users },
-        { title: "Roles & Permissions", url: "/dashboard/roles", icon: Lock },
-      ],
-    },
-    {
-      title: "Security",
-      items: [
-        { title: "Sessions", url: "/dashboard/sessions", icon: Shield },
-        {
-          title: "Login Attempts",
-          url: "/dashboard/login-attempts",
-          icon: Fingerprint,
-        },
-        { title: "Audit Logs", url: "/dashboard/audit-logs", icon: FileText },
-      ],
-    },
-    {
-      title: "Monitoring",
-      items: [
-        { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
-      ],
-    },
-    {
-      title: "System",
-      items: [
-        { title: "Settings", url: "/dashboard/settings", icon: Settings },
-        { title: "Integrations", url: "/dashboard/integrations", icon: Plug },
-      ],
-    },
-  ],
-};
+const navData = [
+  {
+    title: "General",
+    items: [
+      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+      { title: "Users", url: "/dashboard/users", icon: Users },
+      { title: "Roles & Permissions", url: "/dashboard/roles", icon: Lock },
+    ],
+  },
+  {
+    title: "Security",
+    items: [
+      { title: "Sessions", url: "/dashboard/sessions", icon: Shield },
+      {
+        title: "Login Attempts",
+        url: "/dashboard/login-attempts",
+        icon: Fingerprint,
+      },
+      { title: "Audit Logs", url: "/dashboard/audit-logs", icon: FileText },
+    ],
+  },
+  {
+    title: "Monitoring",
+    items: [
+      { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
+    ],
+  },
+  {
+    title: "System",
+    items: [
+      { title: "Settings", url: "/dashboard/settings", icon: Settings },
+      { title: "Integrations", url: "/dashboard/integrations", icon: Plug },
+    ],
+  },
+];
 
 /* ============================================================
-   🧩 Component
+   🧩 Sidebar Component
 ============================================================ */
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
@@ -78,18 +76,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       {/* 🌐 Brand Header */}
-      <SidebarHeader className="px-5 pt-6 pb-4 border-b border-border/40">
+      <SidebarHeader className="px-5 pt-6 pb-5">
         <Link
           href="/dashboard"
           className="flex items-center gap-3 group transition-all duration-200"
         >
-          {/* Icon */}
           <div className="relative flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary/20 transition-all">
             <ShieldCheck className="size-5" />
             <div className="absolute inset-0 rounded-xl ring-1 ring-inset ring-primary/20" />
           </div>
-
-          {/* Brand Text */}
           <div className="flex flex-col leading-tight">
             <span className="text-[15.5px] font-semibold tracking-tight">
               Auth by Iventics
@@ -99,35 +94,44 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </span>
           </div>
         </Link>
+
+        {/* ✨ Subtle Separator Below Brand */}
+        <div className="mt-5 h-px bg-border/50 rounded-full" />
       </SidebarHeader>
 
       {/* 🧭 Navigation Sections */}
-      <SidebarContent className="px-3 pt-3 pb-4">
-        {data.sections.map((section, i) => (
-          <div key={section.title} className={cn("mt-6 first:mt-2")}>
-            <p className="px-3 mb-2 text-[11px] font-semibold uppercase text-muted-foreground/80 tracking-wider">
+      <SidebarContent className="px-3 pt-4 pb-6">
+        {navData.map((section, i) => (
+          <div key={i} className={cn("mt-6 first:mt-3")}>
+            <p className="px-3 mb-2 text-[11px] font-semibold uppercase text-muted-foreground/70 tracking-wider">
               {section.title}
             </p>
-            <div className="space-y-1">
+
+            <div className="flex flex-col gap-1.5">
               {section.items.map((item) => {
                 const isActive = pathname.startsWith(item.url);
+
                 return (
                   <SidebarMenu key={item.title}>
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         asChild
                         className={cn(
-                          "flex items-center gap-2 px-3 py-2 rounded-md text-[15px] font-medium transition-all",
-                          "hover:bg-accent/60 hover:text-accent-foreground active:scale-[0.99]",
+                          // Layout
+                          "flex items-center gap-2.5 px-3 py-2.5 rounded-md text-[15px] font-medium transition-all duration-150",
+                          // Hover + active
+                          "hover:bg-accent/40 hover:text-foreground active:scale-[0.98]",
                           isActive &&
-                            "bg-accent text-accent-foreground shadow-sm"
+                            "bg-accent text-accent-foreground shadow-sm ring-1 ring-accent/40"
                         )}
                       >
                         <Link href={item.url}>
                           <item.icon
                             className={cn(
-                              "size-5 shrink-0",
-                              isActive ? "opacity-100" : "opacity-80"
+                              "size-[18px] shrink-0 transition-opacity duration-150",
+                              isActive
+                                ? "opacity-100 text-accent-foreground"
+                                : "opacity-70 text-muted-foreground group-hover/item:opacity-100"
                             )}
                           />
                           <span>{item.title}</span>
@@ -138,16 +142,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 );
               })}
             </div>
-
-            {i < data.sections.length - 1 && (
-              <div className="mx-3 mt-5 border-t border-border/40" />
-            )}
           </div>
         ))}
       </SidebarContent>
 
-      {/* 🩺 System Status + Theme Toggle Footer */}
-      <SidebarFooter className="border-t border-border mt-auto px-3 py-2">
+      {/* 🩺 Footer */}
+      <SidebarFooter className="mt-auto px-4 py-3 border-t border-border/40">
         <div className="flex items-center justify-between w-full">
           {/* 🔵 System Status */}
           <Link
@@ -156,11 +156,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           >
             <div
               className="size-2.5 rounded-full animate-pulse"
-              style={{ backgroundColor: "#0070f5" }}
+              style={{ backgroundColor: "#00bfa6" }}
             />
             <span
               className="text-[12.5px] font-medium tracking-tight"
-              style={{ color: "#0070f5" }}
+              style={{ color: "#00bfa6" }}
             >
               All systems normal
             </span>
