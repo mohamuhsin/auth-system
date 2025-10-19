@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Bell } from "lucide-react";
 import { NavUser } from "@/components/dashboard/nav-user";
+import { PageBreadcrumb } from "./breadcrumbs";
 
 export function SiteHeader() {
   return (
@@ -17,9 +18,7 @@ export function SiteHeader() {
             orientation="vertical"
             className="mx-2 h-4 data-[orientation=vertical]:h-4 bg-border/80"
           />
-          <h1 className="text-base font-medium tracking-tight text-foreground">
-            Documents
-          </h1>
+          <PageBreadcrumb />
         </div>
 
         {/* 🔸 Right: Actions */}
@@ -31,7 +30,7 @@ export function SiteHeader() {
             className="relative flex size-9 items-center justify-center rounded-md hover:bg-accent/60 active:scale-[0.98] transition-all"
           >
             <Bell className="size-5 text-muted-foreground stroke-[1.6]" />
-            <span className="absolute top-[7px] right-[8px] h-1.5 w-1.5 rounded-full bg-emerald-500 ring-[2px] ring-background" />
+            <span className="absolute top-[7px] right-[8px] h-2 w-2 rounded-full bg-[#0070f5] ring-[2px] ring-background" />
           </Button>
 
           {/* 👤 User Menu */}
