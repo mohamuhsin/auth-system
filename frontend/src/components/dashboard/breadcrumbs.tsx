@@ -14,10 +14,8 @@ export function PageBreadcrumb() {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
 
-  // ✅ Configurable app/system name
   const systemName = process.env.NEXT_PUBLIC_APP_NAME || "Auth System";
 
-  // 🧭 Build breadcrumb trail
   const crumbs = [
     { name: systemName, href: "/" },
     ...segments.map((segment, index) => ({
@@ -27,12 +25,11 @@ export function PageBreadcrumb() {
     })),
   ];
 
-  // 🧩 Last page name for small screens
   const currentPage = crumbs[crumbs.length - 1]?.name || systemName;
 
   return (
     <Breadcrumb>
-      {/* 👇 Full breadcrumb (desktop & tablet) */}
+      {/* Full breadcrumb (desktop) */}
       <BreadcrumbList className="hidden md:flex">
         {crumbs.map((crumb, index) => {
           const isLast = index === crumbs.length - 1;
@@ -59,7 +56,7 @@ export function PageBreadcrumb() {
         })}
       </BreadcrumbList>
 
-      {/* 👇 Condensed version (mobile) */}
+      {/* Condensed version (mobile) */}
       <div className="block md:hidden font-medium text-foreground">
         {currentPage}
       </div>
