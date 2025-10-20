@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-provider/theme-toggle";
 
 /* ============================================================
-   🧭 Navigation Structure
+   🧭 Navigation Configuration
 ============================================================ */
 const navData = [
   {
@@ -76,15 +76,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       {/* 🌐 Brand Header */}
-      <SidebarHeader className="px-5 pt-6 pb-5">
+      <SidebarHeader className="px-5 pt-6 pb-4">
         <Link
           href="/dashboard"
           className="flex items-center gap-3 group transition-all duration-200"
         >
-          <div className="relative flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary/20 transition-all">
+          {/* Logo mark */}
+          <div className="relative flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary/15 transition-colors duration-200">
             <ShieldCheck className="size-5" />
             <div className="absolute inset-0 rounded-xl ring-1 ring-inset ring-primary/20" />
           </div>
+
+          {/* Brand text */}
           <div className="flex flex-col leading-tight">
             <span className="text-[15.5px] font-semibold tracking-tight">
               Auth by Iventics
@@ -95,8 +98,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </div>
         </Link>
 
-        {/* ✨ Subtle Separator Below Brand */}
-        <div className="mt-5 h-px bg-border/50 rounded-full" />
+        {/* Subtle divider */}
+        <div className="mt-4 h-px bg-border/50 rounded-full" />
       </SidebarHeader>
 
       {/* 🧭 Navigation Sections */}
@@ -110,17 +113,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <div className="flex flex-col gap-1.5">
               {section.items.map((item) => {
                 const isActive = pathname.startsWith(item.url);
-
                 return (
                   <SidebarMenu key={item.title}>
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         asChild
                         className={cn(
-                          // Layout
-                          "flex items-center gap-2.5 px-3 py-2.5 rounded-md text-[15px] font-medium transition-all duration-150",
-                          // Hover + active
-                          "hover:bg-accent/40 hover:text-foreground active:scale-[0.98]",
+                          "flex items-center gap-2.5 px-3 py-2.5 rounded-md text-[14.5px] font-medium transition-all duration-150",
+                          "hover:bg-accent/50 hover:text-foreground active:scale-[0.98]",
                           isActive &&
                             "bg-accent text-accent-foreground shadow-sm ring-1 ring-accent/40"
                         )}
@@ -128,13 +128,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         <Link href={item.url}>
                           <item.icon
                             className={cn(
-                              "size-[18px] shrink-0 transition-opacity duration-150",
+                              "size-[18px] shrink-0 transition-colors duration-150",
                               isActive
-                                ? "opacity-100 text-accent-foreground"
-                                : "opacity-70 text-muted-foreground group-hover/item:opacity-100"
+                                ? "text-accent-foreground"
+                                : "text-muted-foreground group-hover:text-foreground"
                             )}
                           />
-                          <span>{item.title}</span>
+                          <span className="truncate">{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -152,22 +152,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           {/* 🔵 System Status */}
           <Link
             href="/dashboard/health"
-            className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-accent/30 transition-all duration-150"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent/30 transition-all duration-150"
           >
-            <div
-              className="size-2.5 rounded-full animate-pulse"
-              style={{ backgroundColor: "#00bfa6" }}
-            />
-            <span
-              className="text-[12.5px] font-medium tracking-tight"
-              style={{ color: "#00bfa6" }}
-            >
+            <div className="size-2.5 rounded-full animate-pulse bg-emerald-500" />
+            <span className="text-[12.5px] font-medium tracking-tight text-emerald-500">
               All systems normal
             </span>
           </Link>
 
           {/* 🌗 Theme Toggle */}
-          <div className="scale-[0.75] opacity-90 hover:opacity-100 transition-transform duration-150">
+          <div className="scale-[0.8] opacity-95 hover:opacity-100 transition-opacity duration-150">
             <ThemeToggle />
           </div>
         </div>
