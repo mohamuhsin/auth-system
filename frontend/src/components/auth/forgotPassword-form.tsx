@@ -108,6 +108,15 @@ export function ForgotPasswordForm({
           </form>
         </CardContent>
       </Card>
+      <FieldDescription className="px-6 text-center">
+        Need help?{" "}
+        <a
+          href="mailto:support@iventics.com"
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Contact Support
+        </a>
+      </FieldDescription>
     </div>
   );
 }
