@@ -24,11 +24,3 @@ export default function SignupPage() {
     </div>
   );
 }
-
-/* ============================================================
-   🌐 GLOBAL THEME — Auth by Iventics
-   ------------------------------------------------------------
-   • Refined "Iventics Royal Indigo" palette (#375DFB)
-   • Optimized for Neutral base in both modes
-   • Tuned shadows, borders, and accent contrasts
-============================================================ */
