@@ -4,16 +4,10 @@ import { ChevronRight, MoreHorizontal } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-/* ============================================================
-   📍 Breadcrumb Container
-============================================================ */
 function Breadcrumb({ ...props }: React.ComponentProps<"nav">) {
   return <nav aria-label="breadcrumb" data-slot="breadcrumb" {...props} />;
 }
 
-/* ============================================================
-   📋 Breadcrumb List
-============================================================ */
 function BreadcrumbList({ className, ...props }: React.ComponentProps<"ol">) {
   return (
     <ol
@@ -27,9 +21,6 @@ function BreadcrumbList({ className, ...props }: React.ComponentProps<"ol">) {
   );
 }
 
-/* ============================================================
-   🔹 Breadcrumb Item
-============================================================ */
 function BreadcrumbItem({ className, ...props }: React.ComponentProps<"li">) {
   return (
     <li
@@ -40,9 +31,6 @@ function BreadcrumbItem({ className, ...props }: React.ComponentProps<"li">) {
   );
 }
 
-/* ============================================================
-   🔗 Breadcrumb Link
-============================================================ */
 function BreadcrumbLink({
   asChild,
   className,
@@ -64,9 +52,6 @@ function BreadcrumbLink({
   );
 }
 
-/* ============================================================
-   📄 Current Page
-============================================================ */
 function BreadcrumbPage({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
@@ -80,9 +65,6 @@ function BreadcrumbPage({ className, ...props }: React.ComponentProps<"span">) {
   );
 }
 
-/* ============================================================
-   ➡️ Separator (Fixed: span instead of li)
-============================================================ */
 function BreadcrumbSeparator({
   children,
   className,
@@ -104,9 +86,6 @@ function BreadcrumbSeparator({
   );
 }
 
-/* ============================================================
-   ⋯ Ellipsis (Collapsed items)
-============================================================ */
 function BreadcrumbEllipsis({
   className,
   ...props

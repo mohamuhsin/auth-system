@@ -7,42 +7,53 @@ import { Bell, CheckSquare2 } from "lucide-react";
 import { NavUser } from "@/components/dashboard/nav-user";
 import { PageBreadcrumb } from "./breadcrumbs";
 
+/* ============================================================
+   🌐 SiteHeader — ShadCN-Aligned + Visible Separator
+============================================================ */
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 flex h-[58px] shrink-0 items-center border-b bg-background/80 backdrop-blur-sm supports-[backdrop-filter]:bg-background/60 transition-all">
-      <div className="flex w-full items-center justify-between px-3 sm:px-4 md:px-6">
+    <header
+      className="sticky top-0 z-50 flex h-[60px] shrink-0 items-center 
+      border-b bg-background/95 backdrop-blur-sm supports-[backdrop-filter]:bg-background/80 
+      px-4 lg:px-6 transition-all duration-200"
+    >
+      <div className="flex w-full items-center justify-between">
         {/* ============================================================
-           🔹 LEFT: Sidebar Trigger + Breadcrumb
+           🔹 LEFT — Sidebar trigger + Separator + Breadcrumb
         ============================================================ */}
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          {/* Sidebar toggle */}
-          <SidebarTrigger className="-ml-0.5 size-9 rounded-md hover:bg-accent/50 active:scale-[0.98] transition-all" />
-
-          {/* Divider — always visible */}
-          <Separator
-            orientation="vertical"
-            className="mx-2 h-4 data-[orientation=vertical]:h-4 bg-border/70"
+        <div className="flex items-center gap-2.5">
+          {/* Sidebar Trigger */}
+          <SidebarTrigger
+            className="flex size-[38px] items-center justify-center rounded-full 
+            border border-border bg-background/50 hover:bg-accent/50 
+            hover:ring-2 hover:ring-accent/30 
+            active:scale-[0.97] shadow-sm transition-all duration-150"
           />
 
-          {/* Breadcrumb */}
-          <div className="truncate">
-            <PageBreadcrumb />
-          </div>
+          {/* 🌟 Clearly Visible Separator */}
+          <Separator
+            orientation="vertical"
+            className="mx-2 data-[orientation=vertical]:h-4"
+          />
+
+          <PageBreadcrumb />
         </div>
 
         {/* ============================================================
-           🔸 RIGHT: Header Actions (Notifications / Tasks / User)
+           🔸 RIGHT — Notifications / Tasks / User
         ============================================================ */}
-        <div className="ml-auto flex items-center gap-4 sm:gap-5 md:gap-7 lg:gap-8">
+        <div className="ml-auto flex items-center gap-3.5 sm:gap-4">
           {/* 🔔 Notifications */}
           <Button
             variant="ghost"
             size="icon"
             aria-label="Notifications"
-            className="relative flex size-9 items-center justify-center rounded-md hover:bg-accent/60 active:scale-[0.97] transition-all duration-150"
+            className="relative flex size-[38px] items-center justify-center rounded-full 
+            border border-border bg-background/50 hover:bg-accent/50 
+            hover:ring-2 hover:ring-accent/30 
+            active:scale-[0.97] shadow-sm transition-all duration-150"
           >
-            <Bell className="size-5 text-muted-foreground stroke-[1.6]" />
-            <span className="absolute top-[7px] right-[8px] h-2 w-2 rounded-full bg-[#0070f5] ring-[2px] ring-background" />
+            <Bell className="size-[18px] text-foreground/90 stroke-[1.6]" />
           </Button>
 
           {/* ✅ Tasks */}
@@ -50,24 +61,24 @@ export function SiteHeader() {
             variant="ghost"
             size="icon"
             aria-label="Tasks"
-            className="relative flex size-9 items-center justify-center rounded-md hover:bg-accent/60 active:scale-[0.97] transition-all duration-150"
+            className="relative flex size-[38px] items-center justify-center rounded-full 
+            border border-border bg-background/50 hover:bg-accent/50 
+            hover:ring-2 hover:ring-accent/30 
+            active:scale-[0.97] shadow-sm transition-all duration-150"
           >
-            <CheckSquare2 className="size-5 text-muted-foreground stroke-[1.6]" />
-            <span className="absolute top-[7px] right-[8px] h-2 w-2 rounded-full bg-amber-500 ring-[2px] ring-background" />
+            <CheckSquare2 className="size-[18px] text-foreground/90 stroke-[1.6]" />
           </Button>
 
-          {/* 👤 User Menu */}
-          <div className="flex h-9 items-center justify-center pl-2 sm:pl-3 md:pl-4">
-            <div className="scale-[0.95] opacity-95 hover:opacity-100 transition-opacity duration-150">
-              <NavUser
-                user={{
-                  name: "Moha Muhsin",
-                  email: "muhsin@iventics.com",
-                  avatar: "/avatars/admin.png",
-                  role: "Admin",
-                }}
-              />
-            </div>
+          {/* 👤 User */}
+          <div className="flex items-center justify-center">
+            <NavUser
+              user={{
+                name: "Moha Muhsin",
+                email: "muhsin@iventics.com",
+                avatar: "/avatars/admin.png",
+                role: "Admin",
+              }}
+            />
           </div>
         </div>
       </div>

@@ -5,7 +5,6 @@ import {
   IconLogout,
   IconShieldLock,
   IconUserCircle,
-  IconDotsVertical,
 } from "@tabler/icons-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -22,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /* ============================================================
-   👤 NavUser — Premium Polished Version (Iventics Standard)
+   👤 NavUser — ShadCN-Aligned Borders + Full Avatar Fill
 ============================================================ */
 export function NavUser({
   user,
@@ -42,7 +41,6 @@ export function NavUser({
       .slice(0, 2)
       .toUpperCase() || "US";
 
-  // 🎨 Role-based badge styling
   const roleColor = cn(
     "border border-border/40 text-[11px] font-semibold px-1.5 py-[1px] rounded-md capitalize leading-none",
     user.role?.toLowerCase() === "admin" && "bg-primary/15 text-primary",
@@ -58,29 +56,26 @@ export function NavUser({
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
+          size="icon"
+          aria-label="User menu"
           className={cn(
-            "flex items-center gap-2 rounded-md px-2 py-1.5 transition-all duration-150",
-            "hover:bg-accent/60 focus-visible:ring-1 focus-visible:ring-ring"
+            "relative flex size-[38px] items-center justify-center rounded-full overflow-hidden",
+            // ⬇️ ShadCN-aligned styles
+            "border border-border bg-background/50 hover:bg-accent/50",
+            "hover:ring-2 hover:ring-accent/30 active:scale-[0.97]",
+            "shadow-sm transition-all duration-150"
           )}
         >
-          {/* Avatar */}
-          <Avatar className="h-8 w-8 rounded-md ring-1 ring-border/50">
-            <AvatarImage src={user.avatar} alt={user.name} />
-            <AvatarFallback className="rounded-md bg-muted text-[10px] font-medium uppercase">
+          <Avatar className="size-full rounded-full">
+            <AvatarImage
+              src={user.avatar}
+              alt={user.name}
+              className="object-cover"
+            />
+            <AvatarFallback className="size-full rounded-full bg-muted text-[11px] font-semibold uppercase flex items-center justify-center">
               {initials}
             </AvatarFallback>
           </Avatar>
-
-          {/* Name (md+) */}
-          <span className="hidden sm:inline text-[15px] font-medium truncate max-w-[110px] text-foreground">
-            {user.name}
-          </span>
-
-          {/* Dots */}
-          <IconDotsVertical
-            className="hidden sm:block size-5 text-muted-foreground transition-opacity duration-150 group-hover:opacity-90"
-            strokeWidth={1.5}
-          />
         </Button>
       </DropdownMenuTrigger>
 
@@ -97,9 +92,9 @@ export function NavUser({
         {/* User summary */}
         <DropdownMenuLabel className="p-0 font-normal">
           <div className="flex items-center gap-3 px-3 py-2.5">
-            <Avatar className="h-9 w-9 rounded-md ring-1 ring-border/40">
+            <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40">
               <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback className="rounded-md bg-muted text-xs font-semibold">
+              <AvatarFallback className="rounded-full bg-muted text-xs font-semibold">
                 {initials}
               </AvatarFallback>
             </Avatar>
@@ -118,7 +113,7 @@ export function NavUser({
           </div>
         </DropdownMenuLabel>
 
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className="my-1 h-[1px] bg-border/80" />
 
         {/* Menu group */}
         <DropdownMenuGroup>
@@ -138,7 +133,7 @@ export function NavUser({
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className="my-1 h-[1px] bg-border/80" />
 
         {/* Logout */}
         <DropdownMenuItem
