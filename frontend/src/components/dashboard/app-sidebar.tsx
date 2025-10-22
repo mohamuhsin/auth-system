@@ -68,7 +68,7 @@ const navData = [
 ];
 
 /* ============================================================
-   🧩 Sidebar Component — ShadCN Polished
+   🧩 Sidebar Component — Enhanced Visual Flow
 ============================================================ */
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
@@ -107,18 +107,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </div>
         </Link>
 
-        {/* Subtle divider */}
-        <div className="mt-4 h-px w-full bg-foreground/10 dark:bg-foreground/20 rounded-full" />
+        {/* ✨ Glassy divider */}
+        <div className="mt-4 h-[1px] w-full bg-gradient-to-r from-transparent via-border/70 to-transparent rounded-full" />
       </SidebarHeader>
 
       {/* 🧭 Navigation Sections */}
       <SidebarContent className="px-3 pt-4 pb-6">
         {navData.map((section, i) => (
-          <div key={i} className={cn("mt-6 first:mt-3")}>
+          <div key={i} className={cn("relative", i > 0 && "mt-6 pt-6")}>
+            {/* Section separator line (between groups) */}
+            {i > 0 && (
+              <div className="absolute -top-3 left-3 right-3 h-px bg-gradient-to-r from-transparent via-border/40 to-transparent rounded-full" />
+            )}
+
+            {/* Title */}
             <p className="px-3 mb-2 text-[11px] font-semibold uppercase text-muted-foreground/70 tracking-wider">
               {section.title}
             </p>
 
+            {/* Menu items */}
             <div className="flex flex-col gap-1.5">
               {section.items.map((item) => {
                 const isActive = pathname.startsWith(item.url);
@@ -161,22 +168,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           {/* ✅ System Status */}
           <Link
             href="/dashboard/health"
-            className="flex items-center gap-2 px-2 py-1.5 rounded-md 
-  hover:bg-primary/10 transition-all duration-150"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-primary/10 transition-all duration-150"
           >
             <div
               className="size-2.5 rounded-full animate-pulse shadow-[0_0_6px_var(--tw-shadow-color)]"
               style={
                 {
-                  backgroundColor: "#006EF5",
-                  "--tw-shadow-color": "#006EF5",
+                  backgroundColor: "#375DFB",
+                  "--tw-shadow-color": "#375DFB",
                 } as React.CSSProperties
               }
             />
-            <span
-              className="text-[12.5px] font-medium tracking-tight"
-              style={{ color: "#006EF5" }}
-            >
+            <span className="text-[12.5px] font-medium tracking-tight text-primary">
               All systems normal
             </span>
           </Link>
