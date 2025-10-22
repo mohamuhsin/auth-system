@@ -187,15 +187,13 @@ export function LoginForm({
       </Card>
 
       <FieldDescription className="px-6 text-center">
-        By clicking continue, you agree to our{" "}
-        <a href="#" className="underline-offset-4 hover:underline">
-          Terms of Service
-        </a>{" "}
-        and{" "}
-        <a href="#" className="underline-offset-4 hover:underline">
-          Privacy Policy
+        Need help?{" "}
+        <a
+          href="mailto:support@iventics.com"
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Contact Support
         </a>
-        .
       </FieldDescription>
     </div>
   );
