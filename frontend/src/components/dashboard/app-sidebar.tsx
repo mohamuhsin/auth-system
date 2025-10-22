@@ -162,10 +162,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <Link
             href="/dashboard/health"
             className="flex items-center gap-2 px-2 py-1.5 rounded-md 
-            hover:bg-accent/30 transition-all duration-150"
+  hover:bg-primary/10 transition-all duration-150"
           >
-            <div className="size-2.5 rounded-full animate-pulse bg-emerald-500" />
-            <span className="text-[12.5px] font-medium tracking-tight text-emerald-500">
+            <div
+              className="size-2.5 rounded-full animate-pulse shadow-[0_0_6px_var(--tw-shadow-color)]"
+              style={
+                {
+                  backgroundColor: "#006EF5",
+                  "--tw-shadow-color": "#006EF5",
+                } as React.CSSProperties
+              }
+            />
+            <span
+              className="text-[12.5px] font-medium tracking-tight"
+              style={{ color: "#006EF5" }}
+            >
               All systems normal
             </span>
           </Link>
