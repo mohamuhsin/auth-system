@@ -21,7 +21,7 @@ export default function NotFound() {
 
       {/* 🧭 Heading + Description */}
       <h1 className="text-3xl font-semibold tracking-tight text-foreground mb-2">
-        404 — Page Not Found
+        404 - Page Not Found
       </h1>
       <p className="text-sm text-muted-foreground max-w-sm leading-relaxed mb-8">
         The page you’re looking for doesn’t exist or may have been moved.
@@ -47,7 +47,7 @@ export default function NotFound() {
         <span className="font-medium text-foreground">
           Auth by Iventics Technologies
         </span>{" "}
-        — All rights reserved
+        - All rights reserved
       </footer>
 
       {/* 🌫️ Subtle gradient background */}
