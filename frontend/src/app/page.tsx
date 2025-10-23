@@ -32,32 +32,34 @@ import { ModeToggle } from "@/components/theme-provider/mode-toggle";
 import { ThemeToggle } from "@/components/theme-provider/theme-toggle";
 
 /* ============================================================
-   🌐 Auth by Iventics — Responsive Landing Page (Pure ShadCN)
+   🌐 Auth by Iventics — Open-Source Authentication System
+   ------------------------------------------------------------
+   Secure. Scalable. Plug & Play.
+   Built with Next.js 15+, Firebase Admin, and Prisma.
 ============================================================ */
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col bg-background text-foreground font-sans">
+    <main className="flex min-h-screen flex-col bg-background text-foreground font-sans scroll-smooth">
       {/* 🧭 NAVBAR */}
-      <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-md">
+      <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 transition-all">
         <div className="mx-auto flex h-[60px] w-full max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* 🔰 Brand */}
           <Link
             href="/"
-            className="flex items-center gap-2 font-semibold tracking-tight hover:opacity-90 transition-opacity"
+            className="group flex items-center gap-2 font-semibold tracking-tight transition-all hover:opacity-90"
           >
-            <div className="relative flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-border/40">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-border/40 group-hover:bg-primary/20 transition-colors">
               <ShieldCheck className="size-4" />
             </div>
             <span className="text-sm sm:text-base">Auth by Iventics</span>
           </Link>
 
-          {/* 🌗 Desktop actions */}
+          {/* 🌗 Desktop Actions */}
           <div className="hidden sm:flex items-center justify-end flex-1">
-            {/* Action Buttons (Left side of toggle) */}
-            <div className="flex items-center gap-4 mr-6">
+            <div className="flex items-center gap-3 mr-6">
               <Link href="/login">
                 <Button size="sm" className="font-medium">
-                  Login
+                  Live Demo
                 </Button>
               </Link>
               <Link
@@ -70,18 +72,14 @@ export default function Home() {
                 </Button>
               </Link>
             </div>
-
-            {/* Separator + ModeToggle (Far right) */}
             <Separator
               orientation="vertical"
-              className="mx-5 h-6 bg-border/60 opacity-70"
+              className="mx-4 h-6 bg-border/60"
             />
-            <div className="flex items-center justify-center">
-              <ModeToggle />
-            </div>
+            <ModeToggle />
           </div>
 
-          {/* 📱 Mobile menu */}
+          {/* 📱 Mobile Menu */}
           <div className="sm:hidden">
             <Sheet>
               <SheetTrigger asChild>
@@ -89,7 +87,6 @@ export default function Home() {
                   <Menu className="size-5" />
                 </Button>
               </SheetTrigger>
-
               <SheetContent side="right" className="w-72 sm:w-80 p-0">
                 <SheetHeader className="border-b border-border/50 px-6 py-4">
                   <SheetTitle className="flex items-center gap-2 text-sm font-medium tracking-tight">
@@ -97,46 +94,37 @@ export default function Home() {
                     Auth by Iventics
                   </SheetTitle>
                 </SheetHeader>
-
-                <div className="flex flex-col py-6">
-                  {/* 🔗 Nav Links */}
-                  <nav className="flex flex-col space-y-2 px-6">
-                    <Link
-                      href="/"
-                      className="py-2 text-sm font-medium hover:text-primary"
-                    >
-                      Home
-                    </Link>
-
-                    <Link
-                      href="https://github.com/mohamuhsin/auth-system"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="py-2 text-sm font-medium hover:text-primary"
-                    >
-                      Docs on GitHub
-                    </Link>
-
-                    <Link
-                      href="/login"
-                      className="py-2 text-sm font-medium hover:text-primary"
-                    >
-                      Login
-                    </Link>
-                  </nav>
+                <nav className="flex flex-col space-y-1 px-6 py-6">
+                  <Link
+                    href="/"
+                    className="rounded-md px-2 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    Home
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="rounded-md px-2 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    Live Demo
+                  </Link>
+                  <Link
+                    href="https://github.com/mohamuhsin/auth-system"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md px-2 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    Docs on GitHub
+                  </Link>
 
                   <Separator className="my-6" />
 
-                  {/* 🌗 Mode Toggle */}
-                  <div className="px-6">
+                  <div>
                     <p className="text-xs text-muted-foreground mb-2">
                       Appearance
                     </p>
-                    <div className="flex items-center justify-between">
-                      <ThemeToggle />
-                    </div>
+                    <ThemeToggle />
                   </div>
-                </div>
+                </nav>
               </SheetContent>
             </Sheet>
           </div>
@@ -144,23 +132,31 @@ export default function Home() {
       </header>
 
       {/* 🌟 HERO */}
-      <section className="flex flex-col items-center text-center px-4 sm:px-6 lg:px-8 pt-24 pb-20">
-        <div className="relative flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-border shadow-inner">
-          <ShieldCheck className="size-7" />
+      <section className="relative flex flex-col items-center text-center px-4 sm:px-6 lg:px-8 pt-28 pb-24 overflow-hidden">
+        {/* ✨ Background Glow */}
+        <div className="absolute inset-0 -z-10 flex justify-center">
+          <div className="h-[500px] w-[500px] rounded-full bg-gradient-to-tr from-primary/30 via-purple-500/20 to-blue-500/10 blur-3xl opacity-40 animate-pulse" />
         </div>
 
-        <h1 className="mt-6 text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight">
-          Auth by Iventics
+        {/* 🛡️ Icon */}
+        <div className="relative flex size-20 items-center justify-center rounded-3xl bg-primary/10 text-primary ring-1 ring-border/40 shadow-inner hover:scale-105 transition-transform duration-300">
+          <ShieldCheck className="size-9" />
+        </div>
+
+        <h1 className="mt-8 text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
+          Secure Auth. Universal Identity.
         </h1>
-        <p className="mt-3 max-w-2xl text-sm sm:text-base md:text-lg text-muted-foreground">
-          Secure, scalable authentication & user management for modern apps -
-          powered by Next.js 15+, Firebase, and Prisma.
+
+        <p className="mt-4 max-w-2xl text-base sm:text-lg text-muted-foreground">
+          An open-source authentication system for modern web apps - fully
+          extensible, production-ready, and easy to clone for any project.
         </p>
 
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
+        {/* 🔘 CTA Buttons */}
+        <div className="mt-10 flex flex-wrap justify-center gap-3">
           <Link href="/login">
             <Button size="lg" className="font-medium w-full sm:w-auto">
-              Get Started
+              Try Live Demo
             </Button>
           </Link>
           <Link
@@ -168,10 +164,31 @@ export default function Home() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            <Button size="lg" variant="outline" className="w-full sm:w-auto">
-              View on GitHub
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full sm:w-auto hover:bg-accent/60"
+            >
+              Clone on GitHub
             </Button>
           </Link>
+        </div>
+
+        {/* ⚙️ Tech Badges */}
+        <div className="mt-8 flex flex-wrap justify-center gap-3 text-xs text-muted-foreground">
+          {[
+            "Next.js 15+",
+            "Firebase Auth + Admin",
+            "Prisma ORM",
+            "Express API",
+          ].map((badge) => (
+            <span
+              key={badge}
+              className="rounded-full border border-border/40 px-3 py-1 hover:border-primary/50 transition-colors"
+            >
+              {badge}
+            </span>
+          ))}
         </div>
       </section>
 
@@ -182,20 +199,23 @@ export default function Home() {
             {
               icon: <Lock className="size-6 text-primary" />,
               title: "Secure Session Handling",
-              desc: "Encrypted cookies and Firebase Admin verification ensure session integrity.",
+              desc: "Encrypted cookies and Firebase Admin verification ensure total session integrity.",
             },
             {
               icon: <Users className="size-6 text-primary" />,
               title: "Role-Based Access",
-              desc: "Supports Admins, Merchants, and Creators - each with tailored dashboards.",
+              desc: "Admins, Merchants, and Creators - each with personalized, secure dashboards.",
             },
             {
               icon: <Zap className="size-6 text-primary" />,
               title: "Plug & Play Architecture",
-              desc: "Integrates easily into existing modern apps with minimal setup.",
+              desc: "Integrate instantly into any app - one configuration, endless scalability.",
             },
           ].map((f) => (
-            <Card key={f.title} className="text-center shadow-sm">
+            <Card
+              key={f.title}
+              className="text-center shadow-sm hover:shadow-md transition-shadow duration-300"
+            >
               <CardHeader className="flex flex-col items-center gap-3">
                 {f.icon}
                 <CardTitle className="text-base sm:text-lg">
@@ -223,20 +243,23 @@ export default function Home() {
               {
                 icon: <Globe className="size-6 text-primary" />,
                 title: "Cross-Domain Sessions",
-                desc: "Unified login between backend domain and frontend domain.",
+                desc: "Unified login between frontend and backend - secure and consistent across subdomains.",
               },
               {
                 icon: <KeyRound className="size-6 text-primary" />,
                 title: "Firebase Identity",
-                desc: "Email/password & Google OAuth powered by Firebase Auth + Admin SDK.",
+                desc: "Email & Google OAuth powered by Firebase Auth and Admin SDK.",
               },
               {
                 icon: <Code2 className="size-6 text-primary" />,
                 title: "Next.js + Prisma Core",
-                desc: "Modern full-stack foundation optimized for performance and type safety.",
+                desc: "Modern full-stack foundation optimized for reliability, type-safety, and speed.",
               },
             ].map((item) => (
-              <Card key={item.title} className="text-center shadow-sm">
+              <Card
+                key={item.title}
+                className="text-center shadow-sm hover:shadow-md transition-shadow duration-300"
+              >
                 <CardHeader className="flex flex-col items-center gap-3">
                   {item.icon}
                   <CardTitle className="text-base sm:text-lg font-semibold">
@@ -256,20 +279,13 @@ export default function Home() {
 
       {/* 🧭 FOOTER */}
       <footer className="border-t border-border/40 bg-background py-10 text-center text-sm text-muted-foreground">
-        <p className="px-4">
+        <p>
           © {new Date().getFullYear()}{" "}
           <span className="font-medium text-foreground">
             Auth by Iventics Technologies
-          </span>{" "}
-          - Secure Access. Simplified.
+          </span>
         </p>
         <div className="mt-3 flex justify-center gap-6 text-xs">
-          <Link href="/privacy" className="hover:underline underline-offset-4">
-            Privacy
-          </Link>
-          <Link href="/terms" className="hover:underline underline-offset-4">
-            Terms
-          </Link>
           <Link
             href="mailto:support@iventics.com"
             className="hover:underline underline-offset-4"
