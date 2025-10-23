@@ -76,7 +76,7 @@ export default function Home() {
             </div>
             <Separator
               orientation="vertical"
-              className="mx-4 h-6 bg-border/60"
+              className="mx-5 data-[orientation=vertical]:h-5"
             />
             <ModeToggle />
           </div>
