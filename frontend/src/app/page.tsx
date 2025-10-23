@@ -10,6 +10,7 @@ import {
   KeyRound,
   Code2,
   Menu,
+  ArrowUpRight,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -31,11 +32,6 @@ import { Separator } from "@/components/ui/separator";
 import { ModeToggle } from "@/components/theme-provider/mode-toggle";
 import { ThemeToggle } from "@/components/theme-provider/theme-toggle";
 
-/* ============================================================
-   🌐 Auth by Iventics — Fully Responsive Landing Page
-   ------------------------------------------------------------
-   Every pixel optimized for all screens (320px → 4K)
-============================================================ */
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground font-sans scroll-smooth overflow-x-hidden">
@@ -55,7 +51,7 @@ export default function Home() {
             </span>
           </Link>
 
-          {/* 🌗 Desktop Actions */}
+          {/* Desktop Actions */}
           <div className="hidden sm:flex items-center justify-end flex-1">
             <div className="flex items-center gap-3 mr-6">
               <Link href="/login">
@@ -68,8 +64,13 @@ export default function Home() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Button variant="outline" size="sm" className="font-medium">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="font-medium flex items-center gap-1.5"
+                >
                   Docs
+                  <ArrowUpRight className="size-3 opacity-70 transition-transform group-hover:-translate-y-[1px] group-hover:translate-x-[1px]" />
                 </Button>
               </Link>
             </div>
@@ -80,7 +81,7 @@ export default function Home() {
             <ModeToggle />
           </div>
 
-          {/* 📱 Mobile Menu */}
+          {/* Mobile Menu */}
           <div className="sm:hidden">
             <Sheet>
               <SheetTrigger asChild>
@@ -112,9 +113,12 @@ export default function Home() {
                       href={link.href}
                       target={link.name.includes("GitHub") ? "_blank" : "_self"}
                       rel="noopener noreferrer"
-                      className="rounded-md px-2 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                      className="flex items-center justify-between rounded-md px-2 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
                     >
-                      {link.name}
+                      <span>{link.name}</span>
+                      {link.name.includes("GitHub") && (
+                        <ArrowUpRight className="size-4 opacity-70" />
+                      )}
                     </Link>
                   ))}
                   <Separator className="my-6" />
@@ -131,30 +135,30 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 🌟 HERO */}
+      {/* HERO */}
       <section className="relative flex flex-col items-center justify-center text-center px-4 sm:px-6 lg:px-8 pt-24 pb-20 overflow-hidden">
-        {/* ✨ Background Glow */}
+        {/* Background Glow */}
         <div className="absolute inset-0 -z-10 flex justify-center items-center">
           <div className="h-[400px] sm:h-[600px] w-[400px] sm:w-[600px] rounded-full bg-gradient-to-tr from-primary/25 via-purple-500/20 to-blue-500/10 blur-3xl opacity-40 animate-pulse" />
         </div>
 
-        {/* 🛡️ Icon */}
+        {/* Icon */}
         <div className="relative flex size-16 sm:size-20 md:size-24 items-center justify-center rounded-3xl bg-primary/10 text-primary ring-1 ring-border/40 shadow-inner hover:scale-105 transition-transform duration-300">
           <ShieldCheck className="size-8 sm:size-9 md:size-10" />
         </div>
 
-        {/* 🧭 Heading */}
+        {/* Heading */}
         <h1 className="mt-8 text-[clamp(1.8rem,4vw,3.5rem)] font-bold tracking-tight bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent leading-tight max-w-[90vw]">
           Secure Auth. Universal Identity.
         </h1>
 
-        {/* 🧾 Subtitle */}
+        {/* Subtitle */}
         <p className="mt-4 max-w-[680px] text-[clamp(0.9rem,1.8vw,1.1rem)] text-muted-foreground px-2">
           An open-source authentication system for modern web apps - fully
           extensible, production-ready, and easy to clone for any project.
         </p>
 
-        {/* 🔘 CTA Buttons */}
+        {/* CTA Buttons */}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link href="/login">
             <Button size="lg" className="font-medium w-full sm:w-auto">
@@ -169,14 +173,15 @@ export default function Home() {
             <Button
               size="lg"
               variant="outline"
-              className="w-full sm:w-auto hover:bg-accent/60"
+              className="w-full sm:w-auto hover:bg-accent/60 flex items-center gap-2 group"
             >
               Clone on GitHub
+              <ArrowUpRight className="size-4 opacity-70 group-hover:translate-x-[2px] group-hover:-translate-y-[2px] transition-transform duration-200" />
             </Button>
           </Link>
         </div>
 
-        {/* ⚙️ Tech Badges */}
+        {/* Tech Badges */}
         <div className="mt-8 flex flex-wrap justify-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground px-2">
           {[
             "Next.js 15+",
@@ -194,7 +199,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ⚡ FEATURES */}
+      {/* FEATURES */}
       <section className="w-full bg-muted/40 py-20">
         <div className="mx-auto max-w-[1400px] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-4 sm:px-6">
           {[
@@ -234,7 +239,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 🔗 INTEGRATIONS */}
+      {/* INTEGRATIONS */}
       <section className="w-full bg-accent/30 py-20">
         <div className="mx-auto max-w-[1400px] px-4 sm:px-6 text-center">
           <h2 className="text-xl sm:text-2xl font-semibold mb-12">
@@ -279,7 +284,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 🧭 FOOTER */}
+      {/* FOOTER */}
       <footer className="border-t border-border/40 bg-background py-10 text-center text-sm text-muted-foreground px-4">
         <p className="leading-relaxed">
           © {new Date().getFullYear()}{" "}
@@ -298,9 +303,10 @@ export default function Home() {
             href="https://github.com/mohamuhsin/auth-system"
             target="_blank"
             rel="noopener noreferrer"
-            className="hover:underline underline-offset-4"
+            className="flex items-center gap-1 hover:underline underline-offset-4"
           >
             GitHub Repo
+            <ArrowUpRight className="size-3 opacity-70" />
           </Link>
         </div>
       </footer>
