@@ -32,17 +32,16 @@ import { ModeToggle } from "@/components/theme-provider/mode-toggle";
 import { ThemeToggle } from "@/components/theme-provider/theme-toggle";
 
 /* ============================================================
-   🌐 Auth by Iventics — Open-Source Authentication System
+   🌐 Auth by Iventics — Fully Responsive Landing Page
    ------------------------------------------------------------
-   Secure. Scalable. Plug & Play.
-   Built with Next.js 15+, Firebase Admin, and Prisma.
+   Every pixel optimized for all screens (320px → 4K)
 ============================================================ */
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col bg-background text-foreground font-sans scroll-smooth">
+    <main className="flex min-h-screen flex-col bg-background text-foreground font-sans scroll-smooth overflow-x-hidden">
       {/* 🧭 NAVBAR */}
       <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 transition-all">
-        <div className="mx-auto flex h-[60px] w-full max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-[60px] w-full max-w-[1400px] items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* 🔰 Brand */}
           <Link
             href="/"
@@ -51,7 +50,9 @@ export default function Home() {
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-border/40 group-hover:bg-primary/20 transition-colors">
               <ShieldCheck className="size-4" />
             </div>
-            <span className="text-sm sm:text-base">Auth by Iventics</span>
+            <span className="text-sm sm:text-base whitespace-nowrap">
+              Auth by Iventics
+            </span>
           </Link>
 
           {/* 🌗 Desktop Actions */}
@@ -87,7 +88,10 @@ export default function Home() {
                   <Menu className="size-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-72 sm:w-80 p-0">
+              <SheetContent
+                side="right"
+                className="w-full max-w-[80vw] sm:max-w-[320px] p-0"
+              >
                 <SheetHeader className="border-b border-border/50 px-6 py-4">
                   <SheetTitle className="flex items-center gap-2 text-sm font-medium tracking-tight">
                     <ShieldCheck className="size-4 text-primary" />
@@ -95,29 +99,25 @@ export default function Home() {
                   </SheetTitle>
                 </SheetHeader>
                 <nav className="flex flex-col space-y-1 px-6 py-6">
-                  <Link
-                    href="/"
-                    className="rounded-md px-2 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
-                  >
-                    Home
-                  </Link>
-                  <Link
-                    href="/login"
-                    className="rounded-md px-2 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
-                  >
-                    Live Demo
-                  </Link>
-                  <Link
-                    href="https://github.com/mohamuhsin/auth-system"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-md px-2 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
-                  >
-                    Docs on GitHub
-                  </Link>
-
+                  {[
+                    { name: "Home", href: "/" },
+                    { name: "Live Demo", href: "/login" },
+                    {
+                      name: "Docs on GitHub",
+                      href: "https://github.com/mohamuhsin/auth-system",
+                    },
+                  ].map((link) => (
+                    <Link
+                      key={link.name}
+                      href={link.href}
+                      target={link.name.includes("GitHub") ? "_blank" : "_self"}
+                      rel="noopener noreferrer"
+                      className="rounded-md px-2 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                    >
+                      {link.name}
+                    </Link>
+                  ))}
                   <Separator className="my-6" />
-
                   <div>
                     <p className="text-xs text-muted-foreground mb-2">
                       Appearance
@@ -132,28 +132,30 @@ export default function Home() {
       </header>
 
       {/* 🌟 HERO */}
-      <section className="relative flex flex-col items-center text-center px-4 sm:px-6 lg:px-8 pt-28 pb-24 overflow-hidden">
+      <section className="relative flex flex-col items-center justify-center text-center px-4 sm:px-6 lg:px-8 pt-24 pb-20 overflow-hidden">
         {/* ✨ Background Glow */}
-        <div className="absolute inset-0 -z-10 flex justify-center">
-          <div className="h-[500px] w-[500px] rounded-full bg-gradient-to-tr from-primary/30 via-purple-500/20 to-blue-500/10 blur-3xl opacity-40 animate-pulse" />
+        <div className="absolute inset-0 -z-10 flex justify-center items-center">
+          <div className="h-[400px] sm:h-[600px] w-[400px] sm:w-[600px] rounded-full bg-gradient-to-tr from-primary/25 via-purple-500/20 to-blue-500/10 blur-3xl opacity-40 animate-pulse" />
         </div>
 
         {/* 🛡️ Icon */}
-        <div className="relative flex size-20 items-center justify-center rounded-3xl bg-primary/10 text-primary ring-1 ring-border/40 shadow-inner hover:scale-105 transition-transform duration-300">
-          <ShieldCheck className="size-9" />
+        <div className="relative flex size-16 sm:size-20 md:size-24 items-center justify-center rounded-3xl bg-primary/10 text-primary ring-1 ring-border/40 shadow-inner hover:scale-105 transition-transform duration-300">
+          <ShieldCheck className="size-8 sm:size-9 md:size-10" />
         </div>
 
-        <h1 className="mt-8 text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">
+        {/* 🧭 Heading */}
+        <h1 className="mt-8 text-[clamp(1.8rem,4vw,3.5rem)] font-bold tracking-tight bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent leading-tight max-w-[90vw]">
           Secure Auth. Universal Identity.
         </h1>
 
-        <p className="mt-4 max-w-2xl text-base sm:text-lg text-muted-foreground">
+        {/* 🧾 Subtitle */}
+        <p className="mt-4 max-w-[680px] text-[clamp(0.9rem,1.8vw,1.1rem)] text-muted-foreground px-2">
           An open-source authentication system for modern web apps - fully
           extensible, production-ready, and easy to clone for any project.
         </p>
 
         {/* 🔘 CTA Buttons */}
-        <div className="mt-10 flex flex-wrap justify-center gap-3">
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link href="/login">
             <Button size="lg" className="font-medium w-full sm:w-auto">
               Try Live Demo
@@ -175,7 +177,7 @@ export default function Home() {
         </div>
 
         {/* ⚙️ Tech Badges */}
-        <div className="mt-8 flex flex-wrap justify-center gap-3 text-xs text-muted-foreground">
+        <div className="mt-8 flex flex-wrap justify-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground px-2">
           {[
             "Next.js 15+",
             "Firebase Auth + Admin",
@@ -184,7 +186,7 @@ export default function Home() {
           ].map((badge) => (
             <span
               key={badge}
-              className="rounded-full border border-border/40 px-3 py-1 hover:border-primary/50 transition-colors"
+              className="rounded-full border border-border/40 px-3 py-1 hover:border-primary/50 transition-colors whitespace-nowrap"
             >
               {badge}
             </span>
@@ -194,22 +196,22 @@ export default function Home() {
 
       {/* ⚡ FEATURES */}
       <section className="w-full bg-muted/40 py-20">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mx-auto max-w-[1400px] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-4 sm:px-6">
           {[
             {
               icon: <Lock className="size-6 text-primary" />,
               title: "Secure Session Handling",
-              desc: "Encrypted cookies and Firebase Admin verification ensure total session integrity.",
+              desc: "Encrypted cookies and Firebase Admin verification ensure complete session integrity.",
             },
             {
               icon: <Users className="size-6 text-primary" />,
               title: "Role-Based Access",
-              desc: "Admins, Merchants, and Creators - each with personalized, secure dashboards.",
+              desc: "Admins, Merchants, and Creators - each with secure and personalized dashboards.",
             },
             {
               icon: <Zap className="size-6 text-primary" />,
               title: "Plug & Play Architecture",
-              desc: "Integrate instantly into any app - one configuration, endless scalability.",
+              desc: "Integrate instantly into any app - minimal setup, maximum scalability.",
             },
           ].map((f) => (
             <Card
@@ -234,16 +236,16 @@ export default function Home() {
 
       {/* 🔗 INTEGRATIONS */}
       <section className="w-full bg-accent/30 py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 text-center">
+        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 text-center">
           <h2 className="text-xl sm:text-2xl font-semibold mb-12">
             Seamless Integrations
           </h2>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               {
                 icon: <Globe className="size-6 text-primary" />,
                 title: "Cross-Domain Sessions",
-                desc: "Unified login between frontend and backend - secure and consistent across subdomains.",
+                desc: "Unified login between frontend and backend - secure, consistent, and cookie-safe across subdomains.",
               },
               {
                 icon: <KeyRound className="size-6 text-primary" />,
@@ -253,7 +255,7 @@ export default function Home() {
               {
                 icon: <Code2 className="size-6 text-primary" />,
                 title: "Next.js + Prisma Core",
-                desc: "Modern full-stack foundation optimized for reliability, type-safety, and speed.",
+                desc: "Modern, type-safe full-stack foundation optimized for reliability and speed.",
               },
             ].map((item) => (
               <Card
@@ -278,19 +280,27 @@ export default function Home() {
       </section>
 
       {/* 🧭 FOOTER */}
-      <footer className="border-t border-border/40 bg-background py-10 text-center text-sm text-muted-foreground">
-        <p>
+      <footer className="border-t border-border/40 bg-background py-10 text-center text-sm text-muted-foreground px-4">
+        <p className="leading-relaxed">
           © {new Date().getFullYear()}{" "}
           <span className="font-medium text-foreground">
             Auth by Iventics Technologies
           </span>
         </p>
-        <div className="mt-3 flex justify-center gap-6 text-xs">
+        <div className="mt-3 flex flex-wrap justify-center gap-4 text-xs sm:text-sm">
           <Link
             href="mailto:support@iventics.com"
             className="hover:underline underline-offset-4"
           >
             Contact Support
+          </Link>
+          <Link
+            href="https://github.com/mohamuhsin/auth-system"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline underline-offset-4"
+          >
+            GitHub Repo
           </Link>
         </div>
       </footer>
