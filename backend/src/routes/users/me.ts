@@ -6,13 +6,18 @@ const router = Router();
 
 /**
  * 👤 GET /api/users/me
+ * ------------------------------------------------------------
  * Returns the authenticated user's profile based on Firebase session cookie.
- * Also records an audit log for profile access (useful for traceability).
+ * Records audit logs for both access and unexpected errors.
  */
 router.get("/", authGuard(), async (req: AuthenticatedRequest, res) => {
   try {
-    if (!req.authUser)
-      return res.status(401).json({ message: "Not authenticated" });
+    if (!req.authUser) {
+      return res.status(401).json({
+        status: "error",
+        message: "Not authenticated",
+      });
+    }
 
     // 🧾 Record profile view event
     await logAudit(
@@ -22,11 +27,15 @@ router.get("/", authGuard(), async (req: AuthenticatedRequest, res) => {
       req.headers["user-agent"]
     );
 
+    // ✅ Unified success response
     res.status(200).json({
-      uid: req.authUser.uid,
-      email: req.authUser.email,
-      role: req.authUser.role,
-      isApproved: req.authUser.isApproved,
+      status: "success",
+      user: {
+        uid: req.authUser.uid,
+        email: req.authUser.email,
+        role: req.authUser.role,
+        isApproved: req.authUser.isApproved,
+      },
     });
   } catch (err: any) {
     console.error("User profile error:", err.message);
@@ -39,7 +48,10 @@ router.get("/", authGuard(), async (req: AuthenticatedRequest, res) => {
       req.headers["user-agent"]
     );
 
-    res.status(500).json({ message: "Failed to fetch profile" });
+    res.status(500).json({
+      status: "error",
+      message: "Failed to fetch profile",
+    });
   }
 });
 

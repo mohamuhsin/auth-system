@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -27,12 +27,24 @@ import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/form-error";
 import { signupSchema, type SignupFormValues } from "@/lib/validators/auth";
 
+import {
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+  updateProfile,
+} from "firebase/auth";
+import { auth } from "@/services/firebase";
+import { useAuth } from "@/context/authContext";
+import { toastAsync, toastMessage } from "@/lib/toast";
+
 export function SignupForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const router = useRouter();
+  const { loginWithFirebase } = useAuth();
 
   // ✅ Hook Form + Zod setup
   const form = useForm<SignupFormValues>({
@@ -46,15 +58,59 @@ export function SignupForm({
     mode: "onChange",
   });
 
-  // ✅ Submit handler
+  // ✅ Submit handler (Email Signup)
   async function onSubmit(values: SignupFormValues) {
-    try {
-      toast.success("Account created (demo)");
-      console.log("Signup form submitted:", values);
-    } catch (error) {
-      toast.error("Something went wrong");
-      console.error(error);
-    }
+    await toastAsync(
+      async () => {
+        // 1️⃣ Create Firebase user
+        const userCred = await createUserWithEmailAndPassword(
+          auth,
+          values.email,
+          values.password
+        );
+
+        // 2️⃣ Set display name in Firebase
+        if (values.name) {
+          await updateProfile(userCred.user, { displayName: values.name });
+        }
+
+        // 3️⃣ Send token to backend for session cookie
+        await loginWithFirebase(userCred.user);
+
+        // 4️⃣ Redirect
+        router.push("/dashboard");
+
+        toastMessage("Account created successfully 🎉", { type: "success" });
+      },
+      {
+        loading: "Creating account...",
+        success: "Welcome aboard!",
+        error: "Signup failed. Please try again.",
+      }
+    );
+  }
+
+  // ✅ Google Signup
+  async function handleGoogleSignup() {
+    await toastAsync(
+      async () => {
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: "select_account" });
+
+        const userCred = await signInWithPopup(auth, provider);
+        await loginWithFirebase(userCred.user);
+
+        router.push("/dashboard");
+        toastMessage(`Welcome ${userCred.user.displayName || "back"}!`, {
+          type: "success",
+        });
+      },
+      {
+        loading: "Connecting to Google...",
+        success: "Signed up with Google 🎉",
+        error: "Google sign-up failed. Please try again.",
+      }
+    );
   }
 
   return (
@@ -74,7 +130,13 @@ export function SignupForm({
             <FieldGroup>
               {/* 🟢 Google Signup */}
               <Field>
-                <Button variant="outline" type="button" className="w-full">
+                <Button
+                  variant="outline"
+                  type="button"
+                  className="w-full"
+                  onClick={handleGoogleSignup}
+                  disabled={form.formState.isSubmitting}
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 48 48"
