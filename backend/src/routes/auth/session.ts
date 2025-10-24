@@ -17,7 +17,9 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { idToken } = req.body;
     if (!idToken) {
-      return res.status(400).json({ error: "Missing idToken" });
+      return res
+        .status(400)
+        .json({ status: "error", message: "Missing idToken" });
     }
 
     // 🔎 Verify Firebase ID token
@@ -26,12 +28,11 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     const name = decoded.name || null;
     const avatarUrl = decoded.picture || null;
 
-    // 🔧 Check if user exists
+    // 🔧 Find or create user
     let user = await prisma.user.findUnique({
       where: { firebaseUid: decoded.uid },
     });
 
-    // 🆕 Create user if not found
     if (!user) {
       const userCount = await prisma.user.count();
       const isFirstUser = userCount === 0;
@@ -55,18 +56,20 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       );
     }
 
-    // 🍪 Create secure session cookie
-    const cookie = await makeSessionCookie(idToken);
+    // 🍪 Create Firebase session cookie (value only)
+    const sessionCookieValue = await makeSessionCookie(idToken);
 
-    // ✅ Set cookie manually with full control for cross-domain
-    res.cookie("__Secure-iventics_session", cookie, {
+    // ✅ Set secure cookie across *.iventics.com
+    const cookieName =
+      process.env.SESSION_COOKIE_NAME || "__Secure-iventics_session";
+    res.cookie(cookieName, sessionCookieValue, {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
       domain:
         process.env.NODE_ENV === "production"
-          ? ".iventics.com" // 🔒 shared across subdomains
-          : "localhost", // 🔧 for local testing
+          ? ".iventics.com" // shared across subdomains
+          : "localhost", // local dev
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
@@ -74,10 +77,10 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     // 🧾 Audit successful login
     await logAudit("LOGIN", user.id, req.ip, req.headers["user-agent"]);
 
-    // ✅ Response
-    res.status(200).json({
+    // ✅ Success response
+    return res.status(200).json({
       status: "success",
-      message: "Session created",
+      message: "Session created successfully",
       user: {
         id: user.id,
         email: user.email,
@@ -87,14 +90,19 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       },
     });
   } catch (err) {
-    // 🧾 Log failed attempt (non-blocking)
+    console.error("❌ /api/auth/session error:", (err as Error).message);
+
     await logAudit(
       "LOGIN_FAILED",
       undefined,
       req.ip,
       req.headers["user-agent"]
     );
-    next(err);
+
+    return res.status(500).json({
+      status: "error",
+      message: (err as Error).message || "Internal Server Error",
+    });
   }
 });
 
