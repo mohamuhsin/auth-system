@@ -17,9 +17,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { idToken } = req.body;
     if (!idToken) {
-      const error = new Error("Missing idToken");
-      (error as any).status = 400;
-      throw error;
+      return res.status(400).json({ error: "Missing idToken" });
     }
 
     // 🔎 Verify Firebase ID token
@@ -45,7 +43,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
           name,
           avatarUrl,
           role: isFirstUser ? "ADMIN" : "USER",
-          isApproved: isFirstUser, // Auto-approved admin
+          isApproved: isFirstUser,
         },
       });
 
@@ -59,12 +57,24 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
 
     // 🍪 Create secure session cookie
     const cookie = await makeSessionCookie(idToken);
-    res.setHeader("Set-Cookie", cookie);
+
+    // ✅ Set cookie manually with full control for cross-domain
+    res.cookie("__Secure-iventics_session", cookie, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      domain:
+        process.env.NODE_ENV === "production"
+          ? ".iventics.com" // 🔒 shared across subdomains
+          : "localhost", // 🔧 for local testing
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
 
     // 🧾 Audit successful login
     await logAudit("LOGIN", user.id, req.ip, req.headers["user-agent"]);
 
-    // ✅ Unified response
+    // ✅ Response
     res.status(200).json({
       status: "success",
       message: "Session created",
@@ -76,7 +86,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
         isApproved: user.isApproved,
       },
     });
-  } catch (err: any) {
+  } catch (err) {
     // 🧾 Log failed attempt (non-blocking)
     await logAudit(
       "LOGIN_FAILED",

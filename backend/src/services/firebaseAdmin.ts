@@ -1,12 +1,12 @@
 import admin, { ServiceAccount } from "firebase-admin";
 
 /**
- * 🔥 Firebase Admin Initialization (Minimal & Secure – Level 1)
+ * 🔥 Firebase Admin Initialization (Level 1.5 Hardened)
  * ------------------------------------------------------------
- * Supports both:
- *   • FIREBASE_SERVICE_ACCOUNT (JSON string for Railway / Docker)
- *   • FIREBASE_* vars (for local development)
- * Handles newline fixes in private keys and prevents double init.
+ * Handles both FIREBASE_SERVICE_ACCOUNT (JSON string)
+ * and individual FIREBASE_* vars.
+ * Auto-fixes newline escape sequences in private keys.
+ * Safe for both local dev and production (Railway, Vercel, etc.)
  */
 
 if (!admin.apps.length) {
@@ -22,7 +22,6 @@ if (!admin.apps.length) {
     let credentials: ServiceAccount;
 
     if (FIREBASE_SERVICE_ACCOUNT) {
-      // ✅ Preferred: JSON string secret
       const parsed = JSON.parse(FIREBASE_SERVICE_ACCOUNT);
       credentials = {
         projectId: parsed.project_id,
@@ -34,27 +33,27 @@ if (!admin.apps.length) {
       FIREBASE_CLIENT_EMAIL &&
       FIREBASE_PRIVATE_KEY
     ) {
-      // ✅ Fallback for local .env
       credentials = {
         projectId: FIREBASE_PROJECT_ID,
         clientEmail: FIREBASE_CLIENT_EMAIL,
         privateKey: FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
       };
     } else {
-      throw new Error("Missing Firebase Admin credentials in environment");
+      throw new Error(
+        "❌ Missing Firebase Admin credentials in environment variables"
+      );
     }
 
     admin.initializeApp({ credential: admin.credential.cert(credentials) });
 
     console.log(
-      `✅ Firebase Admin initialized (${credentials.projectId}) [${NODE_ENV}]`
+      `✅ Firebase Admin initialized → ${credentials.projectId} [${NODE_ENV}]`
     );
   } catch (err) {
     console.error(
-      "❌ Firebase Admin initialization failed:",
+      "🚨 Firebase Admin initialization failed:",
       (err as Error).message
     );
-    // Fail fast if auth is essential for the app to run
     process.exit(1);
   }
 }

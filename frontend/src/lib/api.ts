@@ -6,15 +6,16 @@
 ============================================================ */
 
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "https://auth-api.iventics.com/api";
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
+  "https://auth-api.iventics.com/api";
 
-interface ApiError {
-  message: string;
+interface ApiError extends Error {
   status?: number;
 }
 
 /**
  * Safe API request wrapper with unified error handling.
+ * Ensures secure cross-domain session cookies.
  */
 export async function apiRequest<T>(
   path: string,
@@ -25,36 +26,35 @@ export async function apiRequest<T>(
     : `${API_BASE}/${path}`;
 
   const res = await fetch(url, {
-    ...options,
-    credentials: "include", // required for secure cookies
+    method: options.method || "GET",
+    credentials: "include", // ✅ crucial for session cookies
     headers: {
+      Accept: "application/json",
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
+    body: options.body,
   });
 
-  // 🧩 Parse and handle errors gracefully
+  // 🧩 Graceful error handling
   if (!res.ok) {
-    let errorData: ApiError = { message: `API Error ${res.status}` };
-
+    let message = `API Error ${res.status}`;
     try {
       const json = await res.json();
-      if (json && typeof json.message === "string") {
-        errorData = { message: json.message, status: res.status };
-      }
+      if (json?.message) message = json.message;
     } catch {
-      // fallback already set
+      /* ignore JSON parse failure */
     }
 
-    const error = new Error(errorData.message) as ApiError;
-    error.status = errorData.status ?? res.status;
+    const error = new Error(message) as ApiError;
+    error.status = res.status;
     throw error;
   }
 
-  // ✅ Parse JSON safely
+  // ✅ Parse JSON (fallback for empty responses)
   try {
     return (await res.json()) as T;
   } catch {
-    return {} as T; // fallback for empty responses (e.g., 204 No Content)
+    return {} as T;
   }
 }
