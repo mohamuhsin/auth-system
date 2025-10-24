@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -29,30 +29,54 @@ import {
   type ResetPasswordValues,
 } from "@/lib/validators/auth";
 
+import { confirmPasswordReset } from "firebase/auth";
+import { auth } from "@/services/firebase";
+import { toastAsync, toastMessage } from "@/lib/toast";
+
 export function ResetPasswordForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [oobCode, setOobCode] = useState<string | null>(null);
 
-  // ✅ Hook Form + Zod setup
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const form = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: { password: "", confirmPassword: "" },
     mode: "onChange",
   });
 
-  // ✅ Submit handler
+  useEffect(() => {
+    const code = searchParams.get("oobCode");
+    if (code) setOobCode(code);
+  }, [searchParams]);
+
   async function onSubmit(values: ResetPasswordValues) {
-    try {
-      // TODO: Firebase confirmPasswordReset(oobCode, values.password)
-      toast.success("Password updated (demo)");
-      console.log(values);
-    } catch (error) {
-      toast.error("Failed to update password");
-      console.error(error);
+    if (!oobCode) {
+      toastMessage("Invalid or expired password reset link.", {
+        type: "error",
+      });
+      return;
     }
+
+    await toastAsync(
+      async () => {
+        await confirmPasswordReset(auth, oobCode, values.password);
+        toastMessage("Your password has been updated!", {
+          type: "success",
+        });
+        router.push("/login");
+      },
+      {
+        loading: "Updating password...",
+        success: "Password updated successfully",
+        error: "Failed to update password. Please try again.",
+      }
+    );
   }
 
   return (
@@ -68,7 +92,6 @@ export function ResetPasswordForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* 🔑 New Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -103,7 +126,6 @@ export function ResetPasswordForm({
                 )}
               />
 
-              {/* 🔁 Confirm Password */}
               <Controller
                 name="confirmPassword"
                 control={form.control}
@@ -140,7 +162,6 @@ export function ResetPasswordForm({
                 )}
               />
 
-              {/* ✅ Submit */}
               <Field>
                 <Button
                   type="submit"
@@ -166,6 +187,7 @@ export function ResetPasswordForm({
           </form>
         </CardContent>
       </Card>
+
       <FieldDescription className="px-6 text-center">
         Need help?{" "}
         <a

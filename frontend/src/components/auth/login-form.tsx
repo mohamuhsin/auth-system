@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -27,24 +27,71 @@ import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/form-error";
 import { loginSchema, type LoginFormValues } from "@/lib/validators/auth";
 
+import {
+  signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+} from "firebase/auth";
+import { auth } from "@/services/firebase";
+import { useAuth } from "@/context/authContext";
+import { toastAsync, toastMessage } from "@/lib/toast";
+
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const [showPassword, setShowPassword] = useState(false);
+  const { loginWithFirebase } = useAuth();
+  const router = useRouter();
 
-  // ✅  React Hook Form + Zod setup
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
     mode: "onChange",
   });
 
-  // ✅  Handle submit
   async function onSubmit(values: LoginFormValues) {
-    toast.success("Form submitted (demo)");
-    console.log(values);
-    // TODO: Firebase signInWithEmailAndPassword + session cookie
+    await toastAsync(
+      async () => {
+        const userCred = await signInWithEmailAndPassword(
+          auth,
+          values.email,
+          values.password
+        );
+
+        await loginWithFirebase(userCred.user);
+        router.push("/dashboard");
+
+        toastMessage("Welcome back!", { type: "success" });
+      },
+      {
+        loading: "Signing you in...",
+        success: "Login successful",
+        error: "Login failed. Check your credentials.",
+      }
+    );
+  }
+
+  async function handleGoogleLogin() {
+    await toastAsync(
+      async () => {
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: "select_account" });
+
+        const userCred = await signInWithPopup(auth, provider);
+        await loginWithFirebase(userCred.user);
+
+        router.push("/dashboard");
+        toastMessage(`Welcome ${userCred.user.displayName || "back"}!`, {
+          type: "success",
+        });
+      },
+      {
+        loading: "Connecting to Google...",
+        success: "Signed in with Google",
+        error: "Google sign-in failed. Please try again.",
+      }
+    );
   }
 
   return (
@@ -56,12 +103,17 @@ export function LoginForm({
             Login with your Email or Google account
           </CardDescription>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* 🟢 Google sign-in */}
               <Field>
-                <Button variant="outline" type="button">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={form.formState.isSubmitting}
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 48 48"
@@ -100,7 +152,6 @@ export function LoginForm({
                 Or continue with
               </FieldSeparator>
 
-              {/* 📧 Email */}
               <Controller
                 name="email"
                 control={form.control}
@@ -119,7 +170,6 @@ export function LoginForm({
                 )}
               />
 
-              {/* 🔒 Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -162,7 +212,6 @@ export function LoginForm({
                 )}
               />
 
-              {/* Submit */}
               <Field>
                 <Button
                   type="submit"

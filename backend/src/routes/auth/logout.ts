@@ -7,8 +7,9 @@ const router = Router();
 
 /**
  * 🔐 POST /api/auth/logout
+ * ------------------------------------------------------------
  * Revokes the Firebase session cookie and clears it from the client.
- * Also records an audit log for the logout action.
+ * Records audit logs for all possible outcomes.
  */
 router.post("/", async (req, res) => {
   try {
@@ -22,7 +23,7 @@ router.post("/", async (req, res) => {
         const decoded = await admin.auth().verifySessionCookie(cookie, true);
         await admin.auth().revokeRefreshTokens(decoded.sub);
 
-        // 🧾 Record LOGOUT event
+        // 🧾 Record successful logout
         await logAudit(
           "LOGOUT",
           decoded.uid,
@@ -52,7 +53,12 @@ router.post("/", async (req, res) => {
 
     // 🍪 Clear the cookie from the client
     res.setHeader("Set-Cookie", clearSessionCookie());
-    res.status(200).json({ message: "Logged out successfully" });
+
+    // ✅ Unified success response
+    res.status(200).json({
+      status: "success",
+      message: "Logged out successfully",
+    });
   } catch (err: any) {
     console.error("Logout error:", err.message);
 
@@ -64,7 +70,10 @@ router.post("/", async (req, res) => {
       req.headers["user-agent"]
     );
 
-    res.status(500).json({ message: "Logout failed" });
+    res.status(500).json({
+      status: "error",
+      message: "Logout failed",
+    });
   }
 });
 

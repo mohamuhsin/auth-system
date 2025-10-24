@@ -28,6 +28,9 @@ import {
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-provider/theme-toggle";
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "https://auth-api.iventics.com/api";
+
 /* ============================================================
    🧭 Navigation Configuration
 ============================================================ */
@@ -68,10 +71,45 @@ const navData = [
 ];
 
 /* ============================================================
-   🧩 Sidebar Component — Enhanced Visual Flow
+   🧩 Sidebar Component — with Live Health Status
 ============================================================ */
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
+  const [health, setHealth] = React.useState<"ok" | "error" | "loading">(
+    "loading"
+  );
+
+  // 🩺 Ping /api/health
+  React.useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/health`);
+        const data = await res.json();
+        if (data.ok) setHealth("ok");
+        else setHealth("error");
+      } catch {
+        setHealth("error");
+      }
+    };
+
+    checkHealth();
+    const interval = setInterval(checkHealth, 15000); // every 15s
+    return () => clearInterval(interval);
+  }, []);
+
+  const statusColor =
+    health === "ok"
+      ? "#10B981" // green
+      : health === "loading"
+      ? "#FBBF24" // yellow
+      : "#EF4444"; // red
+
+  const statusText =
+    health === "ok"
+      ? "All systems normal"
+      : health === "loading"
+      ? "Checking system..."
+      : "System offline";
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -81,7 +119,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           href="/dashboard"
           className="flex items-center gap-3 group transition-all duration-200"
         >
-          {/* ⚡ Logo mark */}
           <div
             className="relative flex size-9 items-center justify-center rounded-xl
             bg-primary/10 text-primary ring-1 ring-inset ring-border/40
@@ -96,7 +133,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             />
           </div>
 
-          {/* Brand text */}
           <div className="flex flex-col leading-tight">
             <span className="text-[15.5px] font-semibold tracking-tight">
               Auth by Iventics
@@ -107,7 +143,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </div>
         </Link>
 
-        {/* ✨ Glassy divider */}
         <div className="mt-4 h-[1px] w-full bg-gradient-to-r from-transparent via-border/70 to-transparent rounded-full" />
       </SidebarHeader>
 
@@ -115,17 +150,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent className="px-3 pt-4 pb-6">
         {navData.map((section, i) => (
           <div key={i} className={cn("relative", i > 0 && "mt-6 pt-6")}>
-            {/* Section separator line (between groups) */}
             {i > 0 && (
               <div className="absolute -top-3 left-3 right-3 h-px bg-gradient-to-r from-transparent via-border/40 to-transparent rounded-full" />
             )}
-
-            {/* Title */}
             <p className="px-3 mb-2 text-[11px] font-semibold uppercase text-muted-foreground/70 tracking-wider">
               {section.title}
             </p>
 
-            {/* Menu items */}
             <div className="flex flex-col gap-1.5">
               {section.items.map((item) => {
                 const isActive = pathname.startsWith(item.url);
@@ -174,13 +205,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="size-2.5 rounded-full animate-pulse shadow-[0_0_6px_var(--tw-shadow-color)]"
               style={
                 {
-                  backgroundColor: "#375DFB",
-                  "--tw-shadow-color": "#375DFB",
+                  backgroundColor: statusColor,
+                  "--tw-shadow-color": statusColor,
                 } as React.CSSProperties
               }
             />
-            <span className="text-[12.5px] font-medium tracking-tight text-primary">
-              All systems normal
+            <span
+              className={cn(
+                "text-[12.5px] font-medium tracking-tight",
+                health === "ok" && "text-green-500",
+                health === "loading" && "text-amber-500",
+                health === "error" && "text-red-500"
+              )}
+            >
+              {statusText}
             </span>
           </Link>
 

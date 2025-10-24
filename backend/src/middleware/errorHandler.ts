@@ -13,26 +13,27 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ) {
-  // Log full error details to pino logger
+  // 🔍 Log full details to centralized logger
   logger.error({
+    name: err.name,
     message: err.message,
     stack: err.stack,
-    name: err.name,
   });
 
-  // Decide HTTP status
-  const status = err.status || 500;
+  // 🧾 Determine HTTP status
+  const statusCode = err.status || 500;
 
-  // Sanitize message for client
+  // 🧩 Safe message for client
   const message =
-    status === 500
+    statusCode === 500
       ? "Internal server error"
       : err.message || "Something went wrong";
 
-  // Send structured JSON response
-  res.status(status).json({
+  // 🎯 Unified structured response
+  res.status(statusCode).json({
     ok: false,
-    status,
+    status: "error",
+    code: statusCode,
     message,
   });
 }

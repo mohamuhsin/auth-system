@@ -1,7 +1,11 @@
+import { Suspense } from "react";
+import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { ResetPasswordForm } from "@/components/auth/resetPassword-form";
-import Link from "next/link";
 
+/* ============================================================
+   🔐 Reset Password Page (Client-safe with Suspense)
+============================================================ */
 export default function ResetPasswordPage() {
   return (
     <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
@@ -19,8 +23,16 @@ export default function ResetPasswordPage() {
           </span>
         </Link>
 
-        {/* 🔒 Reset Password Form */}
-        <ResetPasswordForm />
+        {/* 🔒 Reset Password Form (Client Component) */}
+        <Suspense
+          fallback={
+            <div className="text-center text-muted-foreground">
+              Loading reset form...
+            </div>
+          }
+        >
+          <ResetPasswordForm />
+        </Suspense>
       </div>
     </div>
   );

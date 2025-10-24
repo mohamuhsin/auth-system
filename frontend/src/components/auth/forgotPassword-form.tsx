@@ -2,7 +2,6 @@
 
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
@@ -27,6 +26,10 @@ import {
   type ForgotPasswordValues,
 } from "@/lib/validators/auth";
 
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/services/firebase";
+import { toastAsync, toastMessage } from "@/lib/toast";
+
 export function ForgotPasswordForm({
   className,
   ...props
@@ -38,14 +41,19 @@ export function ForgotPasswordForm({
   });
 
   async function onSubmit(values: ForgotPasswordValues) {
-    try {
-      // TODO: Firebase sendPasswordResetEmail(values.email)
-      toast.success("Reset link sent (demo)");
-      console.log(values);
-    } catch (error) {
-      toast.error("Failed to send reset link");
-      console.error(error);
-    }
+    await toastAsync(
+      async () => {
+        await sendPasswordResetEmail(auth, values.email);
+        toastMessage("Password reset link sent to your email.", {
+          type: "success",
+        });
+      },
+      {
+        loading: "Sending reset link...",
+        success: "Email sent successfully",
+        error: "Failed to send reset link. Please try again.",
+      }
+    );
   }
 
   return (
@@ -63,7 +71,6 @@ export function ForgotPasswordForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* 📧 Email input */}
               <Controller
                 name="email"
                 control={form.control}
@@ -82,7 +89,6 @@ export function ForgotPasswordForm({
                 )}
               />
 
-              {/* 📨 Submit */}
               <Field>
                 <Button
                   type="submit"
@@ -108,6 +114,7 @@ export function ForgotPasswordForm({
           </form>
         </CardContent>
       </Card>
+
       <FieldDescription className="px-6 text-center">
         Need help?{" "}
         <a
