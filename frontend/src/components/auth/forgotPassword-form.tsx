@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { Controller, useForm } from "react-hook-form";
@@ -28,7 +29,7 @@ import {
 
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/services/firebase";
-import { toastAsync, toastMessage } from "@/lib/toast";
+import { toastAsync } from "@/lib/toast";
 
 export function ForgotPasswordForm({
   className,
@@ -40,22 +41,39 @@ export function ForgotPasswordForm({
     mode: "onChange",
   });
 
+  /* ============================================================
+     ✉️ Handle Password Reset
+  ============================================================ */
   async function onSubmit(values: ForgotPasswordValues) {
     await toastAsync(
       async () => {
-        await sendPasswordResetEmail(auth, values.email);
-        toastMessage("Password reset link sent to your email.", {
-          type: "success",
-        });
+        try {
+          await sendPasswordResetEmail(auth, values.email);
+        } catch (err: any) {
+          // Handle Firebase-specific errors gracefully
+          if (err.code === "auth/user-not-found") {
+            throw new Error(
+              "No account found with that email address. Please sign up first."
+            );
+          }
+          if (err.code === "auth/invalid-email") {
+            throw new Error("Please enter a valid email address.");
+          }
+          throw err;
+        }
       },
       {
         loading: "Sending reset link...",
-        success: "Email sent successfully",
+        success:
+          "Password reset email sent! Check your inbox (and spam folder).",
         error: "Failed to send reset link. Please try again.",
       }
     );
   }
 
+  /* ============================================================
+     💅 Render
+  ============================================================ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -64,13 +82,14 @@ export function ForgotPasswordForm({
             Forgot Password?
           </CardTitle>
           <CardDescription>
-            Enter your email address and we’ll send you a reset link.
+            Enter your email address, and we’ll send you a reset link.
           </CardDescription>
         </CardHeader>
 
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
+              {/* 📧 Email */}
               <Controller
                 name="email"
                 control={form.control}
@@ -89,6 +108,7 @@ export function ForgotPasswordForm({
                 )}
               />
 
+              {/* 🔘 Submit */}
               <Field>
                 <Button
                   type="submit"
@@ -115,6 +135,7 @@ export function ForgotPasswordForm({
         </CardContent>
       </Card>
 
+      {/* 🧭 Footer Help */}
       <FieldDescription className="px-6 text-center">
         Need help?{" "}
         <a

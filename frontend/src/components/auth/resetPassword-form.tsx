@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -31,7 +32,7 @@ import {
 
 import { confirmPasswordReset } from "firebase/auth";
 import { auth } from "@/services/firebase";
-import { toastAsync, toastMessage } from "@/lib/toast";
+import { toastAsync } from "@/lib/toast";
 
 export function ResetPasswordForm({
   className,
@@ -50,35 +51,53 @@ export function ResetPasswordForm({
     mode: "onChange",
   });
 
+  // 🔍 Extract the oobCode from URL
   useEffect(() => {
     const code = searchParams.get("oobCode");
     if (code) setOobCode(code);
   }, [searchParams]);
 
+  /* ============================================================
+     🔑 Handle Password Reset
+  ============================================================ */
   async function onSubmit(values: ResetPasswordValues) {
     if (!oobCode) {
-      toastMessage("Invalid or expired password reset link.", {
-        type: "error",
+      toastAsync(async () => {
+        throw new Error("Invalid or expired password reset link.");
       });
       return;
     }
 
     await toastAsync(
       async () => {
-        await confirmPasswordReset(auth, oobCode, values.password);
-        toastMessage("Your password has been updated!", {
-          type: "success",
-        });
-        router.push("/login");
+        try {
+          await confirmPasswordReset(auth, oobCode, values.password);
+          router.push("/login");
+        } catch (err: any) {
+          // Handle Firebase error codes more gracefully
+          if (err.code === "auth/expired-action-code") {
+            throw new Error("This reset link has expired. Request a new one.");
+          }
+          if (err.code === "auth/invalid-action-code") {
+            throw new Error("Invalid or broken reset link.");
+          }
+          if (err.code === "auth/weak-password") {
+            throw new Error("Password is too weak. Try a stronger one.");
+          }
+          throw err;
+        }
       },
       {
         loading: "Updating password...",
-        success: "Password updated successfully",
+        success: "Your password has been updated successfully.",
         error: "Failed to update password. Please try again.",
       }
     );
   }
 
+  /* ============================================================
+     💅 UI Render
+  ============================================================ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -92,6 +111,7 @@ export function ResetPasswordForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
+              {/* 🔑 New Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -108,7 +128,7 @@ export function ResetPasswordForm({
                       />
                       <button
                         type="button"
-                        onClick={() => setShowPassword((prev) => !prev)}
+                        onClick={() => setShowPassword((p) => !p)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         aria-label={
                           showPassword ? "Hide password" : "Show password"
@@ -126,6 +146,7 @@ export function ResetPasswordForm({
                 )}
               />
 
+              {/* 🔁 Confirm Password */}
               <Controller
                 name="confirmPassword"
                 control={form.control}
@@ -144,7 +165,7 @@ export function ResetPasswordForm({
                       />
                       <button
                         type="button"
-                        onClick={() => setShowConfirm((prev) => !prev)}
+                        onClick={() => setShowConfirm((p) => !p)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         aria-label={
                           showConfirm ? "Hide password" : "Show password"
@@ -162,6 +183,7 @@ export function ResetPasswordForm({
                 )}
               />
 
+              {/* Submit */}
               <Field>
                 <Button
                   type="submit"

@@ -35,7 +35,7 @@ import {
 } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { useAuth } from "@/context/authContext";
-import { toastAsync, toastMessage } from "@/lib/toast";
+import { toastAsync } from "@/lib/toast";
 
 export function SignupForm({
   className,
@@ -58,59 +58,73 @@ export function SignupForm({
     mode: "onChange",
   });
 
-  // ✅ Submit handler (Email Signup)
+  /* ============================================================
+     ✉️ Email + Password Signup
+  ============================================================ */
   async function onSubmit(values: SignupFormValues) {
-    await toastAsync(
-      async () => {
-        // 1️⃣ Create Firebase user
-        const userCred = await createUserWithEmailAndPassword(
-          auth,
-          values.email,
-          values.password
-        );
+    try {
+      await toastAsync(
+        async () => {
+          // 1️⃣ Create Firebase user
+          const userCred = await createUserWithEmailAndPassword(
+            auth,
+            values.email,
+            values.password
+          );
 
-        // 2️⃣ Set display name in Firebase
-        if (values.name) {
-          await updateProfile(userCred.user, { displayName: values.name });
+          // 2️⃣ Set display name
+          if (values.name) {
+            await updateProfile(userCred.user, { displayName: values.name });
+          }
+
+          // 3️⃣ Exchange ID token → backend session cookie
+          const result = await loginWithFirebase(userCred.user);
+          if (result.status !== "success") {
+            throw new Error(result.message || "Session creation failed");
+          }
+
+          // 4️⃣ Navigate only after backend confirms
+          router.push("/dashboard");
+        },
+        {
+          loading: "Creating account...",
+          success: "Account created successfully 🎉",
+          error: "Signup failed. Please try again.",
         }
-
-        // 3️⃣ Send token to backend for session cookie
-        await loginWithFirebase(userCred.user);
-
-        // 4️⃣ Redirect
-        router.push("/dashboard");
-
-        toastMessage("Account created successfully 🎉", { type: "success" });
-      },
-      {
-        loading: "Creating account...",
-        success: "Welcome aboard!",
-        error: "Signup failed. Please try again.",
-      }
-    );
+      );
+    } catch (err) {
+      console.error("❌ Signup error:", err);
+    }
   }
 
-  // ✅ Google Signup
+  /* ============================================================
+     🔵 Google Signup
+  ============================================================ */
   async function handleGoogleSignup() {
-    await toastAsync(
-      async () => {
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: "select_account" });
+    try {
+      await toastAsync(
+        async () => {
+          const provider = new GoogleAuthProvider();
+          provider.setCustomParameters({ prompt: "select_account" });
 
-        const userCred = await signInWithPopup(auth, provider);
-        await loginWithFirebase(userCred.user);
+          const userCred = await signInWithPopup(auth, provider);
 
-        router.push("/dashboard");
-        toastMessage(`Welcome ${userCred.user.displayName || "back"}!`, {
-          type: "success",
-        });
-      },
-      {
-        loading: "Connecting to Google...",
-        success: "Signed up with Google 🎉",
-        error: "Google sign-up failed. Please try again.",
-      }
-    );
+          const result = await loginWithFirebase(userCred.user);
+          if (result.status !== "success") {
+            throw new Error(result.message || "Session creation failed");
+          }
+
+          router.push("/dashboard");
+        },
+        {
+          loading: "Connecting to Google...",
+          success: "Signed up with Google 🎉",
+          error: "Google sign-up failed. Please try again.",
+        }
+      );
+    } catch (err) {
+      console.error("❌ Google signup error:", err);
+    }
   }
 
   return (
