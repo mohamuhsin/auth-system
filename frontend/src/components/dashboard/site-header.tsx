@@ -71,14 +71,7 @@ export function SiteHeader() {
 
           {/* 👤 User */}
           <div className="flex items-center justify-center">
-            <NavUser
-              user={{
-                name: "Moha Muhsin",
-                email: "muhsin@iventics.com",
-                avatar: "/avatars/admin.png",
-                role: "Admin",
-              }}
-            />
+            <NavUser />
           </div>
         </div>
       </div>
