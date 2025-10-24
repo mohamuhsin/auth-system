@@ -8,10 +8,16 @@ import { apiRequest } from "@/lib/api";
 import { toastAsync } from "@/lib/toast";
 import type { User } from "@/types/user";
 
+interface ApiResponse {
+  status: string;
+  message?: string;
+  user?: User;
+}
+
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  loginWithFirebase: (firebaseUser: any) => Promise<void>;
+  loginWithFirebase: (firebaseUser: any) => Promise<ApiResponse>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
 }
@@ -43,24 +49,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /* ============================================================
      🔑 Login — exchange Firebase ID token → backend session cookie
   ============================================================ */
-  const loginWithFirebase = async (firebaseUser: any) => {
-    await toastAsync(
-      async () => {
-        const idToken = await getIdToken(firebaseUser, true);
+  const loginWithFirebase = async (firebaseUser: any): Promise<ApiResponse> => {
+    const idToken = await getIdToken(firebaseUser, true);
 
-        await apiRequest("/auth/session", {
-          method: "POST",
-          body: JSON.stringify({ idToken }),
-        });
+    // ✅ Call backend to create session
+    const response = await apiRequest<ApiResponse>("/auth/session", {
+      method: "POST",
+      body: JSON.stringify({ idToken }),
+    });
 
-        await fetchSession();
-      },
-      {
-        loading: "Signing you in...",
-        success: "Logged in successfully",
-        error: "Login failed",
-      }
-    );
+    // ✅ Refresh user context after session is set
+    await fetchSession();
+
+    // ✅ Return backend response (so frontend can check `status`)
+    return response;
   };
 
   /* ============================================================
@@ -94,7 +96,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 /* ============================================================
    🪶 Hook: useAuth
-   Ensures context is only used inside AuthProvider.
 ============================================================ */
 export function useAuth() {
   const ctx = useContext(AuthContext);

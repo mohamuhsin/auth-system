@@ -34,7 +34,7 @@ import {
 } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { useAuth } from "@/context/authContext";
-import { toastAsync, toastMessage } from "@/lib/toast";
+import { toastAsync } from "@/lib/toast";
 
 export function LoginForm({
   className,
@@ -50,48 +50,71 @@ export function LoginForm({
     mode: "onChange",
   });
 
+  /* ============================================================
+     ✉️ Email + Password Login
+  ============================================================ */
   async function onSubmit(values: LoginFormValues) {
-    await toastAsync(
-      async () => {
-        const userCred = await signInWithEmailAndPassword(
-          auth,
-          values.email,
-          values.password
-        );
+    try {
+      await toastAsync(
+        async () => {
+          // 1️⃣ Firebase sign-in
+          const userCred = await signInWithEmailAndPassword(
+            auth,
+            values.email,
+            values.password
+          );
 
-        await loginWithFirebase(userCred.user);
-        router.push("/dashboard");
+          // 2️⃣ Exchange Firebase ID token → backend session cookie
+          const result = await loginWithFirebase(userCred.user);
+          if (!result || result.status !== "success") {
+            throw new Error(result?.message || "Session creation failed");
+          }
 
-        toastMessage("Welcome back!", { type: "success" });
-      },
-      {
-        loading: "Signing you in...",
-        success: "Login successful",
-        error: "Login failed. Check your credentials.",
-      }
-    );
+          // 3️⃣ Navigate after verified success
+          router.push("/dashboard");
+        },
+        {
+          loading: "Signing you in...",
+          success: "Welcome back!",
+          error: "Login failed. Please check your credentials.",
+        }
+      );
+    } catch (err) {
+      console.error("❌ Login error:", err);
+    }
   }
 
+  /* ============================================================
+     🔵 Google Login
+  ============================================================ */
   async function handleGoogleLogin() {
-    await toastAsync(
-      async () => {
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: "select_account" });
+    try {
+      await toastAsync(
+        async () => {
+          const provider = new GoogleAuthProvider();
+          provider.setCustomParameters({ prompt: "select_account" });
 
-        const userCred = await signInWithPopup(auth, provider);
-        await loginWithFirebase(userCred.user);
+          // 1️⃣ Firebase Google popup
+          const userCred = await signInWithPopup(auth, provider);
 
-        router.push("/dashboard");
-        toastMessage(`Welcome ${userCred.user.displayName || "back"}!`, {
-          type: "success",
-        });
-      },
-      {
-        loading: "Connecting to Google...",
-        success: "Signed in with Google",
-        error: "Google sign-in failed. Please try again.",
-      }
-    );
+          // 2️⃣ Exchange ID token for backend session
+          const result = await loginWithFirebase(userCred.user);
+          if (!result || result.status !== "success") {
+            throw new Error(result?.message || "Session creation failed");
+          }
+
+          // 3️⃣ Redirect on success
+          router.push("/dashboard");
+        },
+        {
+          loading: "Connecting to Google...",
+          success: "Signed in successfully!",
+          error: "Google sign-in failed. Please try again.",
+        }
+      );
+    } catch (err) {
+      console.error("❌ Google login error:", err);
+    }
   }
 
   return (
@@ -107,6 +130,7 @@ export function LoginForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
+              {/* 🔵 Google Sign-In */}
               <Field>
                 <Button
                   variant="outline"
@@ -152,6 +176,7 @@ export function LoginForm({
                 Or continue with
               </FieldSeparator>
 
+              {/* ✉️ Email */}
               <Controller
                 name="email"
                 control={form.control}
@@ -170,6 +195,7 @@ export function LoginForm({
                 )}
               />
 
+              {/* 🔒 Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -212,6 +238,7 @@ export function LoginForm({
                 )}
               />
 
+              {/* 🔘 Submit */}
               <Field>
                 <Button
                   type="submit"
