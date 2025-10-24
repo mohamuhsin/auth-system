@@ -1,34 +1,49 @@
 import admin, { ServiceAccount } from "firebase-admin";
 
 /**
- * 🔥 Firebase Admin Initialization (Level 1.5 Hardened)
+ * 🔥 Firebase Admin Initialization (Level 2.0 Hardened)
  * ------------------------------------------------------------
- * Handles both FIREBASE_SERVICE_ACCOUNT (JSON string)
- * and individual FIREBASE_* vars.
- * Auto-fixes newline escape sequences in private keys.
- * Safe for both local dev and production (Railway, Vercel, etc.)
+ * Supports:
+ *   - FIREBASE_SERVICE_ACCOUNT (single JSON string)
+ *   - or individual FIREBASE_* vars.
+ *
+ * Auto-fixes escaped newline sequences in private keys.
+ * Prevents duplicate initialization.
+ * Fails fast with clear context (never a silent 500).
  */
 
 if (!admin.apps.length) {
   try {
     const {
+      FIREBASE_SERVICE_ACCOUNT,
       FIREBASE_PROJECT_ID,
       FIREBASE_CLIENT_EMAIL,
       FIREBASE_PRIVATE_KEY,
-      FIREBASE_SERVICE_ACCOUNT,
       NODE_ENV,
     } = process.env;
 
     let credentials: ServiceAccount;
 
+    /* ============================================================
+       1️⃣ Preferred: FIREBASE_SERVICE_ACCOUNT (JSON string)
+    ============================================================ */
     if (FIREBASE_SERVICE_ACCOUNT) {
-      const parsed = JSON.parse(FIREBASE_SERVICE_ACCOUNT);
-      credentials = {
-        projectId: parsed.project_id,
-        clientEmail: parsed.client_email,
-        privateKey: parsed.private_key?.replace(/\\n/g, "\n"),
-      };
+      try {
+        const parsed = JSON.parse(FIREBASE_SERVICE_ACCOUNT);
+        credentials = {
+          projectId: parsed.project_id,
+          clientEmail: parsed.client_email,
+          privateKey: parsed.private_key?.replace(/\\n/g, "\n"),
+        };
+      } catch (jsonErr) {
+        throw new Error(
+          "Failed to parse FIREBASE_SERVICE_ACCOUNT JSON — check escape sequences"
+        );
+      }
     } else if (
+      /* ============================================================
+       2️⃣ Fallback: Individual FIREBASE_* variables
+    ============================================================ */
       FIREBASE_PROJECT_ID &&
       FIREBASE_CLIENT_EMAIL &&
       FIREBASE_PRIVATE_KEY
@@ -40,22 +55,27 @@ if (!admin.apps.length) {
       };
     } else {
       throw new Error(
-        "❌ Missing Firebase Admin credentials in environment variables"
+        "Missing Firebase credentials. Set FIREBASE_SERVICE_ACCOUNT or individual FIREBASE_* vars."
       );
     }
 
-    admin.initializeApp({ credential: admin.credential.cert(credentials) });
+    /* ============================================================
+       3️⃣ Initialize Firebase Admin
+    ============================================================ */
+    admin.initializeApp({
+      credential: admin.credential.cert(credentials),
+    });
 
     console.log(
       `✅ Firebase Admin initialized → ${credentials.projectId} [${NODE_ENV}]`
     );
-  } catch (err) {
-    console.error(
-      "🚨 Firebase Admin initialization failed:",
-      (err as Error).message
-    );
+  } catch (err: any) {
+    console.error("🚨 Firebase Admin initialization failed:", err.message);
+    // Fail fast — don't let Express start without valid credentials
     process.exit(1);
   }
+} else {
+  console.log("⚙️ Firebase Admin already initialized — skipping re-init");
 }
 
 export default admin;
