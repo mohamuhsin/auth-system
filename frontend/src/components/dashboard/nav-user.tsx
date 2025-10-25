@@ -101,9 +101,10 @@ export function NavUser() {
         side="bottom"
         align="end"
         sideOffset={8}
+        // 🧩 Auto width based on content, with a max limit
         className={cn(
-          "w-[--radix-dropdown-menu-trigger-width] min-w-max rounded-lg border border-border/50",
-          "bg-popover/95 backdrop-blur-md shadow-lg animate-in fade-in-0 zoom-in-95"
+          "w-auto max-w-[18rem] min-w-[13rem] rounded-lg border border-border/50 bg-popover/95 backdrop-blur-md shadow-lg",
+          "animate-in fade-in-0 zoom-in-95"
         )}
       >
         {/* Header */}
@@ -116,14 +117,14 @@ export function NavUser() {
               </AvatarFallback>
             </Avatar>
 
-            <div className="flex flex-col min-w-0">
+            <div className="flex flex-col min-w-0 max-w-[12rem]">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-[15px] font-medium text-foreground truncate">
                   {user.name || "User"}
                 </span>
                 {user.role && <span className={roleColor}>{user.role}</span>}
               </div>
-              <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+              <span className="text-xs text-muted-foreground truncate">
                 {user.email}
               </span>
             </div>
@@ -139,7 +140,7 @@ export function NavUser() {
             onClick={() => router.push("/profile")}
           >
             <IconUserCircle className="size-4 text-muted-foreground/80 shrink-0" />
-            <span className="truncate">Profile</span>
+            <span>Profile</span>
           </DropdownMenuItem>
 
           <DropdownMenuItem
@@ -147,7 +148,7 @@ export function NavUser() {
             onClick={() => router.push("/security")}
           >
             <IconShieldLock className="size-4 text-muted-foreground/80 shrink-0" />
-            <span className="truncate">Security</span>
+            <span>Security</span>
           </DropdownMenuItem>
 
           <DropdownMenuItem
@@ -155,7 +156,7 @@ export function NavUser() {
             onClick={() => router.push("/settings")}
           >
             <IconSettings className="size-4 text-muted-foreground/80 shrink-0" />
-            <span className="truncate">Settings</span>
+            <span>Settings</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
@@ -170,7 +171,7 @@ export function NavUser() {
           )}
         >
           <IconLogout className="size-4 shrink-0 opacity-90" />
-          <span className="truncate">Log out</span>
+          <span>Log out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

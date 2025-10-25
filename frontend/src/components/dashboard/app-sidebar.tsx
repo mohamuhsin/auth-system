@@ -110,11 +110,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
      🎨 Status Mapping
   ============================================================ */
   const statusMap = {
-    ok: { color: "#006ef5", label: "Healthy" },
-    degraded: { color: "#FACC15", label: "Degraded" },
+    ok: { color: "#006ef5", label: "System Healthy" },
+    degraded: { color: "#FACC15", label: "System Degraded" },
     maintenance: { color: "#FB923C", label: "Maintaining" },
-    error: { color: "#EF4444", label: "Offline" },
-    loading: { color: "#9CA3AF", label: "Checking..." },
+    error: { color: "#EF4444", label: "System Offline" },
+    loading: { color: "#9CA3AF", label: "Checking System..." },
   } as const;
 
   const { color, label } = statusMap[health];
