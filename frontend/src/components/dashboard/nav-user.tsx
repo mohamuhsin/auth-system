@@ -24,7 +24,7 @@ import { useAuth } from "@/context/authContext";
 import { useRouter } from "next/navigation";
 
 /* ============================================================
-   🌐 NavUser — Profile Dropdown (Context-driven)
+   🌐 NavUser — Profile Dropdown (Aligned & Clean)
 ============================================================ */
 export function NavUser() {
   const { user, logout, loading } = useAuth();
@@ -34,13 +34,11 @@ export function NavUser() {
      🚦 Redirect if logged out on protected route
   ============================================================ */
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
-    }
+    if (!loading && !user) router.push("/login");
   }, [user, loading, router]);
 
   /* ============================================================
-     🌀 Loading state
+     🌀 Loading State
   ============================================================ */
   if (loading)
     return (
@@ -75,7 +73,7 @@ export function NavUser() {
       .toUpperCase() || "US";
 
   const roleColor = cn(
-    "border border-border/40 text-[11px] font-semibold px-1.5 py-[1px] rounded-md capitalize leading-none",
+    "border border-border/40 text-[11px] font-semibold px-1.5 py-[1px] rounded-md capitalize leading-none whitespace-nowrap",
     user.role === "ADMIN" && "bg-primary/15 text-primary",
     user.role === "CREATOR" && "bg-emerald-500/15 text-emerald-500",
     user.role === "MERCHANT" && "bg-amber-500/15 text-amber-600",
@@ -83,7 +81,7 @@ export function NavUser() {
   );
 
   /* ============================================================
-     🚪 Logout handler
+     🚪 Logout Handler
   ============================================================ */
   const handleLogout = async () => {
     try {
@@ -136,21 +134,22 @@ export function NavUser() {
         {/* Header */}
         <DropdownMenuLabel className="p-0 font-normal">
           <div className="flex items-center gap-3 px-3 py-2.5">
-            <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40">
+            <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40 shrink-0">
               <AvatarImage src={user.avatarUrl || ""} alt={user.name || ""} />
               <AvatarFallback className="rounded-full bg-muted text-xs font-semibold">
                 {initials}
               </AvatarFallback>
             </Avatar>
 
-            <div className="flex flex-col min-w-0 leading-tight">
-              <div className="flex items-center gap-2">
+            {/* ✅ Keep name + role aligned on same line */}
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
                 <span className="text-[15px] font-medium text-foreground truncate">
                   {user.name || "User"}
                 </span>
                 {user.role && <span className={roleColor}>{user.role}</span>}
               </div>
-              <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+              <span className="text-xs text-muted-foreground truncate max-w-[180px]">
                 {user.email}
               </span>
             </div>
