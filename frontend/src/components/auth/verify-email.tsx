@@ -1,5 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
+
+/* ============================================================
+   ✉️ VerifyEmailNotice — Post-Signup Email Verification Screen
+   ------------------------------------------------------------
+   • Confirms verification email was sent
+   • Allows resending using centralized helper
+   • Auto-redirects once verified
+============================================================ */
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -13,13 +20,11 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { MailCheck, MailWarning, Loader2 } from "lucide-react";
-import { toastAsync, toastMessage } from "@/lib/toast";
+import { toastMessage } from "@/lib/toast";
 import { auth } from "@/services/firebase";
-import { sendEmailVerification, onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
+import { resendVerificationEmail } from "@/lib/auth-email";
 
-/* ============================================================
-   ✉️ VerifyEmailNotice — After Signup (Email Link Sent)
-============================================================ */
 export function VerifyEmailNotice() {
   const [resending, setResending] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -40,15 +45,15 @@ export function VerifyEmailNotice() {
         return;
       }
 
-      // Pull email if not from query
+      // Pull email from Firebase if not in query
       if (!emailParam && user.email) setUserEmail(user.email);
 
-      // 🔁 Refresh user to get latest verification status
+      // 🔁 Refresh to check if email has been verified
       await user.reload();
 
       if (user.emailVerified) {
         toastMessage("Your email has been verified!", { type: "success" });
-        router.replace("/login");
+        setTimeout(() => router.replace("/login"), 1000);
         return;
       }
 
@@ -62,39 +67,8 @@ export function VerifyEmailNotice() {
      🔁 Resend Verification Email
   ============================================================ */
   const handleResend = async () => {
-    const user = auth.currentUser;
-
-    if (!user) {
-      toastMessage("Please log in again before resending verification.", {
-        type: "error",
-      });
-      router.push("/login");
-      return;
-    }
-
-    await toastAsync(
-      async () => {
-        setResending(true);
-        await sendEmailVerification(user);
-      },
-      {
-        loading: "Sending verification email...",
-        success: "Verification link sent successfully!",
-        error: "Failed to resend verification email. Try again.",
-      }
-    ).catch((err: any) => {
-      if (err?.code === "auth/too-many-requests") {
-        toastMessage(
-          "You’ve requested too many verification emails. Please wait a few minutes.",
-          { type: "warning" }
-        );
-      } else {
-        toastMessage("Something went wrong. Please try again.", {
-          type: "error",
-        });
-      }
-    });
-
+    setResending(true);
+    await resendVerificationEmail();
     setResending(false);
   };
 
@@ -110,7 +84,7 @@ export function VerifyEmailNotice() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-muted/40 px-6">
+    <main className="flex min-h-screen items-center justify-center bg-muted/40 px-6">
       <Card className="w-full max-w-sm border border-border/60 shadow-md bg-background/95 backdrop-blur">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-2">
@@ -121,18 +95,17 @@ export function VerifyEmailNotice() {
             Verify your email
           </CardTitle>
 
-          <CardDescription>
-            We’ve sent a verification link
+          <CardDescription className="mt-2 text-sm">
+            We’ve sent a verification link{" "}
             {userEmail ? (
               <>
-                {" "}
-                to <strong>{userEmail}</strong>.
+                to <span className="font-medium text-primary">{userEmail}</span>
               </>
             ) : (
-              " to your registered email address."
+              "to your registered email address"
             )}
-            <br />
-            Please check your inbox before logging in.
+            . <br />
+            Please check your inbox and confirm to activate your account.
           </CardDescription>
         </CardHeader>
 
@@ -162,6 +135,6 @@ export function VerifyEmailNotice() {
           </Link>
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 }
