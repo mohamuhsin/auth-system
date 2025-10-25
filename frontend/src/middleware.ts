@@ -6,10 +6,11 @@ import type { NextRequest } from "next/server";
  * ------------------------------------------------------------
  * Ensures session persistence across Iventics subdomains.
  */
-const SESSION_COOKIE = "__Secure-iventics_session";
+const SESSION_COOKIE =
+  process.env.NEXT_PUBLIC_SESSION_COOKIE_NAME || "__Secure-iventics_session";
 
 const PUBLIC_PATHS = [
-  "/", // Landing
+  "/",
   "/login",
   "/signup",
   "/forgot-password",
@@ -18,18 +19,13 @@ const PUBLIC_PATHS = [
 
 /**
  * 🚦 Middleware Logic
- * ------------------------------------------------------------
- * Handles:
- *  - Allowing public/static routes
- *  - Redirecting authenticated users away from /login, /signup, etc.
- *  - Redirecting unauthenticated users to /login
  */
 export function middleware(req: NextRequest) {
   const { pathname, origin } = req.nextUrl;
   const normalizedPath = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
   const hasSession = req.cookies.has(SESSION_COOKIE);
 
-  // ✅ Allow internal/static/API routes
+  // ✅ Allow public/static/API routes
   const isPublicRoute =
     PUBLIC_PATHS.includes(normalizedPath) ||
     normalizedPath.startsWith("/api") ||
@@ -37,7 +33,7 @@ export function middleware(req: NextRequest) {
     /\.(ico|svg|png|jpg|jpeg|gif|webp|avif)$/.test(normalizedPath);
 
   if (isPublicRoute) {
-    // 🚫 If already authenticated, redirect away from auth pages
+    // 🚫 Redirect authenticated users away from auth pages
     if (
       hasSession &&
       ["/login", "/signup", "/forgot-password", "/reset-password"].includes(
@@ -50,22 +46,19 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 🔒 Protect all other routes
+  // 🔒 Protect private routes
   if (!hasSession) {
     const loginUrl = new URL("/login", origin);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // ✅ Session valid → continue
+  // ✅ Session valid
   return NextResponse.next();
 }
 
 /**
  * ⚙️ Matcher Config
- * ------------------------------------------------------------
- * - Excludes _next, images, and all static assets
- * - Works seamlessly on multi-domain setups
  */
 export const config = {
   matcher: [

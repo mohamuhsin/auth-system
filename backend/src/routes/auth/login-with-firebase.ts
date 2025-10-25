@@ -2,21 +2,25 @@ import { Router } from "express";
 import admin from "../../services/firebaseAdmin";
 import prisma from "../../prisma/client";
 import { makeSessionCookie } from "../../utils/cookies";
+import { logAudit } from "../../utils/audit";
 
 const router = Router();
 
 /**
  * 🔐 POST /api/auth/login-with-firebase
+ * ------------------------------------------------------------
  * Verifies Firebase ID token and creates a secure session cookie.
+ * Existing users only — new users must sign up via /signup-with-firebase.
  */
 router.post("/", async (req, res) => {
   try {
     const { idToken, userAgent } = req.body;
 
     if (!idToken) {
-      return res
-        .status(400)
-        .json({ code: "ID_TOKEN_REQUIRED", message: "Missing ID token" });
+      return res.status(400).json({
+        status: "error",
+        message: "Missing ID token",
+      });
     }
 
     // ✅ Verify Firebase token
@@ -25,31 +29,37 @@ router.post("/", async (req, res) => {
       decoded = await admin.auth().verifyIdToken(idToken, true);
     } catch (verifyErr) {
       console.error("❌ Invalid Firebase token:", verifyErr);
-      return res
-        .status(401)
-        .json({ code: "INVALID_TOKEN", message: "Invalid or expired token" });
+      return res.status(401).json({
+        status: "error",
+        message: "Invalid or expired token",
+      });
     }
 
-    // ✅ Check if user exists in DB
+    // ✅ Find user by email
     const existingUser = await prisma.user.findUnique({
       where: { email: decoded.email! },
     });
 
     if (!existingUser) {
+      await logAudit(
+        "LOGIN_FAILED_USER_NOT_FOUND",
+        undefined,
+        req.ip,
+        req.headers["user-agent"]
+      );
       return res.status(404).json({
-        code: "USER_NOT_FOUND",
+        status: "error",
         message: "No account found. Please sign up first.",
       });
     }
 
-    // ✅ Optional: mirror verification via metadata (only if column exists)
-    // If you later add an `emailVerified` column to User:
-    // await prisma.user.update({
-    //   where: { id: existingUser.id },
-    //   data: { emailVerified: decoded.email_verified ?? false },
-    // });
+    // 🧩 Optional — sync email verification
+    await prisma.user.update({
+      where: { id: existingUser.id },
+      data: { emailVerified: decoded.email_verified ?? false },
+    });
 
-    // ✅ Create session in DB
+    // ✅ Create session record
     const session = await prisma.session.create({
       data: {
         userId: existingUser.id,
@@ -62,28 +72,43 @@ router.post("/", async (req, res) => {
       },
     });
 
-    // ✅ Create signed cookie
-    const cookie = await makeSessionCookie(decoded.uid);
+    // ✅ Create Firebase session cookie
+    const cookieHeader = await makeSessionCookie(idToken);
 
     res
-      .cookie("__Secure-iventics_session", cookie, {
+      .cookie("__Secure-iventics_session", cookieHeader, {
         httpOnly: true,
         secure: true,
-        sameSite: "none", // ✅ important for cross-domain cookies
+        sameSite: "none",
         path: "/",
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+        maxAge: 1000 * 60 * 60 * 24 * 7,
       })
       .status(200)
       .json({
         status: "success",
-        message: "Session created successfully",
+        message: "Login successful",
         userId: existingUser.id,
         sessionId: session.id,
       });
-  } catch (err) {
-    console.error("🔥 login-with-firebase error:", err);
+
+    // 🧾 Record successful login
+    await logAudit(
+      "LOGIN_WITH_FIREBASE",
+      existingUser.id,
+      req.ip,
+      req.headers["user-agent"]
+    );
+  } catch (err: any) {
+    console.error("🔥 login-with-firebase error:", err.message);
+    await logAudit(
+      "LOGIN_WITH_FIREBASE_ERROR",
+      undefined,
+      req.ip,
+      req.headers["user-agent"]
+    );
+
     return res.status(500).json({
-      code: "INTERNAL_ERROR",
+      status: "error",
       message: "Something went wrong creating the session",
     });
   }

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { authRateLimiter } from "../../middleware/rateLimiter";
 
 // 🟢 Existing routes
 import session from "./session";
@@ -13,6 +14,8 @@ const router = Router();
 /* ============================================================
    🔐 AUTH ROUTES
 ============================================================ */
+
+router.use(authRateLimiter);
 
 // Get current session
 router.use("/session", session);

@@ -2,59 +2,88 @@ import { Router } from "express";
 import admin from "../../services/firebaseAdmin";
 import prisma from "../../prisma/client";
 import { makeSessionCookie } from "../../utils/cookies";
+import { logAudit } from "../../utils/audit";
 
 const router = Router();
 
 /**
  * 🔐 POST /api/auth/signup-with-firebase
- * Called by frontend when user signs up using Google for the first time
+ * ------------------------------------------------------------
+ * Handles first-time signups using Google/Firebase.
+ * Creates user in DB, logs audit, and issues session cookie.
  */
 router.post("/", async (req, res) => {
   try {
     const { idToken, name, avatarUrl, userAgent } = req.body;
 
     if (!idToken) {
-      return res
-        .status(400)
-        .json({ code: "ID_TOKEN_REQUIRED", message: "Missing ID token" });
+      return res.status(400).json({
+        status: "error",
+        message: "Missing ID token",
+      });
     }
 
-    // ✅ Verify Firebase token
+    // ✅ Verify Firebase ID token
     let decoded;
     try {
       decoded = await admin.auth().verifyIdToken(idToken, true);
     } catch (verifyErr) {
       console.error("❌ Invalid Firebase token:", verifyErr);
-      return res
-        .status(401)
-        .json({ code: "INVALID_TOKEN", message: "Invalid or expired token" });
+      await logAudit(
+        "SIGNUP_INVALID_TOKEN",
+        undefined,
+        req.ip,
+        req.headers["user-agent"]
+      );
+      return res.status(401).json({
+        status: "error",
+        message: "Invalid or expired token",
+      });
     }
 
-    // ✅ Ensure user does not already exist
-    const existing = await prisma.user.findUnique({
-      where: { email: decoded.email! },
-    });
+    const email = decoded.email!;
+    const displayName = name ?? decoded.name ?? null;
+    const picture = avatarUrl ?? decoded.picture ?? null;
 
+    // 🚫 Prevent duplicate accounts
+    const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
+      await logAudit(
+        "SIGNUP_EMAIL_EXISTS",
+        existing.id,
+        req.ip,
+        req.headers["user-agent"]
+      );
       return res.status(409).json({
-        code: "EMAIL_ALREADY_EXISTS",
+        status: "error",
         message: "Account already exists. Please sign in instead.",
       });
     }
 
-    // ✅ Create new user
+    // 🆕 Create new user (auto-admin for first account)
+    const userCount = await prisma.user.count();
+    const isFirstUser = userCount === 0;
+
     const newUser = await prisma.user.create({
       data: {
-        firebaseUid: decoded.uid,
-        email: decoded.email!,
-        name: name ?? decoded.name ?? null,
-        avatarUrl: avatarUrl ?? decoded.picture ?? null,
-        // Removed emailVerified because your schema doesn't include it
-        role: "USER",
+        uid: decoded.uid,
+        email,
+        name: displayName,
+        avatarUrl: picture,
+        emailVerified: decoded.email_verified ?? false,
+        role: isFirstUser ? "ADMIN" : "USER",
+        isApproved: isFirstUser,
       },
     });
 
-    // ✅ Create session
+    await logAudit(
+      "USER_CREATED",
+      newUser.id,
+      req.ip,
+      req.headers["user-agent"]
+    );
+
+    // 🧾 Create session record
     const session = await prisma.session.create({
       data: {
         userId: newUser.id,
@@ -67,28 +96,44 @@ router.post("/", async (req, res) => {
       },
     });
 
-    // ✅ Create secure cross-domain cookie
-    const cookie = await makeSessionCookie(decoded.uid);
+    // 🍪 Create secure Firebase session cookie
+    const cookieValue = await makeSessionCookie(idToken);
 
     res
-      .cookie("__Secure-iventics_session", cookie, {
+      .cookie("__Secure-iventics_session", cookieValue, {
         httpOnly: true,
         secure: true,
-        sameSite: "none", // ✅ required for auth.iventics.com <-> auth-api.iventics.com
+        sameSite: "none",
+        domain: process.env.COOKIE_DOMAIN || ".iventics.com", // ✅ from env
         path: "/",
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+        maxAge: 1000 * 60 * 60 * 24 * 7,
       })
       .status(201)
       .json({
         status: "success",
         message: "User created successfully",
-        userId: newUser.id,
+        user: {
+          id: newUser.id,
+          uid: newUser.uid,
+          email: newUser.email,
+          name: newUser.name,
+          avatarUrl: newUser.avatarUrl,
+          role: newUser.role,
+          isApproved: newUser.isApproved,
+        },
         sessionId: session.id,
       });
-  } catch (err) {
-    console.error("🔥 signup-with-firebase error:", err);
+  } catch (err: any) {
+    console.error("🔥 signup-with-firebase error:", err.message);
+    await logAudit(
+      "SIGNUP_WITH_FIREBASE_ERROR",
+      undefined,
+      req.ip,
+      req.headers["user-agent"]
+    );
+
     return res.status(500).json({
-      code: "INTERNAL_ERROR",
+      status: "error",
       message: "Something went wrong creating the user",
     });
   }

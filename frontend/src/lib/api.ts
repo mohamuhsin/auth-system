@@ -15,7 +15,7 @@ interface ApiError extends Error {
 
 /**
  * Safe API request wrapper with unified error handling.
- * Ensures secure cross-domain session cookies.
+ * Automatically stringifies objects and maintains session cookies.
  */
 export async function apiRequest<T>(
   path: string,
@@ -25,36 +25,46 @@ export async function apiRequest<T>(
     ? `${API_BASE}${path}`
     : `${API_BASE}/${path}`;
 
-  const res = await fetch(url, {
-    method: options.method || "GET",
-    credentials: "include", // ✅ crucial for session cookies
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-    body: options.body,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000); // 15 s safety
 
-  // 🧩 Graceful error handling
-  if (!res.ok) {
-    let message = `API Error ${res.status}`;
-    try {
-      const json = await res.json();
-      if (json?.message) message = json.message;
-    } catch {
-      /* ignore JSON parse failure */
+  try {
+    const res = await fetch(url, {
+      method: options.method || "GET",
+      credentials: "include",
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+      body:
+        options.body &&
+        typeof options.body === "object" &&
+        !(options.body instanceof FormData)
+          ? JSON.stringify(options.body)
+          : (options.body as BodyInit),
+    });
+
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      let message = `API Error ${res.status}`;
+      try {
+        const json = await res.json();
+        if (json?.message) message = json.message;
+      } catch {
+        /* ignore */
+      }
+
+      const error = new Error(message) as ApiError;
+      error.status = res.status;
+      throw error;
     }
 
-    const error = new Error(message) as ApiError;
-    error.status = res.status;
-    throw error;
-  }
-
-  // ✅ Parse JSON (fallback for empty responses)
-  try {
-    return (await res.json()) as T;
-  } catch {
-    return {} as T;
+    return (await res.json().catch(() => ({}))) as T;
+  } catch (err) {
+    console.error("🌐 API request failed:", err);
+    throw err;
   }
 }

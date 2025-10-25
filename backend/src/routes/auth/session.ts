@@ -23,10 +23,9 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     }
 
     console.log("🟢 Received idToken. Verifying...");
-    const decoded = await admin.auth().verifyIdToken(idToken);
+    const decoded = await admin.auth().verifyIdToken(idToken, true);
     console.log("✅ Token verified for UID:", decoded.uid);
 
-    // 🚫 Reject unverified email users (non-OAuth signups)
     if (!decoded.email_verified) {
       console.warn(`⛔ Unverified email attempt: ${decoded.email}`);
       await logAudit(
@@ -45,21 +44,19 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     const name = decoded.name || null;
     const avatarUrl = decoded.picture || null;
 
-    // 🔍 Find user by Firebase UID or email
+    // 🔍 Find or create user
     let user = await prisma.user.findFirst({
-      where: {
-        OR: [{ firebaseUid: decoded.uid }, { email }],
-      },
+      where: { OR: [{ uid: decoded.uid }, { email }] },
     });
 
     if (!user) {
       console.log("🆕 Creating new user...");
-      const userCount = await prisma.user.count();
-      const isFirstUser = userCount === 0;
+      const count = await prisma.user.count();
+      const isFirstUser = count === 0;
 
       user = await prisma.user.create({
         data: {
-          firebaseUid: decoded.uid,
+          uid: decoded.uid,
           email,
           name,
           avatarUrl,
@@ -74,11 +71,11 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
         req.ip,
         req.headers["user-agent"]
       );
-    } else if (!user.firebaseUid) {
+    } else if (!user.uid) {
       console.log("🔗 Linking existing user to Firebase UID...");
       user = await prisma.user.update({
         where: { id: user.id },
-        data: { firebaseUid: decoded.uid },
+        data: { uid: decoded.uid },
       });
     }
 
@@ -88,7 +85,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     res.setHeader("Set-Cookie", cookieHeader);
     console.log(`✅ Session cookie set for ${user.email}`);
 
-    // 🧾 Record successful login
+    // 🧾 Audit successful login
     await logAudit("LOGIN", user.id, req.ip, req.headers["user-agent"]);
 
     return res.status(200).json({
@@ -96,10 +93,12 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       message: "Session created successfully",
       user: {
         id: user.id,
+        uid: user.uid,
         email: user.email,
         name: user.name,
         role: user.role,
         isApproved: user.isApproved,
+        avatarUrl: user.avatarUrl,
       },
     });
   } catch (err: any) {

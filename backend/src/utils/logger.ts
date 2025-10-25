@@ -1,11 +1,12 @@
 import pino from "pino";
 import pinoHttp from "pino-http";
 import type { IncomingMessage, ServerResponse } from "http";
+import { safeError } from "./errors";
 
 const isProd = process.env.NODE_ENV === "production";
 
 /**
- * 🪵 Pino Logger (Level 1)
+ * 🪵 Pino Logger (Level 1.5)
  * ------------------------------------------------------------
  * High-performance JSON logger with pretty-print for development.
  * Integrates seamlessly with Express via pino-http.
@@ -13,7 +14,7 @@ const isProd = process.env.NODE_ENV === "production";
 export const logger = pino({
   level: isProd ? "info" : "debug",
   ...(isProd
-    ? {} // Production → plain JSON logs (structured for Railway/Vercel)
+    ? {}
     : {
         transport: {
           targets: [
@@ -33,9 +34,7 @@ export const logger = pino({
 /**
  * 🌐 HTTP Logger Middleware
  * ------------------------------------------------------------
- * Automatically logs all incoming requests and responses with
- * contextual info for debugging and observability.
- *
+ * Logs all incoming requests and responses with contextual info.
  * Example log:
  *   GET /api/auth/session → 200
  */
@@ -44,8 +43,8 @@ export const httpLogger = pinoHttp<IncomingMessage, ServerResponse>({
   customSuccessMessage: (req, res) =>
     `${req.method} ${req.url} → ${res.statusCode}`,
   customErrorMessage: (req, res, err) =>
-    `${req.method} ${req.url} → ${res.statusCode} (${err.message})`,
+    `${req.method} ${req.url} → ${res.statusCode} (${safeError(err)})`,
 
-  // Optional: Include unique request ID for tracing (future Level 1.5)
+  // 🧠 Optional: unique request ID for tracing (future Level 1.5)
   // genReqId: () => crypto.randomUUID(),
 });
