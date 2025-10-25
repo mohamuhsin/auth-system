@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -28,15 +27,11 @@ import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/form-error";
 import { loginSchema, type LoginFormValues } from "@/lib/validators/auth";
 
-import {
-  signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signOut,
-} from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { useAuth } from "@/context/authContext";
 import { toastAsync, toastMessage } from "@/lib/toast";
+import { loginWithEmailPassword } from "@/lib/auth-email";
 
 /* ============================================================
    🔐 LoginForm — Handles Email+Password and Google Login
@@ -66,82 +61,9 @@ export function LoginForm({
       return;
     }
 
-    try {
-      const userCred = await signInWithEmailAndPassword(
-        auth,
-        values.email,
-        values.password
-      );
-
-      const result = await loginWithFirebase(userCred.user);
-
-      if (!result || result.status !== "success") {
-        if (result.statusCode === 404) {
-          toastMessage("Account not found. Please sign up first.", {
-            type: "warning",
-          });
-          router.push("/signup");
-          return;
-        }
-
-        throw Object.assign(
-          new Error(result?.message || "Session creation failed"),
-          { status: (result as any)?.statusCode }
-        );
-      }
-
-      toastMessage("Welcome back! Redirecting to dashboard...", {
-        type: "success",
-      });
+    const result = await loginWithEmailPassword(values.email, values.password);
+    if (result?.ok) {
       router.push("/dashboard");
-    } catch (err: any) {
-      const code = err?.code || "";
-      const msg = err?.message || "";
-
-      // 🔹 Common Firebase auth errors
-      if (code === "auth/user-not-found") {
-        toastMessage("Account not found. Please sign up first.", {
-          type: "warning",
-        });
-        router.push("/signup");
-        return;
-      }
-
-      if (code === "auth/wrong-password") {
-        toastMessage("Incorrect password. Try again.", { type: "error" });
-        return;
-      }
-
-      if (code === "auth/too-many-requests") {
-        toastMessage(
-          "Too many failed attempts. Please wait a few minutes and try again.",
-          { type: "error" }
-        );
-        return;
-      }
-
-      const needsVerify =
-        err?.status === 403 ||
-        /verify/i.test(msg) ||
-        /verify/i.test(err?.response?.data?.message || "");
-
-      if (needsVerify) {
-        await signOut(auth).catch(() => {});
-        toastMessage("Please verify your email before logging in.", {
-          type: "warning",
-        });
-        router.push("/verify-email");
-        return;
-      }
-
-      // 🔹 Network or unknown errors
-      if (msg.includes("fetch") || msg.includes("network")) {
-        toastMessage("Unable to reach the server. Check your connection.", {
-          type: "error",
-        });
-      } else {
-        toastMessage("Login failed. Please try again.", { type: "error" });
-      }
     }
   }
 
@@ -161,7 +83,6 @@ export function LoginForm({
 
         if (!result || result.status !== "success") {
           if (result.statusCode === 404) {
-            await signOut(auth);
             toastMessage("No account found. Please sign up first.", {
               type: "warning",
             });

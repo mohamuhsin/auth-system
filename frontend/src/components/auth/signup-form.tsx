@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -28,17 +27,11 @@ import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/form-error";
 import { signupSchema, type SignupFormValues } from "@/lib/validators/auth";
 
-import {
-  createUserWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup,
-  updateProfile,
-  sendEmailVerification,
-  signOut,
-} from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { useAuth } from "@/context/authContext";
 import { toastAsync, toastMessage } from "@/lib/toast";
+import { signupWithEmailPassword } from "@/lib/auth-email";
 
 /* ============================================================
    🟢 SignupForm — Email & Google Signup (Backend Verified)
@@ -67,12 +60,6 @@ export function SignupForm({
      ✉️ Email + Password Signup
   ============================================================ */
   async function onSubmit(values: SignupFormValues) {
-    // Prevent empty or invalid form submission
-    if (!values.email || !values.password) {
-      toastMessage("Please fill in all required fields.", { type: "warning" });
-      return;
-    }
-
     if (values.password !== values.confirmPassword) {
       toastMessage("Passwords do not match. Please try again.", {
         type: "error",
@@ -80,144 +67,53 @@ export function SignupForm({
       return;
     }
 
-    await toastAsync(
-      async () => {
-        try {
-          // 1️⃣ Create Firebase user
-          const userCred = await createUserWithEmailAndPassword(
-            auth,
-            values.email,
-            values.password
-          );
-
-          // 2️⃣ Add display name
-          if (values.name) {
-            await updateProfile(userCred.user, { displayName: values.name });
-          }
-
-          // 3️⃣ Send verification email
-          await sendEmailVerification(userCred.user);
-
-          // 4️⃣ Sign out to prevent auto-login before verification
-          await auth.signOut();
-
-          // 5️⃣ Notify & redirect
-          toastMessage(
-            "A verification link has been sent to your email. Please verify before logging in.",
-            { type: "success" }
-          );
-
-          router.push(
-            `/verify-email?email=${encodeURIComponent(values.email)}`
-          );
-        } catch (err: any) {
-          const code = err?.code || "";
-
-          // 🔹 Handle common Firebase signup errors
-          switch (code) {
-            case "auth/email-already-in-use":
-              toastMessage("Account already exists. Please sign in instead.", {
-                type: "warning",
-              });
-              router.push("/login");
-              return;
-
-            case "auth/invalid-email":
-              toastMessage("Please enter a valid email address.", {
-                type: "error",
-              });
-              return;
-
-            case "auth/weak-password":
-              toastMessage(
-                "Weak password. Use at least 8 characters with a number and uppercase letter.",
-                { type: "error" }
-              );
-              return;
-
-            default:
-              if (
-                err.message?.includes("network") ||
-                err.code === "auth/network-request-failed"
-              ) {
-                toastMessage("Network error. Please check your connection.", {
-                  type: "error",
-                });
-                return;
-              }
-
-              throw err; // Let toastAsync handle unrecognized errors
-          }
-        }
-      },
-      {
-        loading: "Creating your account...",
-        success: "Account created successfully!",
-        error: "Signup failed. Please try again.",
-      }
+    const result = await signupWithEmailPassword(
+      values.email,
+      values.password,
+      values.name
     );
+
+    if (result?.ok) {
+      router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
+    }
   }
 
   /* ============================================================
-     🔵 Google Signup (Backend Verified)
+     🔵 Google Signup — secure backend-verified flow
   ============================================================ */
   async function handleGoogleSignup() {
     await toastAsync(
       async () => {
-        try {
-          const provider = new GoogleAuthProvider();
-          provider.setCustomParameters({ prompt: "select_account" });
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: "select_account" });
 
-          const userCred = await signInWithPopup(auth, provider);
-          const googleUser = userCred.user;
+        const userCred = await signInWithPopup(auth, provider);
+        const googleUser = userCred.user;
 
-          // 🧠 Call backend for secure cookie session
-          const result = await signupWithFirebase(googleUser, {
-            name: googleUser.displayName ?? undefined,
-            avatarUrl: googleUser.photoURL ?? undefined,
-          });
+        const result = await signupWithFirebase(googleUser, {
+          name: googleUser.displayName ?? undefined,
+          avatarUrl: googleUser.photoURL ?? undefined,
+        });
 
-          if (result.status !== "success") {
-            if (result.statusCode === 409) {
-              await signOut(auth);
-              toastMessage("Account already exists. Please sign in instead.", {
-                type: "warning",
-              });
-              router.push("/login");
-              return;
-            }
-
-            throw new Error(result.message || "Signup verification failed");
-          }
-
-          toastMessage("Signed up successfully with Google!", {
-            type: "success",
-          });
-          router.push("/dashboard");
-        } catch (err: any) {
-          const code = err?.code || "";
-
-          // Handle user closing popup or network errors
-          if (code === "auth/popup-closed-by-user") {
-            toastMessage("Google signup canceled. Please try again.", {
-              type: "info",
+        if (result.status !== "success") {
+          if (result.statusCode === 409) {
+            toastMessage("Account already exists. Redirecting to login...", {
+              type: "warning",
             });
+            setTimeout(() => router.push("/login"), 1200);
             return;
           }
-
-          if (code === "auth/network-request-failed") {
-            toastMessage("Network error. Please check your connection.", {
-              type: "error",
-            });
-            return;
-          }
-
-          throw err;
+          throw new Error(result.message || "Signup verification failed");
         }
+
+        toastMessage("Signed up successfully with Google!", {
+          type: "success",
+        });
+        router.push("/dashboard");
       },
       {
         loading: "Connecting to Google...",
-        success: "Connected to Google!",
+        success: "Connected!",
         error: "Google sign-up failed. Please try again.",
       }
     );
@@ -344,9 +240,6 @@ export function SignupForm({
                         type="button"
                         onClick={() => setShowPassword((p) => !p)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        aria-label={
-                          showPassword ? "Hide password" : "Show password"
-                        }
                       >
                         {showPassword ? (
                           <EyeOff className="size-4" />
@@ -380,9 +273,6 @@ export function SignupForm({
                         type="button"
                         onClick={() => setShowConfirm((p) => !p)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        aria-label={
-                          showConfirm ? "Hide password" : "Show password"
-                        }
                       >
                         {showConfirm ? (
                           <EyeOff className="size-4" />

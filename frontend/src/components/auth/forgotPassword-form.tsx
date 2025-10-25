@@ -1,9 +1,15 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
+
+/* ============================================================
+   🔑 ForgotPasswordForm — Secure Password Reset via Firebase
+   ------------------------------------------------------------
+   Unified with toastAsync + shared requestPasswordReset helper
+============================================================ */
 
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -27,17 +33,18 @@ import {
   type ForgotPasswordValues,
 } from "@/lib/validators/auth";
 
-import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "@/services/firebase";
 import { toastAsync, toastMessage } from "@/lib/toast";
+import { requestPasswordReset } from "@/lib/auth-email";
 
 /* ============================================================
-   🔑 ForgotPasswordForm — Secure Password Reset via Firebase
+   🔐 ForgotPasswordForm — Request reset link via Firebase
 ============================================================ */
 export function ForgotPasswordForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const router = useRouter();
+
   const form = useForm<ForgotPasswordValues>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: { email: "" },
@@ -57,36 +64,20 @@ export function ForgotPasswordForm({
 
     await toastAsync(
       async () => {
-        try {
-          await sendPasswordResetEmail(auth, values.email);
-        } catch (err: any) {
-          const code = err.code || "";
+        const result = await requestPasswordReset(values.email);
 
-          if (code === "auth/user-not-found") {
-            throw new Error(
-              "No account found with that email. Please sign up first."
-            );
-          }
-
-          if (code === "auth/invalid-email") {
-            throw new Error("Please enter a valid email address.");
-          }
-
-          if (code === "auth/network-request-failed") {
-            throw new Error(
-              "Network error. Please check your internet connection."
-            );
-          }
-
-          // Default fallback
-          throw new Error("Something went wrong. Please try again later.");
+        if (!result?.ok) {
+          throw new Error("Failed to send password reset link.");
         }
+
+        // Optional small delay before redirect
+        setTimeout(() => router.push("/login"), 2500);
       },
       {
         loading: "Sending reset link...",
         success:
           "Password reset email sent! Check your inbox (and spam folder).",
-        error: "Failed to send reset link. Please try again.",
+        error: "Unable to send reset link. Please try again later.",
       }
     );
   }
@@ -102,7 +93,7 @@ export function ForgotPasswordForm({
             Forgot Password?
           </CardTitle>
           <CardDescription>
-            Enter your email address, and we’ll send you a reset link.
+            Enter your email, and we’ll send you a secure reset link.
           </CardDescription>
         </CardHeader>
 

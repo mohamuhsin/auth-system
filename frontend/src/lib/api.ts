@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* ============================================================
    🌐 API Client — Iventics Auth System (Frontend)
    ------------------------------------------------------------
@@ -9,8 +10,15 @@ export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
   "https://auth-api.iventics.com/api";
 
-interface ApiError extends Error {
+export interface ApiError extends Error {
   status?: number;
+}
+
+/**
+ * Enhanced type for options so body can be any JSON-like value.
+ */
+export interface ApiRequestOptions extends RequestInit {
+  body?: any; // 👈 allows { idToken }, { email }, etc.
 }
 
 /**
@@ -19,19 +27,19 @@ interface ApiError extends Error {
  */
 export async function apiRequest<T>(
   path: string,
-  options: RequestInit = {}
+  options: ApiRequestOptions = {}
 ): Promise<T> {
   const url = path.startsWith("/")
     ? `${API_BASE}${path}`
     : `${API_BASE}/${path}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000); // 15 s safety
+  const timeout = setTimeout(() => controller.abort(), 15_000); // 15 s safety timeout
 
   try {
     const res = await fetch(url, {
       method: options.method || "GET",
-      credentials: "include",
+      credentials: "include", // 🔐 send cookies with cross-domain requests
       signal: controller.signal,
       headers: {
         Accept: "application/json",
@@ -54,7 +62,7 @@ export async function apiRequest<T>(
         const json = await res.json();
         if (json?.message) message = json.message;
       } catch {
-        /* ignore */
+        /* ignore non-JSON errors */
       }
 
       const error = new Error(message) as ApiError;
@@ -62,8 +70,10 @@ export async function apiRequest<T>(
       throw error;
     }
 
+    // Gracefully handle empty bodies
     return (await res.json().catch(() => ({}))) as T;
   } catch (err) {
+    clearTimeout(timeout);
     console.error("🌐 API request failed:", err);
     throw err;
   }

@@ -1,6 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+/* ============================================================
+   🔑 ResetPasswordForm — Secure Firebase Password Reset
+   ------------------------------------------------------------
+   Handles URL-based reset (oobCode), verifies, updates password,
+   and redirects to login with unified toast feedback.
+============================================================ */
+
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
@@ -34,9 +41,6 @@ import { confirmPasswordReset } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { toastAsync, toastMessage } from "@/lib/toast";
 
-/* ============================================================
-   🔑 ResetPasswordForm — Secure Firebase Password Reset
-============================================================ */
 export function ResetPasswordForm({
   className,
   ...props
@@ -66,11 +70,11 @@ export function ResetPasswordForm({
      🔐 Handle Password Reset
   ============================================================ */
   async function onSubmit(values: ResetPasswordValues) {
-    // Basic frontend validation
     if (!oobCode) {
       toastMessage("Invalid or expired password reset link.", {
         type: "error",
       });
+      setTimeout(() => router.replace("/forgot-password"), 1500);
       return;
     }
 
@@ -83,43 +87,53 @@ export function ResetPasswordForm({
 
     await toastAsync(
       async () => {
-        try {
-          await confirmPasswordReset(auth, oobCode, values.password);
-          toastMessage("Your password has been updated successfully!", {
-            type: "success",
-          });
+        await confirmPasswordReset(auth, oobCode, values.password);
 
-          // Redirect after short delay
-          setTimeout(() => router.replace("/login"), 1000);
-        } catch (err: any) {
-          const code = err.code || "";
+        toastMessage("Your password has been updated successfully!", {
+          type: "success",
+        });
 
-          switch (code) {
-            case "auth/expired-action-code":
-              throw new Error(
-                "This password reset link has expired. Please request a new one."
-              );
-            case "auth/invalid-action-code":
-              throw new Error("Invalid or broken password reset link.");
-            case "auth/weak-password":
-              throw new Error(
-                "Your password is too weak. Use at least 8 characters with a number and uppercase letter."
-              );
-            case "auth/network-request-failed":
-              throw new Error(
-                "Network error. Please check your connection and try again."
-              );
-            default:
-              throw new Error("Failed to reset password. Please try again.");
-          }
-        }
+        // Redirect after success
+        setTimeout(() => router.replace("/login"), 1200);
       },
       {
         loading: "Updating password...",
         success: "Password updated successfully!",
         error: "Password reset failed. Please try again.",
       }
-    );
+    ).catch((err: any) => {
+      const code = err.code || "";
+      switch (code) {
+        case "auth/expired-action-code":
+          toastMessage(
+            "This password reset link has expired. Please request a new one.",
+            { type: "error" }
+          );
+          router.replace("/forgot-password");
+          break;
+        case "auth/invalid-action-code":
+          toastMessage("Invalid or broken password reset link.", {
+            type: "error",
+          });
+          router.replace("/forgot-password");
+          break;
+        case "auth/weak-password":
+          toastMessage(
+            "Your password is too weak. Use at least 8 characters with a number and uppercase letter.",
+            { type: "warning" }
+          );
+          break;
+        case "auth/network-request-failed":
+          toastMessage("Network error. Please check your connection.", {
+            type: "error",
+          });
+          break;
+        default:
+          toastMessage("Failed to reset password. Please try again.", {
+            type: "error",
+          });
+      }
+    });
   }
 
   /* ============================================================
@@ -131,7 +145,7 @@ export function ResetPasswordForm({
         <CardHeader className="text-center">
           <CardTitle className="text-xl font-display">Reset Password</CardTitle>
           <CardDescription>
-            Choose a strong new password for your account.
+            Enter your new password and confirm to secure your account.
           </CardDescription>
         </CardHeader>
 
