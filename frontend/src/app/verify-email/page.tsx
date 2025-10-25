@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"; // ✅ prevents prerender build crash on Vercel
+
 import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { VerifyEmailNotice } from "@/components/auth/verify-email";
