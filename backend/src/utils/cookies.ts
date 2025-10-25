@@ -1,18 +1,23 @@
-import cookie from "cookie";
+import * as cookie from "cookie";
 import admin from "../services/firebaseAdmin";
 
 /**
- * 🍪 Cookie Utility (Level 1.5)
+ * 🍪 Cookie Utility (Level 1.5 — Hardened)
  * ------------------------------------------------------------
  * Handles secure session cookie creation and clearing.
- * Works across all Iventics subdomains (auth, pay, api, etc.)
+ * Works seamlessly across all Iventics subdomains:
+ *   e.g. auth.iventics.com, pay.iventics.com, api.iventics.com
+ *
+ * - Uses Firebase Admin session cookies for server-side auth
+ * - Proper SameSite / Secure settings for modern browsers
+ * - Automatically configures domain for local vs production
  */
 
 const NAME = process.env.SESSION_COOKIE_NAME || "__Secure-iventics_session";
 const DOMAIN =
   process.env.NODE_ENV === "production"
-    ? ".iventics.com" // shared across subdomains
-    : "localhost"; // dev only
+    ? ".iventics.com" // shared across all Iventics subdomains
+    : "localhost"; // local dev only
 const TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 7);
 
 /**
@@ -21,14 +26,11 @@ const TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 7);
  */
 export async function makeSessionCookie(idToken: string) {
   const expiresIn = TTL_DAYS * 24 * 60 * 60 * 1000; // e.g. 7 days
-
-  // Create a signed Firebase session cookie
   const sessionCookie = await admin
     .auth()
     .createSessionCookie(idToken, { expiresIn });
 
-  // ✅ Use SameSite=Lax instead of None for same-domain/subdomain requests.
-  // Chrome 2024+ blocks SameSite=None cookies without explicit Secure+cross-site context.
+  // ✅ Use SameSite=Lax for same-domain/subdomain requests.
   return cookie.serialize(NAME, sessionCookie, {
     httpOnly: true,
     secure: true,
