@@ -79,14 +79,9 @@ const navData = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
 
-  // Extended health states
   type HealthState = "ok" | "degraded" | "maintenance" | "error" | "loading";
   const [health, setHealth] = React.useState<HealthState>("loading");
-  const [lastChecked, setLastChecked] = React.useState<string>("--:--");
 
-  /* ============================================================
-     🩺 Health Checker
-  ============================================================ */
   React.useEffect(() => {
     const checkHealth = async () => {
       try {
@@ -101,20 +96,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         else if (latency > 800) setHealth("degraded");
         else if (data.ok) setHealth("ok");
         else setHealth("error");
-
-        setLastChecked(
-          new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        );
       } catch {
         setHealth("error");
       }
     };
 
     checkHealth();
-    const interval = setInterval(checkHealth, 15000); // check every 15s
+    const interval = setInterval(checkHealth, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -122,29 +110,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
      🎨 Status Mapping
   ============================================================ */
   const statusMap = {
-    ok: {
-      color: "#10B981",
-      text: "All systems operational",
-    },
-    degraded: {
-      color: "#FACC15",
-      text: "Minor performance issues",
-    },
-    maintenance: {
-      color: "#FB923C",
-      text: "Scheduled maintenance",
-    },
-    error: {
-      color: "#EF4444",
-      text: "System offline",
-    },
-    loading: {
-      color: "#9CA3AF",
-      text: "Checking system health...",
-    },
+    ok: { color: "#006ef5", label: "Healthy" },
+    degraded: { color: "#FACC15", label: "Degraded" },
+    maintenance: { color: "#FB923C", label: "Maintaining" },
+    error: { color: "#EF4444", label: "Offline" },
+    loading: { color: "#9CA3AF", label: "Checking..." },
   } as const;
 
-  const { color, text } = statusMap[health];
+  const { color, label } = statusMap[health];
 
   /* ============================================================
      🌟 Sidebar UI
@@ -232,18 +205,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
 
       {/* 🩺 Footer */}
-      <SidebarFooter className="mt-auto px-4 py-4 border-t border-border/40">
-        <div className="flex flex-col items-center gap-3 w-full">
-          {/* ✅ System Health */}
+      <SidebarFooter className="mt-auto px-4 py-3 border-t border-border/40">
+        <div className="flex items-center justify-between w-full">
+          {/* ✅ Compact System Health */}
           <Link
             href="/dashboard/health"
-            className="group flex items-center gap-2.5 px-3 py-1.5 rounded-md hover:bg-accent/30 transition-all duration-200 w-full justify-center"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent/30 transition-all duration-200"
             aria-label="System Health Status"
           >
-            {/* Status Dot */}
             <div
               className={cn(
-                "relative flex size-2.5 rounded-full ring-2 ring-background/90 shadow-[0_0_8px_var(--tw-shadow-color)] transition-all duration-300 shrink-0",
+                "relative flex size-2.5 rounded-full ring-2 ring-background/90 shadow-[0_0_8px_var(--tw-shadow-color)] transition-all duration-300",
                 health === "loading" && "animate-pulse"
               )}
               style={
@@ -253,35 +225,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 } as React.CSSProperties
               }
             />
-
-            {/* Status Texts */}
-            <div className="flex flex-col items-center text-center leading-tight min-w-0">
-              <span
-                className={cn(
-                  "truncate text-[12.5px] font-medium tracking-tight max-w-[170px]",
-                  health === "ok" && "text-blue-500",
-                  health === "degraded" && "text-yellow-500",
-                  health === "maintenance" && "text-orange-500",
-                  health === "error" && "text-red-500",
-                  health === "loading" && "text-muted-foreground"
-                )}
-              >
-                {text}
-              </span>
-              <span className="text-[11px] text-muted-foreground/80">
-                Updated {lastChecked}
-              </span>
-            </div>
+            <span
+              className={cn(
+                "text-[13px] font-medium tracking-tight",
+                health === "ok" && "text-blue-500",
+                health === "degraded" && "text-yellow-500",
+                health === "maintenance" && "text-orange-500",
+                health === "error" && "text-red-500",
+                health === "loading" && "text-muted-foreground"
+              )}
+            >
+              {label}
+            </span>
           </Link>
 
-          {/* Divider */}
-          <div className="h-[1px] w-[70%] bg-border/60 rounded-full" />
-
           {/* 🌗 Theme Toggle */}
-          <div className="flex justify-center">
-            <div className="scale-[0.9] opacity-90 hover:opacity-100 transition-opacity duration-150">
-              <ThemeToggle />
-            </div>
+          <div className="scale-[0.9] opacity-90 hover:opacity-100 transition-opacity duration-150">
+            <ThemeToggle />
           </div>
         </div>
       </SidebarFooter>
