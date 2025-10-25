@@ -6,8 +6,6 @@ import {
   IconShieldLock,
   IconUserCircle,
 } from "@tabler/icons-react";
-import { Loader2 } from "lucide-react";
-import { useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -22,18 +20,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/authContext";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
-/* ============================================================
-   🌐 NavUser — Compact + Responsive Profile Dropdown
-============================================================ */
 export function NavUser() {
   const { user, logout, loading } = useAuth();
   const router = useRouter();
-
-  // 🚦 Redirect unauthenticated users
-  useEffect(() => {
-    if (!loading && !user) router.push("/login");
-  }, [user, loading, router]);
 
   if (loading)
     return (
@@ -62,54 +53,43 @@ export function NavUser() {
       .toUpperCase() || "US";
 
   const roleColor = cn(
-    "border border-border/40 text-[10.5px] font-semibold px-1.5 py-[1px] rounded-md capitalize leading-none whitespace-nowrap",
-    user.role === "ADMIN" && "bg-primary/15 text-primary",
-    user.role === "CREATOR" && "bg-emerald-500/15 text-emerald-500",
-    user.role === "MERCHANT" && "bg-amber-500/15 text-amber-600",
-    user.role === "USER" && "bg-muted text-muted-foreground"
+    "border border-border/40 text-[11px] font-semibold px-1.5 py-[1px] rounded-md capitalize leading-none",
+    user.role?.toLowerCase() === "admin" && "bg-primary/15 text-primary",
+    user.role?.toLowerCase() === "creator" &&
+      "bg-emerald-500/15 text-emerald-500",
+    user.role?.toLowerCase() === "merchant" && "bg-amber-500/15 text-amber-600",
+    !user.role && "bg-muted text-muted-foreground"
   );
 
   const handleLogout = async () => {
-    try {
-      await logout();
-      router.replace("/login");
-    } catch (err) {
-      console.error("Logout error:", err);
-    }
+    await logout();
+    router.push("/login");
   };
 
-  /* ============================================================
-     🌟 UI
-  ============================================================ */
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
+          size="icon"
           aria-label="User menu"
           className={cn(
-            "relative flex items-center rounded-full overflow-hidden",
+            "relative flex size-[38px] items-center justify-center rounded-full overflow-hidden",
             "border border-border bg-background/50 hover:bg-accent/50",
             "hover:ring-2 hover:ring-accent/30 active:scale-[0.97]",
-            "shadow-sm transition-all duration-150 px-1.5 sm:px-2"
+            "shadow-sm transition-all duration-150"
           )}
         >
-          {/* 🧩 Avatar */}
-          <Avatar className="size-8 sm:size-9 rounded-full">
+          <Avatar className="size-full rounded-full">
             <AvatarImage
               src={user.avatarUrl || ""}
               alt={user.name || "User"}
               className="object-cover"
             />
-            <AvatarFallback className="rounded-full bg-muted text-[11px] font-semibold uppercase flex items-center justify-center">
+            <AvatarFallback className="size-full rounded-full bg-muted text-[11px] font-semibold uppercase flex items-center justify-center">
               {initials}
             </AvatarFallback>
           </Avatar>
-
-          {/* 🧱 Username (shown only on mobile) */}
-          <span className="ml-2 text-sm font-medium text-foreground truncate sm:hidden max-w-[90px]">
-            {user.name || "User"}
-          </span>
         </Button>
       </DropdownMenuTrigger>
 
@@ -122,24 +102,23 @@ export function NavUser() {
           "animate-in fade-in-0 zoom-in-95"
         )}
       >
-        {/* Header */}
         <DropdownMenuLabel className="p-0 font-normal">
-          <div className="flex items-center gap-2.5 px-3 py-2">
-            <Avatar className="h-9 w-9 rounded-full ring-1 ring-border/40 shrink-0">
+          <div className="flex items-center gap-3 px-3 py-2.5">
+            <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40">
               <AvatarImage src={user.avatarUrl || ""} alt={user.name || ""} />
-              <AvatarFallback className="rounded-full bg-muted text-[11px] font-semibold">
+              <AvatarFallback className="rounded-full bg-muted text-xs font-semibold">
                 {initials}
               </AvatarFallback>
             </Avatar>
 
-            <div className="flex flex-col leading-tight min-w-0">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="text-[14.5px] font-medium truncate max-w-[130px]">
+            <div className="flex flex-col min-w-0 leading-tight">
+              <div className="flex items-center gap-2">
+                <span className="text-[15px] font-medium text-foreground truncate">
                   {user.name || "User"}
                 </span>
                 {user.role && <span className={roleColor}>{user.role}</span>}
               </div>
-              <span className="text-[12px] text-muted-foreground truncate max-w-[160px]">
+              <span className="text-xs text-muted-foreground truncate max-w-[150px]">
                 {user.email}
               </span>
             </div>
@@ -148,28 +127,18 @@ export function NavUser() {
 
         <DropdownMenuSeparator className="my-1 h-[1px] bg-border/80" />
 
-        {/* Menu Items */}
         <DropdownMenuGroup>
-          <DropdownMenuItem
-            className="text-[14px] cursor-pointer hover:bg-accent/50 transition-colors"
-            onClick={() => router.push("/profile")}
-          >
+          <DropdownMenuItem className="text-[14.5px] cursor-pointer hover:bg-accent/50 transition-colors">
             <IconUserCircle className="size-4 mr-2 text-muted-foreground/80" />
             Profile
           </DropdownMenuItem>
 
-          <DropdownMenuItem
-            className="text-[14px] cursor-pointer hover:bg-accent/50 transition-colors"
-            onClick={() => router.push("/security")}
-          >
+          <DropdownMenuItem className="text-[14.5px] cursor-pointer hover:bg-accent/50 transition-colors">
             <IconShieldLock className="size-4 mr-2 text-muted-foreground/80" />
             Security
           </DropdownMenuItem>
 
-          <DropdownMenuItem
-            className="text-[14px] cursor-pointer hover:bg-accent/50 transition-colors"
-            onClick={() => router.push("/billing")}
-          >
+          <DropdownMenuItem className="text-[14.5px] cursor-pointer hover:bg-accent/50 transition-colors">
             <IconCreditCard className="size-4 mr-2 text-muted-foreground/80" />
             Billing & Settings
           </DropdownMenuItem>
@@ -177,11 +146,10 @@ export function NavUser() {
 
         <DropdownMenuSeparator className="my-1 h-[1px] bg-border/80" />
 
-        {/* Logout */}
         <DropdownMenuItem
           onClick={handleLogout}
           className={cn(
-            "text-[14px] text-destructive focus:text-destructive cursor-pointer font-medium",
+            "text-[14.5px] text-destructive focus:text-destructive cursor-pointer font-medium",
             "hover:bg-destructive/10 transition-colors"
           )}
         >
