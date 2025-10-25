@@ -79,17 +79,20 @@ export function SignupForm({
         // 3️⃣ Send verification email
         await sendEmailVerification(userCred.user);
 
-        // 4️⃣ Notify & redirect
+        // 4️⃣ Sign out so middleware doesn’t redirect to /login
+        await auth.signOut();
+
+        // 5️⃣ Notify & redirect to verify-email page
         toastMessage(
           "A verification link has been sent to your email. Please verify before logging in.",
           { type: "success" }
         );
 
-        router.push("/verify-email");
+        router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
       },
       {
         loading: "Creating your account...",
-        success: "Verification email sent!",
+        success: "Account created successfully!",
         error: "Signup failed. Please try again.",
       }
     );
@@ -122,6 +125,9 @@ export function SignupForm({
     );
   }
 
+  /* ============================================================
+     🧩 UI Layout
+  ============================================================ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>

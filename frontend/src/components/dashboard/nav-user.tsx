@@ -23,12 +23,15 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/authContext";
 import { useRouter } from "next/navigation";
 
+/* ============================================================
+   🌐 NavUser — Profile Dropdown (Context-driven)
+============================================================ */
 export function NavUser() {
   const { user, logout, loading } = useAuth();
   const router = useRouter();
 
   /* ============================================================
-     🚦 Redirect if user logs out while on a protected route
+     🚦 Redirect if logged out on protected route
   ============================================================ */
   useEffect(() => {
     if (!loading && !user) {
@@ -47,7 +50,7 @@ export function NavUser() {
     );
 
   /* ============================================================
-     🔑 No user — show login button
+     🔑 No user → show Login button
   ============================================================ */
   if (!user)
     return (
@@ -61,7 +64,7 @@ export function NavUser() {
     );
 
   /* ============================================================
-     🧩 Extract initials and color for role
+     🧩 Initials & Role Styling
   ============================================================ */
   const initials =
     user.name
@@ -73,11 +76,10 @@ export function NavUser() {
 
   const roleColor = cn(
     "border border-border/40 text-[11px] font-semibold px-1.5 py-[1px] rounded-md capitalize leading-none",
-    user.role?.toLowerCase() === "admin" && "bg-primary/15 text-primary",
-    user.role?.toLowerCase() === "creator" &&
-      "bg-emerald-500/15 text-emerald-500",
-    user.role?.toLowerCase() === "merchant" && "bg-amber-500/15 text-amber-600",
-    !user.role && "bg-muted text-muted-foreground"
+    user.role === "ADMIN" && "bg-primary/15 text-primary",
+    user.role === "CREATOR" && "bg-emerald-500/15 text-emerald-500",
+    user.role === "MERCHANT" && "bg-amber-500/15 text-amber-600",
+    user.role === "USER" && "bg-muted text-muted-foreground"
   );
 
   /* ============================================================
@@ -86,7 +88,7 @@ export function NavUser() {
   const handleLogout = async () => {
     try {
       await logout();
-      router.replace("/login"); // replace ensures we don’t go “Back” into dashboard
+      router.replace("/login");
     } catch (err) {
       console.error("Logout error:", err);
     }
@@ -131,6 +133,7 @@ export function NavUser() {
           "animate-in fade-in-0 zoom-in-95"
         )}
       >
+        {/* Header */}
         <DropdownMenuLabel className="p-0 font-normal">
           <div className="flex items-center gap-3 px-3 py-2.5">
             <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40">
@@ -156,18 +159,28 @@ export function NavUser() {
 
         <DropdownMenuSeparator className="my-1 h-[1px] bg-border/80" />
 
+        {/* Menu Items */}
         <DropdownMenuGroup>
-          <DropdownMenuItem className="text-[14.5px] cursor-pointer hover:bg-accent/50 transition-colors">
+          <DropdownMenuItem
+            className="text-[14.5px] cursor-pointer hover:bg-accent/50 transition-colors"
+            onClick={() => router.push("/profile")}
+          >
             <IconUserCircle className="size-4 mr-2 text-muted-foreground/80" />
             Profile
           </DropdownMenuItem>
 
-          <DropdownMenuItem className="text-[14.5px] cursor-pointer hover:bg-accent/50 transition-colors">
+          <DropdownMenuItem
+            className="text-[14.5px] cursor-pointer hover:bg-accent/50 transition-colors"
+            onClick={() => router.push("/security")}
+          >
             <IconShieldLock className="size-4 mr-2 text-muted-foreground/80" />
             Security
           </DropdownMenuItem>
 
-          <DropdownMenuItem className="text-[14.5px] cursor-pointer hover:bg-accent/50 transition-colors">
+          <DropdownMenuItem
+            className="text-[14.5px] cursor-pointer hover:bg-accent/50 transition-colors"
+            onClick={() => router.push("/billing")}
+          >
             <IconCreditCard className="size-4 mr-2 text-muted-foreground/80" />
             Billing & Settings
           </DropdownMenuItem>
@@ -175,6 +188,7 @@ export function NavUser() {
 
         <DropdownMenuSeparator className="my-1 h-[1px] bg-border/80" />
 
+        {/* Logout */}
         <DropdownMenuItem
           onClick={handleLogout}
           className={cn(
