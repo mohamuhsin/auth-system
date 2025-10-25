@@ -232,17 +232,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
 
       {/* 🩺 Footer */}
-      <SidebarFooter className="mt-auto px-4 py-3 border-t border-border/40">
-        <div className="flex items-center justify-between w-full">
+      <SidebarFooter className="mt-auto px-4 py-4 border-t border-border/40">
+        <div className="flex flex-col items-center gap-3 w-full">
           {/* ✅ System Health */}
           <Link
             href="/dashboard/health"
-            className="group flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-accent/30 transition-all duration-200"
+            className="group flex items-center gap-2.5 px-3 py-1.5 rounded-md hover:bg-accent/30 transition-all duration-200 w-full justify-center"
             aria-label="System Health Status"
           >
+            {/* Status Dot */}
             <div
               className={cn(
-                "relative flex size-2.5 rounded-full ring-2 ring-background/90 shadow-[0_0_8px_var(--tw-shadow-color)] transition-all duration-300",
+                "relative flex size-2.5 rounded-full ring-2 ring-background/90 shadow-[0_0_8px_var(--tw-shadow-color)] transition-all duration-300 shrink-0",
                 health === "loading" && "animate-pulse"
               )}
               style={
@@ -252,11 +253,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 } as React.CSSProperties
               }
             />
-            <div className="flex flex-col leading-tight">
+
+            {/* Status Texts */}
+            <div className="flex flex-col items-center text-center leading-tight min-w-0">
               <span
                 className={cn(
-                  "text-[12.5px] font-medium tracking-tight",
-                  health === "ok" && "text-green-500",
+                  "truncate text-[12.5px] font-medium tracking-tight max-w-[170px]",
+                  health === "ok" && "text-blue-500",
                   health === "degraded" && "text-yellow-500",
                   health === "maintenance" && "text-orange-500",
                   health === "error" && "text-red-500",
@@ -271,9 +274,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </div>
           </Link>
 
+          {/* Divider */}
+          <div className="h-[1px] w-[70%] bg-border/60 rounded-full" />
+
           {/* 🌗 Theme Toggle */}
-          <div className="scale-[0.9] opacity-90 hover:opacity-100 transition-opacity duration-150">
-            <ThemeToggle />
+          <div className="flex justify-center">
+            <div className="scale-[0.9] opacity-90 hover:opacity-100 transition-opacity duration-150">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </SidebarFooter>
