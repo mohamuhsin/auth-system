@@ -29,8 +29,11 @@ import {
 
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/services/firebase";
-import { toastAsync } from "@/lib/toast";
+import { toastAsync, toastMessage } from "@/lib/toast";
 
+/* ============================================================
+   🔑 ForgotPasswordForm — Secure Password Reset via Firebase
+============================================================ */
 export function ForgotPasswordForm({
   className,
   ...props
@@ -45,21 +48,38 @@ export function ForgotPasswordForm({
      ✉️ Handle Password Reset
   ============================================================ */
   async function onSubmit(values: ForgotPasswordValues) {
+    if (!values.email) {
+      toastMessage("Please enter your email address first.", {
+        type: "warning",
+      });
+      return;
+    }
+
     await toastAsync(
       async () => {
         try {
           await sendPasswordResetEmail(auth, values.email);
         } catch (err: any) {
-          // Handle Firebase-specific errors gracefully
-          if (err.code === "auth/user-not-found") {
+          const code = err.code || "";
+
+          if (code === "auth/user-not-found") {
             throw new Error(
-              "No account found with that email address. Please sign up first."
+              "No account found with that email. Please sign up first."
             );
           }
-          if (err.code === "auth/invalid-email") {
+
+          if (code === "auth/invalid-email") {
             throw new Error("Please enter a valid email address.");
           }
-          throw err;
+
+          if (code === "auth/network-request-failed") {
+            throw new Error(
+              "Network error. Please check your internet connection."
+            );
+          }
+
+          // Default fallback
+          throw new Error("Something went wrong. Please try again later.");
         }
       },
       {

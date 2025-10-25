@@ -59,6 +59,13 @@ export function LoginForm({
      ✉️ Email + Password Login
   ============================================================ */
   async function onSubmit(values: LoginFormValues) {
+    if (!values.email || !values.password) {
+      toastMessage("Please fill in both fields before logging in.", {
+        type: "warning",
+      });
+      return;
+    }
+
     try {
       const userCred = await signInWithEmailAndPassword(
         auth,
@@ -69,7 +76,6 @@ export function LoginForm({
       const result = await loginWithFirebase(userCred.user);
 
       if (!result || result.status !== "success") {
-        // handle backend-driven errors
         if (result.statusCode === 404) {
           toastMessage("Account not found. Please sign up first.", {
             type: "warning",
@@ -84,12 +90,15 @@ export function LoginForm({
         );
       }
 
-      toastMessage("Welcome back!", { type: "success" });
+      toastMessage("Welcome back! Redirecting to dashboard...", {
+        type: "success",
+      });
       router.push("/dashboard");
     } catch (err: any) {
       const code = err?.code || "";
       const msg = err?.message || "";
 
+      // 🔹 Common Firebase auth errors
       if (code === "auth/user-not-found") {
         toastMessage("Account not found. Please sign up first.", {
           type: "warning",
@@ -100,6 +109,14 @@ export function LoginForm({
 
       if (code === "auth/wrong-password") {
         toastMessage("Incorrect password. Try again.", { type: "error" });
+        return;
+      }
+
+      if (code === "auth/too-many-requests") {
+        toastMessage(
+          "Too many failed attempts. Please wait a few minutes and try again.",
+          { type: "error" }
+        );
         return;
       }
 
@@ -117,9 +134,14 @@ export function LoginForm({
         return;
       }
 
-      toastMessage("Login failed. Please check your credentials.", {
-        type: "error",
-      });
+      // 🔹 Network or unknown errors
+      if (msg.includes("fetch") || msg.includes("network")) {
+        toastMessage("Unable to reach the server. Check your connection.", {
+          type: "error",
+        });
+      } else {
+        toastMessage("Login failed. Please try again.", { type: "error" });
+      }
     }
   }
 
@@ -149,11 +171,14 @@ export function LoginForm({
           throw new Error(result.message || "Session creation failed");
         }
 
+        toastMessage("Signed in successfully! Redirecting...", {
+          type: "success",
+        });
         router.push("/dashboard");
       },
       {
         loading: "Connecting to Google...",
-        success: "Signed in successfully!",
+        success: "Connected!",
         error: "Google sign-in failed. Please try again.",
       }
     );

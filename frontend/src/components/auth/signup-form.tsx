@@ -64,9 +64,22 @@ export function SignupForm({
   });
 
   /* ============================================================
-     ✉️ Email + Password Signup (requires verification)
+     ✉️ Email + Password Signup
   ============================================================ */
   async function onSubmit(values: SignupFormValues) {
+    // Prevent empty or invalid form submission
+    if (!values.email || !values.password) {
+      toastMessage("Please fill in all required fields.", { type: "warning" });
+      return;
+    }
+
+    if (values.password !== values.confirmPassword) {
+      toastMessage("Passwords do not match. Please try again.", {
+        type: "error",
+      });
+      return;
+    }
+
     await toastAsync(
       async () => {
         try {
@@ -85,7 +98,7 @@ export function SignupForm({
           // 3️⃣ Send verification email
           await sendEmailVerification(userCred.user);
 
-          // 4️⃣ Sign out to prevent redirect loops
+          // 4️⃣ Sign out to prevent auto-login before verification
           await auth.signOut();
 
           // 5️⃣ Notify & redirect
@@ -100,15 +113,41 @@ export function SignupForm({
         } catch (err: any) {
           const code = err?.code || "";
 
-          if (code === "auth/email-already-in-use") {
-            toastMessage("Account already exists. Please sign in instead.", {
-              type: "warning",
-            });
-            router.push("/login");
-            return;
-          }
+          // 🔹 Handle common Firebase signup errors
+          switch (code) {
+            case "auth/email-already-in-use":
+              toastMessage("Account already exists. Please sign in instead.", {
+                type: "warning",
+              });
+              router.push("/login");
+              return;
 
-          throw err; // Let toastAsync catch unknown errors
+            case "auth/invalid-email":
+              toastMessage("Please enter a valid email address.", {
+                type: "error",
+              });
+              return;
+
+            case "auth/weak-password":
+              toastMessage(
+                "Weak password. Use at least 8 characters with a number and uppercase letter.",
+                { type: "error" }
+              );
+              return;
+
+            default:
+              if (
+                err.message?.includes("network") ||
+                err.code === "auth/network-request-failed"
+              ) {
+                toastMessage("Network error. Please check your connection.", {
+                  type: "error",
+                });
+                return;
+              }
+
+              throw err; // Let toastAsync handle unrecognized errors
+          }
         }
       },
       {
@@ -125,38 +164,60 @@ export function SignupForm({
   async function handleGoogleSignup() {
     await toastAsync(
       async () => {
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: "select_account" });
+        try {
+          const provider = new GoogleAuthProvider();
+          provider.setCustomParameters({ prompt: "select_account" });
 
-        const userCred = await signInWithPopup(auth, provider);
-        const googleUser = userCred.user;
+          const userCred = await signInWithPopup(auth, provider);
+          const googleUser = userCred.user;
 
-        // 🧠 Use backend signup-with-firebase endpoint
-        const result = await signupWithFirebase(googleUser, {
-          name: googleUser.displayName ?? undefined,
-          avatarUrl: googleUser.photoURL ?? undefined,
-        });
+          // 🧠 Call backend for secure cookie session
+          const result = await signupWithFirebase(googleUser, {
+            name: googleUser.displayName ?? undefined,
+            avatarUrl: googleUser.photoURL ?? undefined,
+          });
 
-        // Backend checks existence → 409 means account already exists
-        if (result.status !== "success") {
-          if (result.statusCode === 409) {
-            await signOut(auth);
-            toastMessage("Account already exists. Please sign in instead.", {
-              type: "warning",
+          if (result.status !== "success") {
+            if (result.statusCode === 409) {
+              await signOut(auth);
+              toastMessage("Account already exists. Please sign in instead.", {
+                type: "warning",
+              });
+              router.push("/login");
+              return;
+            }
+
+            throw new Error(result.message || "Signup verification failed");
+          }
+
+          toastMessage("Signed up successfully with Google!", {
+            type: "success",
+          });
+          router.push("/dashboard");
+        } catch (err: any) {
+          const code = err?.code || "";
+
+          // Handle user closing popup or network errors
+          if (code === "auth/popup-closed-by-user") {
+            toastMessage("Google signup canceled. Please try again.", {
+              type: "info",
             });
-            router.push("/login");
             return;
           }
 
-          throw new Error(result.message || "Session creation failed");
-        }
+          if (code === "auth/network-request-failed") {
+            toastMessage("Network error. Please check your connection.", {
+              type: "error",
+            });
+            return;
+          }
 
-        // ✅ Success → go to dashboard
-        router.push("/dashboard");
+          throw err;
+        }
       },
       {
         loading: "Connecting to Google...",
-        success: "Signed up successfully with Google!",
+        success: "Connected to Google!",
         error: "Google sign-up failed. Please try again.",
       }
     );
@@ -366,7 +427,6 @@ export function SignupForm({
         </CardContent>
       </Card>
 
-      {/* Footer */}
       <FieldDescription className="px-6 text-center">
         Need help?{" "}
         <a

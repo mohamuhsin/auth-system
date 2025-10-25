@@ -32,8 +32,11 @@ import {
 
 import { confirmPasswordReset } from "firebase/auth";
 import { auth } from "@/services/firebase";
-import { toastAsync } from "@/lib/toast";
+import { toastAsync, toastMessage } from "@/lib/toast";
 
+/* ============================================================
+   🔑 ResetPasswordForm — Secure Firebase Password Reset
+============================================================ */
 export function ResetPasswordForm({
   className,
   ...props
@@ -51,19 +54,29 @@ export function ResetPasswordForm({
     mode: "onChange",
   });
 
-  // 🔍 Extract the oobCode from URL
+  /* ============================================================
+     🔍 Extract oobCode (Firebase reset token) from URL
+  ============================================================ */
   useEffect(() => {
     const code = searchParams.get("oobCode");
     if (code) setOobCode(code);
   }, [searchParams]);
 
   /* ============================================================
-     🔑 Handle Password Reset
+     🔐 Handle Password Reset
   ============================================================ */
   async function onSubmit(values: ResetPasswordValues) {
+    // Basic frontend validation
     if (!oobCode) {
-      toastAsync(async () => {
-        throw new Error("Invalid or expired password reset link.");
+      toastMessage("Invalid or expired password reset link.", {
+        type: "error",
+      });
+      return;
+    }
+
+    if (values.password !== values.confirmPassword) {
+      toastMessage("Passwords do not match. Please try again.", {
+        type: "warning",
       });
       return;
     }
@@ -72,25 +85,39 @@ export function ResetPasswordForm({
       async () => {
         try {
           await confirmPasswordReset(auth, oobCode, values.password);
-          router.push("/login");
+          toastMessage("Your password has been updated successfully!", {
+            type: "success",
+          });
+
+          // Redirect after short delay
+          setTimeout(() => router.replace("/login"), 1000);
         } catch (err: any) {
-          // Handle Firebase error codes more gracefully
-          if (err.code === "auth/expired-action-code") {
-            throw new Error("This reset link has expired. Request a new one.");
+          const code = err.code || "";
+
+          switch (code) {
+            case "auth/expired-action-code":
+              throw new Error(
+                "This password reset link has expired. Please request a new one."
+              );
+            case "auth/invalid-action-code":
+              throw new Error("Invalid or broken password reset link.");
+            case "auth/weak-password":
+              throw new Error(
+                "Your password is too weak. Use at least 8 characters with a number and uppercase letter."
+              );
+            case "auth/network-request-failed":
+              throw new Error(
+                "Network error. Please check your connection and try again."
+              );
+            default:
+              throw new Error("Failed to reset password. Please try again.");
           }
-          if (err.code === "auth/invalid-action-code") {
-            throw new Error("Invalid or broken reset link.");
-          }
-          if (err.code === "auth/weak-password") {
-            throw new Error("Password is too weak. Try a stronger one.");
-          }
-          throw err;
         }
       },
       {
         loading: "Updating password...",
-        success: "Your password has been updated successfully.",
-        error: "Failed to update password. Please try again.",
+        success: "Password updated successfully!",
+        error: "Password reset failed. Please try again.",
       }
     );
   }
@@ -210,6 +237,7 @@ export function ResetPasswordForm({
         </CardContent>
       </Card>
 
+      {/* Footer Help */}
       <FieldDescription className="px-6 text-center">
         Need help?{" "}
         <a
