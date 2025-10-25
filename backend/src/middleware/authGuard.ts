@@ -5,13 +5,18 @@ import prisma from "../prisma/client";
 /**
  * Extends Express Request with authenticated user info.
  */
+export interface AuthenticatedUser {
+  uid: string;
+  email: string;
+  role: string;
+  isApproved: boolean;
+  name?: string | null;
+  photoURL?: string | null;
+  avatarUrl?: string | null;
+}
+
 export interface AuthenticatedRequest extends Request {
-  authUser?: {
-    uid: string;
-    email: string;
-    role: string;
-    isApproved: boolean;
-  };
+  authUser?: AuthenticatedUser;
 }
 
 /**
@@ -30,7 +35,7 @@ export function authGuard(requiredRole?: "USER" | "ADMIN") {
       const cookieName =
         process.env.SESSION_COOKIE_NAME || "__Secure-iventics_session";
 
-      // 🔎 Check multiple cookie sources just in case
+      // 🔎 Support both regular and signed cookies
       const sessionCookie =
         req.cookies?.[cookieName] || req.signedCookies?.[cookieName];
 
@@ -41,12 +46,12 @@ export function authGuard(requiredRole?: "USER" | "ADMIN") {
         });
       }
 
-      // ✅ Verify long-lived Firebase session cookie
+      // ✅ Verify Firebase session cookie
       const decoded = await admin
         .auth()
         .verifySessionCookie(sessionCookie, true);
 
-      // 🔍 Fetch user from DB
+      // 🔍 Fetch user from your database
       const dbUser = await prisma.user.findUnique({
         where: { firebaseUid: decoded.uid },
       });
@@ -58,12 +63,15 @@ export function authGuard(requiredRole?: "USER" | "ADMIN") {
         });
       }
 
-      // Attach user info to request
+      // 🧩 Attach full user info (including optional fields)
       req.authUser = {
-        uid: dbUser.id, // ✅ use internal user ID for audit consistency
+        uid: dbUser.id, // use internal UUID for audit consistency
         email: dbUser.email,
         role: dbUser.role,
         isApproved: dbUser.isApproved,
+        name: dbUser.name || (decoded as any).name || null,
+        photoURL: (decoded as any).picture || null,
+        avatarUrl: dbUser.avatarUrl || (decoded as any).picture || null,
       };
 
       // 🔒 Optional role-based access control

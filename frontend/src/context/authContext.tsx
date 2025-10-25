@@ -12,9 +12,20 @@ import type { User } from "@/types/user";
 interface ApiResponse {
   status: string;
   message?: string;
-  user?: User;
+  uid?: string;
+  firebaseUid?: string;
+  email?: string;
+  name?: string | null;
+  avatarUrl?: string | null;
+  role?: string;
+  isApproved?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
+/* ============================================================
+   🧠 Auth Context Types
+============================================================ */
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
@@ -38,10 +49,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ============================================================ */
   const fetchSession = async () => {
     try {
-      const data = await apiRequest<User>("/users/me");
-      setUser(data);
-    } catch {
-      // No valid session → logout silently
+      const res = await apiRequest<ApiResponse>("/users/me");
+
+      if (res.status === "success" && res.email) {
+        // ✅ Validate role type strictly
+        const validRoles = ["USER", "ADMIN", "CREATOR", "MERCHANT"] as const;
+        const normalizedRole = validRoles.includes(res.role as any)
+          ? (res.role as User["role"])
+          : "USER";
+
+        const newUser: User = {
+          id: res.uid || res.firebaseUid || "unknown",
+          firebaseUid: res.firebaseUid || res.uid || "unknown",
+          email: res.email,
+          name: res.name || null,
+          avatarUrl: res.avatarUrl || null,
+          role: normalizedRole,
+          isApproved: res.isApproved ?? false,
+          createdAt: res.createdAt || new Date().toISOString(),
+          updatedAt: res.updatedAt || new Date().toISOString(),
+        };
+
+        setUser(newUser);
+      } else {
+        setUser(null);
+      }
+    } catch (err) {
+      console.warn("Session fetch failed:", err);
       setUser(null);
     } finally {
       setLoading(false);
@@ -63,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ idToken }),
     });
 
+    // Refresh profile after session is set
     await fetchSession();
 
     return response;
@@ -77,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await apiRequest("/auth/logout", { method: "POST" });
         await signOut(auth);
         setUser(null);
-        router.replace("/login"); // 🔁 redirect immediately after logout
+        router.replace("/login");
       },
       {
         loading: "Logging out...",
@@ -87,6 +122,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  /* ============================================================
+     🔄 Manual refresh (optional)
+  ============================================================ */
   const refreshSession = async () => fetchSession();
 
   return (
