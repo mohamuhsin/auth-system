@@ -16,17 +16,18 @@ import prisma from "../prisma/client";
  */
 export async function logAudit(
   action: string,
-  userId?: string,
+  userId?: string, // internal UUID preferred
   ip?: string,
   userAgent?: string
 ) {
   try {
+    // 🪶 Fire-and-forget mode (non-blocking)
     await prisma.auditLog.create({
       data: {
         action,
-        userId,
-        ipAddress: ip,
-        userAgent,
+        userId: userId || null,
+        ipAddress: ip || null,
+        userAgent: userAgent || null,
       },
     });
   } catch (err: any) {

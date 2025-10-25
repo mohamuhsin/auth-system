@@ -3,14 +3,6 @@
 
 import { toast } from "sonner";
 
-/* ============================================================
-   🍞 Toast Utilities — Iventics Auth System
-   ------------------------------------------------------------
-   Provides:
-   - toastMessage(): instant toast
-   - toastAsync(): promise-based toasts with auto feedback
-============================================================ */
-
 export interface ToastOptions {
   type?: "success" | "error" | "info" | "warning" | "loading";
   duration?: number;
@@ -18,9 +10,9 @@ export interface ToastOptions {
   onAction?: () => void;
 }
 
-/**
- * 🪶 toastMessage — Simple toast for quick feedback
- */
+/* ============================================================
+   🪶 toastMessage — Simple, instant toast
+============================================================ */
 export function toastMessage(
   message: string,
   {
@@ -59,16 +51,12 @@ export function toastMessage(
   }
 }
 
-/**
- * ⚙️ toastAsync — Async wrapper with automatic loading/success/error
- */
+/* ============================================================
+   ⚙️ toastAsync — Async wrapper for auto feedback
+============================================================ */
 export async function toastAsync<T>(
   fn: () => Promise<T>,
-  messages?: {
-    loading?: string;
-    success?: string;
-    error?: string;
-  },
+  messages?: { loading?: string; success?: string; error?: string },
   duration = 4000
 ): Promise<T | undefined> {
   const { loading, success, error } = {
@@ -79,7 +67,6 @@ export async function toastAsync<T>(
   };
 
   try {
-    // 🔄 Wrap the async function with sonner's built-in promise toast
     const wrapped = toast.promise(fn(), {
       loading,
       success,
@@ -87,8 +74,7 @@ export async function toastAsync<T>(
       duration,
     }) as unknown as Promise<T>;
 
-    const result = await wrapped;
-    return result;
+    return await wrapped;
   } catch (err: any) {
     const msg =
       err?.message ||
@@ -99,4 +85,5 @@ export async function toastAsync<T>(
     return undefined;
   }
 }
+
 export { toast };

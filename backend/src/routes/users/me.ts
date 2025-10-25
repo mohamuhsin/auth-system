@@ -21,17 +21,18 @@ router.get("/", authGuard(), async (req: AuthenticatedRequest, res) => {
       });
     }
 
-    // 🧾 Record profile view
+    // 🧾 Record profile view (use internal DB id if available)
     await logAudit(
       "USER_PROFILE_VIEWED",
-      user.uid,
+      user.id, // ✅ use internal UUID for FK consistency
       req.ip,
       req.headers["user-agent"]
     );
 
-    // ✅ Return flat user object
+    // ✅ Return unified user profile object
     return res.status(200).json({
       status: "success",
+      id: user.id,
       uid: user.uid,
       email: user.email,
       role: user.role,

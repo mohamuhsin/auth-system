@@ -8,7 +8,7 @@
  *   logger.error(safeError(err))
  */
 export function safeError(err: unknown): string {
-  if (err instanceof Error) return err.message;
+  if (err instanceof Error) return err.stack || err.message;
 
   try {
     return JSON.stringify(err);

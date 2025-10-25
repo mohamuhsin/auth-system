@@ -1,7 +1,7 @@
 import cors, { CorsOptions } from "cors";
 
 /**
- * 🌍 CORS Middleware — Level 1 (Production Safe)
+ * 🌍 CORS Middleware — Level 1.5 (Production Safe)
  * ------------------------------------------------------------
  * Dynamically allows only whitelisted origins for secure cross-domain requests.
  * Reads from `AUTH_ALLOWED_ORIGINS` (comma-separated list)
@@ -16,19 +16,28 @@ const allowedOrigins = (process.env.AUTH_ALLOWED_ORIGINS || "")
 
 const corsConfig: CorsOptions = {
   origin(origin, callback) {
-    if (!origin) return callback(null, true); // ✅ allow Postman, curl, etc.
+    if (!origin) return callback(null, true); // ✅ allow Postman, curl, SSR
 
+    // ✅ Strict match
     if (allowedOrigins.includes(origin)) return callback(null, true);
 
-    // ✅ Optional: wildcard support for subdomains
-    if (allowedOrigins.some((allowed) => origin.endsWith(allowed)))
+    // ✅ Optional wildcard (e.g., spin.ugapay.ug matches ugapay.ug)
+    if (
+      allowedOrigins.some(
+        (allowed) => origin === allowed || origin.endsWith(`.${allowed}`)
+      )
+    ) {
       return callback(null, true);
+    }
 
-    console.warn(`🚫 Blocked CORS origin: ${origin}`);
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(`🚫 Blocked CORS origin: ${origin}`);
+    }
+
     return callback(new Error("CORS: Origin not allowed"));
   },
 
-  credentials: true, // ✅ required for cross-domain cookies
+  credentials: true, // ✅ needed for cookie-based auth
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",

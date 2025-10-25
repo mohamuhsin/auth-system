@@ -6,7 +6,8 @@ import prisma from "../prisma/client";
  * Extends Express Request with authenticated user info.
  */
 export interface AuthenticatedUser {
-  uid: string;
+  id: string; // Internal UUID (Prisma)
+  uid: string; // Firebase UID
   email: string;
   role: string;
   isApproved: boolean;
@@ -49,11 +50,11 @@ export function authGuard(requiredRole?: "USER" | "ADMIN") {
       // ✅ Verify Firebase session cookie
       const decoded = await admin
         .auth()
-        .verifySessionCookie(sessionCookie, true);
+        .verifySessionCookie(sessionCookie, true); // true = check revocation
 
       // 🔍 Fetch user from your database
       const dbUser = await prisma.user.findUnique({
-        where: { firebaseUid: decoded.uid },
+        where: { uid: decoded.uid },
       });
 
       if (!dbUser) {
@@ -63,9 +64,10 @@ export function authGuard(requiredRole?: "USER" | "ADMIN") {
         });
       }
 
-      // 🧩 Attach full user info (including optional fields)
+      // 🧩 Attach full user info (both internal + Firebase UID)
       req.authUser = {
-        uid: dbUser.id, // use internal UUID for audit consistency
+        id: dbUser.id,
+        uid: dbUser.uid,
         email: dbUser.email,
         role: dbUser.role,
         isApproved: dbUser.isApproved,
@@ -82,9 +84,12 @@ export function authGuard(requiredRole?: "USER" | "ADMIN") {
         });
       }
 
-      next();
-    } catch (err) {
-      console.error("AuthGuard error:", (err as Error).message);
+      // 🧠 Optional: log successful verification
+      // console.debug(`[AuthGuard] Authenticated user: ${dbUser.email}`);
+
+      return next();
+    } catch (err: any) {
+      console.error("AuthGuard error:", err.message);
       return res.status(401).json({
         status: "error",
         message: "Invalid or expired session",

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import admin from "../../services/firebaseAdmin";
+import prisma from "../../prisma/client";
 import { clearSessionCookie } from "../../utils/cookies";
 import { logAudit } from "../../utils/audit";
 
@@ -19,21 +20,19 @@ router.post("/", async (req, res) => {
 
     if (cookie) {
       try {
-        // 🔍 Verify and revoke the Firebase session
+        // 🔍 Verify and revoke Firebase session
         const decoded = await admin.auth().verifySessionCookie(cookie, true);
         await admin.auth().revokeRefreshTokens(decoded.sub);
 
-        // 🧾 Record successful logout
-        await logAudit(
-          "LOGOUT",
-          decoded.uid,
-          req.ip,
-          req.headers["user-agent"]
-        );
+        // 🧩 Map Firebase UID → internal DB ID
+        const dbUser = await prisma.user.findUnique({
+          where: { uid: decoded.uid },
+        });
+
+        await logAudit("LOGOUT", dbUser?.id, req.ip, req.headers["user-agent"]);
       } catch (err: any) {
         console.warn("Logout: invalid or expired cookie");
 
-        // 🧾 Record failed logout attempt
         await logAudit(
           "LOGOUT_FAILED",
           undefined,
@@ -42,7 +41,6 @@ router.post("/", async (req, res) => {
         );
       }
     } else {
-      // 🧾 No cookie found (possible direct API call)
       await logAudit(
         "LOGOUT_NO_COOKIE",
         undefined,
@@ -51,18 +49,16 @@ router.post("/", async (req, res) => {
       );
     }
 
-    // 🍪 Clear the cookie from the client
+    // 🍪 Clear cookie from client
     res.setHeader("Set-Cookie", clearSessionCookie());
 
-    // ✅ Unified success response
-    res.status(200).json({
+    return res.status(200).json({
       status: "success",
       message: "Logged out successfully",
     });
   } catch (err: any) {
     console.error("Logout error:", err.message);
 
-    // 🧾 Log unexpected server-side errors
     await logAudit(
       "LOGOUT_ERROR",
       undefined,
@@ -70,7 +66,7 @@ router.post("/", async (req, res) => {
       req.headers["user-agent"]
     );
 
-    res.status(500).json({
+    return res.status(500).json({
       status: "error",
       message: "Logout failed",
     });

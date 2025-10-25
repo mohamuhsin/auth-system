@@ -9,6 +9,8 @@ const router = Router();
  * ------------------------------------------------------------
  * - GET /api/users/me  → Authenticated user profile
  * - GET /api/users/all → ADMIN-only (list all users)
+ *
+ * All routes use authGuard internally.
  */
 router.use("/me", me);
 router.use("/all", all);
