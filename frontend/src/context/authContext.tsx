@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import { getIdToken, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { auth } from "@/services/firebase";
@@ -9,8 +15,11 @@ import { apiRequest } from "@/lib/api";
 import { toastAsync } from "@/lib/toast";
 import type { User } from "@/types/user";
 
+/* ============================================================
+   📦 API Response Type
+============================================================ */
 interface ApiResponse {
-  status: string;
+  status?: string;
   statusCode?: number;
   message?: string;
   uid?: string;
@@ -39,6 +48,9 @@ interface AuthContextValue {
   refreshSession: () => Promise<void>;
 }
 
+/* ============================================================
+   ⚙️ Context Initialization
+============================================================ */
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 /* ============================================================
@@ -51,13 +63,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /* ============================================================
      🟦 Fetch current session (/users/me)
+     - Wrapped in useCallback to keep it stable across renders
   ============================================================ */
-  const fetchSession = async () => {
+  const fetchSession = useCallback(async (retries = 2) => {
     try {
       const res = await apiRequest<ApiResponse>("/users/me");
 
       if (res.status === "success" && res.email) {
-        // ✅ Validate role type strictly
         const validRoles = ["USER", "ADMIN", "CREATOR", "MERCHANT"] as const;
         const normalizedRole = validRoles.includes(res.role as any)
           ? (res.role as User["role"])
@@ -80,19 +92,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
       }
     } catch (err) {
+      if (retries > 0) {
+        console.warn("Retrying session fetch...");
+        return fetchSession(retries - 1);
+      }
       console.warn("Session fetch failed:", err);
       setUser(null);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchSession();
   }, []);
 
   /* ============================================================
-     🔑 Login — backend verified Firebase session cookie
+     🧠 Initialize session on mount
+  ============================================================ */
+  useEffect(() => {
+    fetchSession();
+  }, [fetchSession]);
+
+  /* ============================================================
+     🔑 Login — Backend-verified Firebase session cookie
   ============================================================ */
   const loginWithFirebase = async (firebaseUser: any): Promise<ApiResponse> => {
     const idToken = await getIdToken(firebaseUser, true);
@@ -102,26 +121,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ idToken }),
+        credentials: "include", // ✅ allows cookies
+        body: JSON.stringify({
+          idToken,
+          userAgent: navigator.userAgent,
+        }),
       }
     );
 
     const data: ApiResponse = await res.json().catch(() => ({}));
-    if (!res.ok) {
+
+    if (res.status === 404)
+      return { status: "error", statusCode: 404, message: "NOT_FOUND" };
+
+    if (!res.ok)
       return {
         status: "error",
         statusCode: res.status,
         message: data?.message || "Login failed.",
       };
-    }
 
     await fetchSession();
-    return { ...data, status: "success" };
+    return { ...data, status: data.status ?? "success" };
   };
 
   /* ============================================================
-     🟢 Signup — backend verified Firebase session cookie
+     🟢 Signup — Backend-verified Firebase session cookie
   ============================================================ */
   const signupWithFirebase = async (
     firebaseUser: any,
@@ -134,26 +159,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ idToken, ...extra }),
+        credentials: "include", // ✅ cookie session cross-domain
+        body: JSON.stringify({
+          idToken,
+          userAgent: navigator.userAgent,
+          ...extra,
+        }),
       }
     );
 
     const data: ApiResponse = await res.json().catch(() => ({}));
-    if (!res.ok) {
+
+    if (res.status === 409)
+      return { status: "error", statusCode: 409, message: "ALREADY_EXISTS" };
+
+    if (!res.ok)
       return {
         status: "error",
         statusCode: res.status,
         message: data?.message || "Signup failed.",
       };
-    }
 
     await fetchSession();
-    return { ...data, status: "success" };
+    return { ...data, status: data.status ?? "success" };
   };
 
   /* ============================================================
-     🚪 Logout — clears backend + Firebase + redirect to /login
+     🚪 Logout — Clears backend + Firebase + redirects to /login
   ============================================================ */
   const logout = async () => {
     await toastAsync(
@@ -172,10 +204,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /* ============================================================
-     🔄 Manual refresh (optional)
+     🔄 Manual Refresh (optional)
   ============================================================ */
-  const refreshSession = async () => fetchSession();
+  const refreshSession = useCallback(async () => {
+    await fetchSession();
+  }, [fetchSession]);
 
+  /* ============================================================
+     🧩 Provide Context
+  ============================================================ */
   return (
     <AuthContext.Provider
       value={{

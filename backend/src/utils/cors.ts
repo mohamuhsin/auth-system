@@ -8,8 +8,6 @@ import cors, { CorsOptions } from "cors";
  *
  * Example:
  * AUTH_ALLOWED_ORIGINS=https://auth.iventics.com,https://auth-system-psi-indol.vercel.app,https://ugapay.ug,http://localhost:3000
- *
- * Enables credentials (cookies) for session-based auth across subdomains.
  */
 const allowedOrigins = (process.env.AUTH_ALLOWED_ORIGINS || "")
   .split(",")
@@ -18,25 +16,26 @@ const allowedOrigins = (process.env.AUTH_ALLOWED_ORIGINS || "")
 
 const corsConfig: CorsOptions = {
   origin(origin, callback) {
-    // 🧪 Allow requests without origin (mobile apps, curl, Postman)
-    if (!origin) return callback(null, true);
+    if (!origin) return callback(null, true); // ✅ allow Postman, curl, etc.
 
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    // ✅ Optional: wildcard support for subdomains
+    if (allowedOrigins.some((allowed) => origin.endsWith(allowed)))
       return callback(null, true);
-    }
 
     console.warn(`🚫 Blocked CORS origin: ${origin}`);
     return callback(new Error("CORS: Origin not allowed"));
   },
 
-  credentials: true, // ✅ Allow cookies / session headers
-
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // ✅ include OPTIONS for preflight
+  credentials: true, // ✅ required for cross-domain cookies
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
     "Authorization",
     "X-Requested-With",
     "Accept",
+    "Origin",
   ],
   exposedHeaders: ["Set-Cookie"],
   optionsSuccessStatus: 204,

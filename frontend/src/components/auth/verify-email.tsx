@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -22,22 +23,40 @@ import { sendEmailVerification, onAuthStateChanged } from "firebase/auth";
 export function VerifyEmailNotice() {
   const [resending, setResending] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const searchParams = useSearchParams();
+  const [checking, setChecking] = useState(true);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  // 🧭 Get email from query param (passed after signup)
+  /* ============================================================
+     🧭 Initialize user & email state
+  ============================================================ */
   useEffect(() => {
     const emailParam = searchParams.get("email");
     if (emailParam) setUserEmail(emailParam);
 
-    // Also check if there's a logged-in user
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user?.email && !emailParam) {
-        setUserEmail(user.email);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setChecking(false);
+        return;
       }
+
+      // Pull email if not from query
+      if (!emailParam && user.email) setUserEmail(user.email);
+
+      // 🔁 Refresh user to get latest verification status
+      await user.reload();
+
+      if (user.emailVerified) {
+        toastMessage("Your email has been verified!", { type: "success" });
+        router.replace("/login");
+        return;
+      }
+
+      setChecking(false);
     });
+
     return () => unsubscribe();
-  }, [searchParams]);
+  }, [router, searchParams]);
 
   /* ============================================================
      🔁 Resend Verification Email
@@ -63,7 +82,18 @@ export function VerifyEmailNotice() {
         success: "Verification link sent successfully!",
         error: "Failed to resend verification email. Try again.",
       }
-    );
+    ).catch((err: any) => {
+      if (err?.code === "auth/too-many-requests") {
+        toastMessage(
+          "You’ve requested too many verification emails. Please wait a few minutes.",
+          { type: "warning" }
+        );
+      } else {
+        toastMessage("Something went wrong. Please try again.", {
+          type: "error",
+        });
+      }
+    });
 
     setResending(false);
   };
@@ -71,6 +101,14 @@ export function VerifyEmailNotice() {
   /* ============================================================
      🧩 UI
   ============================================================ */
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/40">
+        <Loader2 className="size-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-muted/40 px-6">
       <Card className="w-full max-w-sm border border-border/60 shadow-md bg-background/95 backdrop-blur">

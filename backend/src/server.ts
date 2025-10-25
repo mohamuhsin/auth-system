@@ -8,18 +8,16 @@ import { httpLogger, logger } from "./utils/logger";
 import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
 import { errorHandler } from "./middleware/errorHandler";
+import prisma from "./prisma/client";
 
 /**
- * 🚀 Iventics Auth API (Level 1.5 — Production Ready)
- * ------------------------------------------------------------
- * Secure authentication and session service for all Iventics apps.
- * Uses Firebase Admin + Prisma ORM + Express with cookie-based sessions.
+ * 🚀 Iventics Auth API — Level 1.5 (Production Ready)
  */
-
 const app = express();
 
 // 🧱 Core middleware
 app.disable("x-powered-by");
+app.set("trust proxy", 1); // ✅ Required for secure cookies behind proxies
 app.use(helmet());
 app.use(cookieParser());
 app.use(express.json());
@@ -27,33 +25,28 @@ app.use(corsMiddleware);
 app.use(httpLogger);
 
 /* ============================================================
-   🩺 Health Check Endpoint — Used by Frontend Sidebar
+   🩺 Health Check
 ============================================================ */
 app.get("/api/health", async (_req, res) => {
   try {
     const start = Date.now();
-
-    // (Optional) Perform deeper checks here, e.g. DB or Firebase
+    await prisma.$queryRaw`SELECT 1`; // optional DB ping
     const latency = Date.now() - start;
 
     res.status(200).json({
-      ok: true, // ✅ required by frontend
+      ok: true,
       maintenance: false,
-      latency, // measured round-trip ms
+      latency,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
     console.error("Health check failed:", err);
-    res.status(500).json({
-      ok: false,
-      maintenance: false,
-      message: "Health check failed",
-    });
+    res.status(500).json({ ok: false, message: "Health check failed" });
   }
 });
 
 /* ============================================================
-   🔐 Core Routes
+   🔐 Routes
 ============================================================ */
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -64,10 +57,10 @@ app.use("/api/users", userRoutes);
 app.use(errorHandler);
 
 /* ============================================================
-   🚀 Server Startup
+   🚀 Startup
 ============================================================ */
 const PORT = Number(process.env.PORT || 4000);
-const HOST = "0.0.0.0"; // ✅ Required for Railway/Vercel/Docker
+const HOST = "0.0.0.0";
 
 app.listen(PORT, HOST, () => {
   logger.info(`🚀 Auth API running on http://${HOST}:${PORT}`);
@@ -77,7 +70,8 @@ app.listen(PORT, HOST, () => {
 /* ============================================================
    🧹 Graceful Shutdown
 ============================================================ */
-process.on("SIGTERM", () => {
+process.on("SIGTERM", async () => {
   logger.info("👋 Graceful shutdown (SIGTERM received)");
+  await prisma.$disconnect();
   process.exit(0);
 });
