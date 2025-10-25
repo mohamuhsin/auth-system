@@ -11,6 +11,7 @@ import type { User } from "@/types/user";
 
 interface ApiResponse {
   status: string;
+  statusCode?: number;
   message?: string;
   uid?: string;
   firebaseUid?: string;
@@ -30,6 +31,10 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   loginWithFirebase: (firebaseUser: any) => Promise<ApiResponse>;
+  signupWithFirebase: (
+    firebaseUser: any,
+    extra?: { name?: string; avatarUrl?: string }
+  ) => Promise<ApiResponse>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
 }
@@ -87,20 +92,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /* ============================================================
-     🔑 Login — exchange Firebase ID token for session cookie
+     🔑 Login — backend verified Firebase session cookie
   ============================================================ */
   const loginWithFirebase = async (firebaseUser: any): Promise<ApiResponse> => {
     const idToken = await getIdToken(firebaseUser, true);
 
-    const response = await apiRequest<ApiResponse>("/auth/session", {
-      method: "POST",
-      body: JSON.stringify({ idToken }),
-    });
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/login-with-firebase`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ idToken }),
+      }
+    );
 
-    // Refresh profile after session is set
+    const data: ApiResponse = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        status: "error",
+        statusCode: res.status,
+        message: data?.message || "Login failed.",
+      };
+    }
+
     await fetchSession();
+    return { ...data, status: "success" };
+  };
 
-    return response;
+  /* ============================================================
+     🟢 Signup — backend verified Firebase session cookie
+  ============================================================ */
+  const signupWithFirebase = async (
+    firebaseUser: any,
+    extra?: { name?: string; avatarUrl?: string }
+  ): Promise<ApiResponse> => {
+    const idToken = await getIdToken(firebaseUser, true);
+
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/signup-with-firebase`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ idToken, ...extra }),
+      }
+    );
+
+    const data: ApiResponse = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        status: "error",
+        statusCode: res.status,
+        message: data?.message || "Signup failed.",
+      };
+    }
+
+    await fetchSession();
+    return { ...data, status: "success" };
   };
 
   /* ============================================================
@@ -129,7 +178,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, loginWithFirebase, logout, refreshSession }}
+      value={{
+        user,
+        loading,
+        loginWithFirebase,
+        signupWithFirebase,
+        logout,
+        refreshSession,
+      }}
     >
       {children}
     </AuthContext.Provider>

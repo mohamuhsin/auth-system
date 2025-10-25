@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -33,11 +34,15 @@ import {
   signInWithPopup,
   updateProfile,
   sendEmailVerification,
+  signOut,
 } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { useAuth } from "@/context/authContext";
 import { toastAsync, toastMessage } from "@/lib/toast";
 
+/* ============================================================
+   🟢 SignupForm — Email & Google Signup (Backend Verified)
+============================================================ */
 export function SignupForm({
   className,
   ...props
@@ -45,7 +50,7 @@ export function SignupForm({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const router = useRouter();
-  const { loginWithFirebase } = useAuth();
+  const { signupWithFirebase } = useAuth();
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -64,31 +69,47 @@ export function SignupForm({
   async function onSubmit(values: SignupFormValues) {
     await toastAsync(
       async () => {
-        // 1️⃣ Create Firebase user
-        const userCred = await createUserWithEmailAndPassword(
-          auth,
-          values.email,
-          values.password
-        );
+        try {
+          // 1️⃣ Create Firebase user
+          const userCred = await createUserWithEmailAndPassword(
+            auth,
+            values.email,
+            values.password
+          );
 
-        // 2️⃣ Set display name
-        if (values.name) {
-          await updateProfile(userCred.user, { displayName: values.name });
+          // 2️⃣ Add display name
+          if (values.name) {
+            await updateProfile(userCred.user, { displayName: values.name });
+          }
+
+          // 3️⃣ Send verification email
+          await sendEmailVerification(userCred.user);
+
+          // 4️⃣ Sign out to prevent redirect loops
+          await auth.signOut();
+
+          // 5️⃣ Notify & redirect
+          toastMessage(
+            "A verification link has been sent to your email. Please verify before logging in.",
+            { type: "success" }
+          );
+
+          router.push(
+            `/verify-email?email=${encodeURIComponent(values.email)}`
+          );
+        } catch (err: any) {
+          const code = err?.code || "";
+
+          if (code === "auth/email-already-in-use") {
+            toastMessage("Account already exists. Please sign in instead.", {
+              type: "warning",
+            });
+            router.push("/login");
+            return;
+          }
+
+          throw err; // Let toastAsync catch unknown errors
         }
-
-        // 3️⃣ Send verification email
-        await sendEmailVerification(userCred.user);
-
-        // 4️⃣ Sign out so middleware doesn’t redirect to /login
-        await auth.signOut();
-
-        // 5️⃣ Notify & redirect to verify-email page
-        toastMessage(
-          "A verification link has been sent to your email. Please verify before logging in.",
-          { type: "success" }
-        );
-
-        router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
       },
       {
         loading: "Creating your account...",
@@ -99,7 +120,7 @@ export function SignupForm({
   }
 
   /* ============================================================
-     🔵 Google Signup (auto-verified)
+     🔵 Google Signup (Backend Verified)
   ============================================================ */
   async function handleGoogleSignup() {
     await toastAsync(
@@ -108,18 +129,34 @@ export function SignupForm({
         provider.setCustomParameters({ prompt: "select_account" });
 
         const userCred = await signInWithPopup(auth, provider);
+        const googleUser = userCred.user;
 
-        // Google accounts are already verified
-        const result = await loginWithFirebase(userCred.user);
+        // 🧠 Use backend signup-with-firebase endpoint
+        const result = await signupWithFirebase(googleUser, {
+          name: googleUser.displayName ?? undefined,
+          avatarUrl: googleUser.photoURL ?? undefined,
+        });
+
+        // Backend checks existence → 409 means account already exists
         if (result.status !== "success") {
+          if (result.statusCode === 409) {
+            await signOut(auth);
+            toastMessage("Account already exists. Please sign in instead.", {
+              type: "warning",
+            });
+            router.push("/login");
+            return;
+          }
+
           throw new Error(result.message || "Session creation failed");
         }
 
+        // ✅ Success → go to dashboard
         router.push("/dashboard");
       },
       {
         loading: "Connecting to Google...",
-        success: "Signed up successfully with Google",
+        success: "Signed up successfully with Google!",
         error: "Google sign-up failed. Please try again.",
       }
     );
@@ -161,25 +198,25 @@ export function SignupForm({
                     <path
                       fill="#EA4335"
                       d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0
-              14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+                        14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
                     />
                     <path
                       fill="#4285F4"
                       d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94
-              c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6
-              c4.51-4.18 7.09-10.36 7.09-17.65z"
+                        c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6
+                        c4.51-4.18 7.09-10.36 7.09-17.65z"
                     />
                     <path
                       fill="#FBBC05"
                       d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19
-              C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+                        C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
                     />
                     <path
                       fill="#34A853"
                       d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6
-              c-2.15 1.45-4.92 2.3-8.16 2.3
-              -6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19
-              C6.51 42.62 14.62 48 24 48z"
+                        c-2.15 1.45-4.92 2.3-8.16 2.3
+                        -6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19
+                        C6.51 42.62 14.62 48 24 48z"
                     />
                   </svg>
                   Sign up with Google
@@ -244,7 +281,7 @@ export function SignupForm({
                       />
                       <button
                         type="button"
-                        onClick={() => setShowPassword((prev) => !prev)}
+                        onClick={() => setShowPassword((p) => !p)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         aria-label={
                           showPassword ? "Hide password" : "Show password"
@@ -280,7 +317,7 @@ export function SignupForm({
                       />
                       <button
                         type="button"
-                        onClick={() => setShowConfirm((prev) => !prev)}
+                        onClick={() => setShowConfirm((p) => !p)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         aria-label={
                           showConfirm ? "Hide password" : "Show password"
@@ -299,7 +336,7 @@ export function SignupForm({
               />
 
               <FieldDescription>
-                Must be at least 8 characters long and include a number and
+                Must be at least 8 characters long and include a number and an
                 uppercase letter.
               </FieldDescription>
 
