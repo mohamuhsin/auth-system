@@ -3,6 +3,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { getIdToken, signOut } from "firebase/auth";
+import { useRouter } from "next/navigation";
 import { auth } from "@/services/firebase";
 import { apiRequest } from "@/lib/api";
 import { toastAsync } from "@/lib/toast";
@@ -24,18 +25,23 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/* ============================================================
+   🌐 AuthProvider — manages global user session
+============================================================ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   /* ============================================================
-     🟦 Fetch current session (GET /users/me)
+     🟦 Fetch current session (/users/me)
   ============================================================ */
   const fetchSession = async () => {
     try {
       const data = await apiRequest<User>("/users/me");
       setUser(data);
     } catch {
+      // No valid session → logout silently
       setUser(null);
     } finally {
       setLoading(false);
@@ -47,26 +53,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /* ============================================================
-     🔑 Login — exchange Firebase ID token → backend session cookie
+     🔑 Login — exchange Firebase ID token for session cookie
   ============================================================ */
   const loginWithFirebase = async (firebaseUser: any): Promise<ApiResponse> => {
     const idToken = await getIdToken(firebaseUser, true);
 
-    // ✅ Call backend to create session
     const response = await apiRequest<ApiResponse>("/auth/session", {
       method: "POST",
       body: JSON.stringify({ idToken }),
     });
 
-    // ✅ Refresh user context after session is set
     await fetchSession();
 
-    // ✅ Return backend response (so frontend can check `status`)
     return response;
   };
 
   /* ============================================================
-     🚪 Logout — clear backend session + Firebase logout
+     🚪 Logout — clears backend + Firebase + redirect to /login
   ============================================================ */
   const logout = async () => {
     await toastAsync(
@@ -74,11 +77,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await apiRequest("/auth/logout", { method: "POST" });
         await signOut(auth);
         setUser(null);
+        router.replace("/login"); // 🔁 redirect immediately after logout
       },
       {
         loading: "Logging out...",
         success: "Logged out successfully",
-        error: "Logout failed",
+        error: "Logout failed. Please try again.",
       }
     );
   };

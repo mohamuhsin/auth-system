@@ -19,29 +19,39 @@ const interTight = Inter_Tight({
 
 export const metadata: Metadata = {
   title: "Auth by Iventics",
-  description: "Secure authentication system for your app",
+  description: "Secure authentication system for all Iventics apps",
 };
 
+/**
+ * 🌍 Root Layout (Level 2.0 Hardened)
+ * ------------------------------------------------------------
+ * - Wraps entire app with AuthProvider + ThemeProvider
+ * - Provides global font + theme + toast
+ * - Handles hydration safely with `suppressHydrationWarning`
+ */
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${interSans.variable} ${interTight.variable} 
           font-sans antialiased min-h-screen bg-background text-foreground`}
       >
+        {/* 🔐 Auth Context must wrap everything */}
         <AuthProvider>
+          {/* 🌓 Theme provider handles light/dark mode */}
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
           >
+            {/* 🧩 App children (pages, layouts, etc.) */}
             {children}
-            <Toaster />
+
+            {/* 🔔 Global toast notifications */}
+            <Toaster richColors position="top-right" closeButton />
           </ThemeProvider>
         </AuthProvider>
       </body>

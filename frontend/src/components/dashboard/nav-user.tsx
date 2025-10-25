@@ -6,6 +6,8 @@ import {
   IconShieldLock,
   IconUserCircle,
 } from "@tabler/icons-react";
+import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -20,12 +22,23 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/authContext";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
 
 export function NavUser() {
   const { user, logout, loading } = useAuth();
   const router = useRouter();
 
+  /* ============================================================
+     🚦 Redirect if user logs out while on a protected route
+  ============================================================ */
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [user, loading, router]);
+
+  /* ============================================================
+     🌀 Loading state
+  ============================================================ */
   if (loading)
     return (
       <div className="flex items-center justify-center h-10 w-10">
@@ -33,6 +46,9 @@ export function NavUser() {
       </div>
     );
 
+  /* ============================================================
+     🔑 No user — show login button
+  ============================================================ */
   if (!user)
     return (
       <Button
@@ -44,6 +60,9 @@ export function NavUser() {
       </Button>
     );
 
+  /* ============================================================
+     🧩 Extract initials and color for role
+  ============================================================ */
   const initials =
     user.name
       ?.split(" ")
@@ -61,11 +80,21 @@ export function NavUser() {
     !user.role && "bg-muted text-muted-foreground"
   );
 
+  /* ============================================================
+     🚪 Logout handler
+  ============================================================ */
   const handleLogout = async () => {
-    await logout();
-    router.push("/login");
+    try {
+      await logout();
+      router.replace("/login"); // replace ensures we don’t go “Back” into dashboard
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
   };
 
+  /* ============================================================
+     🌟 UI
+  ============================================================ */
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
