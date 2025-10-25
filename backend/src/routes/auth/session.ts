@@ -10,10 +10,7 @@ const router = Router();
  * 🔐 POST /api/auth/session
  * ------------------------------------------------------------
  * Exchanges Firebase ID token → Secure session cookie.
- * - Verifies Firebase token
- * - Finds or creates user (handles duplicates by email)
- * - Sets secure cookie (__Secure-iventics_session)
- * - Returns minimal user object
+ * Enforces email verification before session creation.
  */
 router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -28,6 +25,21 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     console.log("🟢 Received idToken. Verifying...");
     const decoded = await admin.auth().verifyIdToken(idToken);
     console.log("✅ Token verified for UID:", decoded.uid);
+
+    // 🚫 Reject unverified email users (non-OAuth signups)
+    if (!decoded.email_verified) {
+      console.warn(`⛔ Unverified email attempt: ${decoded.email}`);
+      await logAudit(
+        "LOGIN_REJECTED_UNVERIFIED",
+        undefined,
+        req.ip,
+        req.headers["user-agent"]
+      );
+      return res.status(403).json({
+        status: "error",
+        message: "Please verify your email address before logging in.",
+      });
+    }
 
     const email = decoded.email || "";
     const name = decoded.name || null;
@@ -63,7 +75,6 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
         req.headers["user-agent"]
       );
     } else if (!user.firebaseUid) {
-      // 🔄 Link an existing email-based account with new Firebase UID
       console.log("🔗 Linking existing user to Firebase UID...");
       user = await prisma.user.update({
         where: { id: user.id },
@@ -75,7 +86,6 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     console.log("🍪 Creating session cookie...");
     const cookieHeader = await makeSessionCookie(idToken);
     res.setHeader("Set-Cookie", cookieHeader);
-
     console.log(`✅ Session cookie set for ${user.email}`);
 
     // 🧾 Record successful login
@@ -96,7 +106,6 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     console.error("🚨 AUTH SESSION ERROR:", err.message);
     console.error(err);
 
-    // Handle Prisma duplicate email (P2002) gracefully
     if (err.code === "P2002") {
       await logAudit(
         "USER_DUPLICATE_EMAIL",

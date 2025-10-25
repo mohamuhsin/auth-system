@@ -99,3 +99,4 @@ export async function toastAsync<T>(
     return undefined;
   }
 }
+export { toast };

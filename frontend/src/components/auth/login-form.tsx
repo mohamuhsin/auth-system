@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -31,10 +32,11 @@ import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
+  signOut,
 } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { useAuth } from "@/context/authContext";
-import { toastAsync } from "@/lib/toast";
+import { toastAsync, toastMessage } from "@/lib/toast";
 
 export function LoginForm({
   className,
@@ -51,70 +53,82 @@ export function LoginForm({
   });
 
   /* ============================================================
-     ✉️ Email + Password Login
+     ✉️ Email + Password Login (manual toasts to handle 403 cleanly)
   ============================================================ */
   async function onSubmit(values: LoginFormValues) {
     try {
-      await toastAsync(
-        async () => {
-          // 1️⃣ Firebase sign-in
-          const userCred = await signInWithEmailAndPassword(
-            auth,
-            values.email,
-            values.password
-          );
-
-          // 2️⃣ Exchange Firebase ID token → backend session cookie
-          const result = await loginWithFirebase(userCred.user);
-          if (!result || result.status !== "success") {
-            throw new Error(result?.message || "Session creation failed");
-          }
-
-          // 3️⃣ Navigate after verified success
-          router.push("/dashboard");
-        },
-        {
-          loading: "Signing you in...",
-          success: "Welcome back!",
-          error: "Login failed. Please check your credentials.",
-        }
+      // 1) Firebase sign-in
+      const userCred = await signInWithEmailAndPassword(
+        auth,
+        values.email,
+        values.password
       );
-    } catch (err) {
-      console.error("❌ Login error:", err);
+
+      // 2) Exchange Firebase ID token → backend session cookie
+      const result = await loginWithFirebase(userCred.user);
+
+      // If backend shape changes, still guard here
+      if (!result || result.status !== "success") {
+        throw Object.assign(
+          new Error(result?.message || "Session creation failed"),
+          {
+            status: (result as any)?.statusCode,
+          }
+        );
+      }
+
+      // 3) Success → dashboard
+      toastMessage("Welcome back!", { type: "success" });
+      router.push("/dashboard");
+    } catch (err: any) {
+      // Detect unverified email from backend (403) or message text
+      const needsVerify =
+        err?.status === 403 ||
+        /verify/i.test(err?.message || "") ||
+        /verify/i.test(err?.response?.data?.message || "");
+
+      if (needsVerify) {
+        // Ensure no lingering Firebase session in the browser
+        await signOut(auth).catch(() => {});
+        toastMessage("Please verify your email before logging in.", {
+          type: "warning",
+        });
+        router.push("/verify-email");
+        return;
+      }
+
+      // Generic failure
+      toastMessage("Login failed. Please check your credentials.", {
+        type: "error",
+      });
+      // Keep user on login page
     }
   }
 
   /* ============================================================
-     🔵 Google Login
+     🔵 Google Login (already verified) — safe to use toastAsync
   ============================================================ */
   async function handleGoogleLogin() {
-    try {
-      await toastAsync(
-        async () => {
-          const provider = new GoogleAuthProvider();
-          provider.setCustomParameters({ prompt: "select_account" });
+    await toastAsync(
+      async () => {
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: "select_account" });
 
-          // 1️⃣ Firebase Google popup
-          const userCred = await signInWithPopup(auth, provider);
+        const userCred = await signInWithPopup(auth, provider);
+        const result = await loginWithFirebase(userCred.user);
 
-          // 2️⃣ Exchange ID token for backend session
-          const result = await loginWithFirebase(userCred.user);
-          if (!result || result.status !== "success") {
-            throw new Error(result?.message || "Session creation failed");
-          }
-
-          // 3️⃣ Redirect on success
-          router.push("/dashboard");
-        },
-        {
-          loading: "Connecting to Google...",
-          success: "Signed in successfully!",
-          error: "Google sign-in failed. Please try again.",
+        if (!result || result.status !== "success") {
+          throw new Error(result?.message || "Session creation failed");
         }
-      );
-    } catch (err) {
-      console.error("❌ Google login error:", err);
-    }
+
+        router.push("/dashboard");
+      },
+      {
+        loading: "Connecting to Google...",
+        success: "Signed in successfully!",
+        error: "Google sign-in failed. Please try again.",
+      }
+    );
   }
 
   return (
