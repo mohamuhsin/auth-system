@@ -28,6 +28,9 @@ import {
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-provider/theme-toggle";
 
+/* ============================================================
+   🌐 API Base
+============================================================ */
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "https://auth-api.iventics.com/api";
 
@@ -71,46 +74,81 @@ const navData = [
 ];
 
 /* ============================================================
-   🧩 Sidebar Component — with Live Health Status
+   🧩 Sidebar Component — with Smart Health Status
 ============================================================ */
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
-  const [health, setHealth] = React.useState<"ok" | "error" | "loading">(
-    "loading"
-  );
 
-  // 🩺 Ping /api/health
+  // Extended health states
+  type HealthState = "ok" | "degraded" | "maintenance" | "error" | "loading";
+  const [health, setHealth] = React.useState<HealthState>("loading");
+  const [lastChecked, setLastChecked] = React.useState<string>("--:--");
+
+  /* ============================================================
+     🩺 Health Checker
+  ============================================================ */
   React.useEffect(() => {
     const checkHealth = async () => {
       try {
+        const start = performance.now();
         const res = await fetch(`${API_BASE}/health`);
+        const latency = Math.round(performance.now() - start);
         const data = await res.json();
-        if (data.ok) setHealth("ok");
+
+        if (!res.ok) return setHealth("error");
+
+        if (data.maintenance) setHealth("maintenance");
+        else if (latency > 800) setHealth("degraded");
+        else if (data.ok) setHealth("ok");
         else setHealth("error");
+
+        setLastChecked(
+          new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        );
       } catch {
         setHealth("error");
       }
     };
 
     checkHealth();
-    const interval = setInterval(checkHealth, 15000); // every 15s
+    const interval = setInterval(checkHealth, 15000); // check every 15s
     return () => clearInterval(interval);
   }, []);
 
-  const statusColor =
-    health === "ok"
-      ? "#10B981" // green
-      : health === "loading"
-      ? "#FBBF24" // yellow
-      : "#EF4444"; // red
+  /* ============================================================
+     🎨 Status Mapping
+  ============================================================ */
+  const statusMap = {
+    ok: {
+      color: "#10B981",
+      text: "All systems operational",
+    },
+    degraded: {
+      color: "#FACC15",
+      text: "Minor performance issues",
+    },
+    maintenance: {
+      color: "#FB923C",
+      text: "Scheduled maintenance",
+    },
+    error: {
+      color: "#EF4444",
+      text: "System offline",
+    },
+    loading: {
+      color: "#9CA3AF",
+      text: "Checking system health...",
+    },
+  } as const;
 
-  const statusText =
-    health === "ok"
-      ? "All systems normal"
-      : health === "loading"
-      ? "Checking system..."
-      : "System offline";
+  const { color, text } = statusMap[health];
 
+  /* ============================================================
+     🌟 Sidebar UI
+  ============================================================ */
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       {/* 🌐 Brand Header */}
@@ -196,34 +234,45 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       {/* 🩺 Footer */}
       <SidebarFooter className="mt-auto px-4 py-3 border-t border-border/40">
         <div className="flex items-center justify-between w-full">
-          {/* ✅ System Status */}
+          {/* ✅ System Health */}
           <Link
             href="/dashboard/health"
-            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-primary/10 transition-all duration-150"
+            className="group flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-accent/30 transition-all duration-200"
+            aria-label="System Health Status"
           >
             <div
-              className="size-2.5 rounded-full animate-pulse shadow-[0_0_6px_var(--tw-shadow-color)]"
+              className={cn(
+                "relative flex size-2.5 rounded-full ring-2 ring-background/90 shadow-[0_0_8px_var(--tw-shadow-color)] transition-all duration-300",
+                health === "loading" && "animate-pulse"
+              )}
               style={
                 {
-                  backgroundColor: statusColor,
-                  "--tw-shadow-color": statusColor,
+                  backgroundColor: color,
+                  "--tw-shadow-color": color,
                 } as React.CSSProperties
               }
             />
-            <span
-              className={cn(
-                "text-[12.5px] font-medium tracking-tight",
-                health === "ok" && "text-green-500",
-                health === "loading" && "text-amber-500",
-                health === "error" && "text-red-500"
-              )}
-            >
-              {statusText}
-            </span>
+            <div className="flex flex-col leading-tight">
+              <span
+                className={cn(
+                  "text-[12.5px] font-medium tracking-tight",
+                  health === "ok" && "text-green-500",
+                  health === "degraded" && "text-yellow-500",
+                  health === "maintenance" && "text-orange-500",
+                  health === "error" && "text-red-500",
+                  health === "loading" && "text-muted-foreground"
+                )}
+              >
+                {text}
+              </span>
+              <span className="text-[11px] text-muted-foreground/80">
+                Updated {lastChecked}
+              </span>
+            </div>
           </Link>
 
           {/* 🌗 Theme Toggle */}
-          <div className="scale-[0.85] opacity-95 hover:opacity-100 transition-opacity duration-150">
+          <div className="scale-[0.9] opacity-90 hover:opacity-100 transition-opacity duration-150">
             <ThemeToggle />
           </div>
         </div>
