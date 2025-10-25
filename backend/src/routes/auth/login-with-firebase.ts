@@ -16,6 +16,7 @@ router.post("/", async (req, res) => {
   try {
     const { idToken, userAgent } = req.body;
 
+    // 🧩 Validate input
     if (!idToken) {
       return res.status(400).json({
         status: "error",
@@ -23,7 +24,7 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // ✅ Verify Firebase token
+    // ✅ Verify Firebase ID token
     let decoded;
     try {
       decoded = await admin.auth().verifyIdToken(idToken, true);
@@ -47,6 +48,7 @@ router.post("/", async (req, res) => {
         req.ip,
         req.headers["user-agent"]
       );
+
       return res.status(404).json({
         status: "error",
         message: "No account found. Please sign up first.",
@@ -59,7 +61,7 @@ router.post("/", async (req, res) => {
       data: { emailVerified: decoded.email_verified ?? false },
     });
 
-    // ✅ Create session record
+    // ✅ Create session record in DB
     const session = await prisma.session.create({
       data: {
         userId: existingUser.id,
@@ -72,24 +74,19 @@ router.post("/", async (req, res) => {
       },
     });
 
-    // ✅ Create Firebase session cookie
+    // ✅ Generate a secure Firebase session cookie (already serialized)
     const cookieHeader = await makeSessionCookie(idToken);
 
-    res
-      .cookie("__Secure-iventics_session", cookieHeader, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "none",
-        path: "/",
-        maxAge: 1000 * 60 * 60 * 24 * 7,
-      })
-      .status(200)
-      .json({
-        status: "success",
-        message: "Login successful",
-        userId: existingUser.id,
-        sessionId: session.id,
-      });
+    // ✅ Send cookie to browser
+    res.setHeader("Set-Cookie", cookieHeader);
+
+    // ✅ Respond success
+    res.status(200).json({
+      status: "success",
+      message: "Login successful",
+      userId: existingUser.id,
+      sessionId: session.id,
+    });
 
     // 🧾 Record successful login
     await logAudit(
@@ -100,6 +97,7 @@ router.post("/", async (req, res) => {
     );
   } catch (err: any) {
     console.error("🔥 login-with-firebase error:", err.message);
+
     await logAudit(
       "LOGIN_WITH_FIREBASE_ERROR",
       undefined,

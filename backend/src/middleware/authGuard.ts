@@ -23,7 +23,7 @@ export interface AuthenticatedRequest extends Request {
 /**
  * 🛡️ authGuard(requiredRole?)
  * ------------------------------------------------------------
- * Verifies Firebase session cookies and attaches the user to req.authUser.
+ * Verifies Firebase session cookie and attaches user to req.authUser.
  * Optionally enforces role-based access control.
  */
 export function authGuard(requiredRole?: "USER" | "ADMIN") {
@@ -36,11 +36,12 @@ export function authGuard(requiredRole?: "USER" | "ADMIN") {
       const cookieName =
         process.env.SESSION_COOKIE_NAME || "__Secure-iventics_session";
 
-      // 🔎 Support both regular and signed cookies
+      // 🔎 Retrieve session cookie (support signed + unsigned)
       const sessionCookie =
         req.cookies?.[cookieName] || req.signedCookies?.[cookieName];
 
       if (!sessionCookie) {
+        console.warn("🚫 No session cookie found in request.");
         return res.status(401).json({
           status: "error",
           message: "No session cookie found",
@@ -52,19 +53,20 @@ export function authGuard(requiredRole?: "USER" | "ADMIN") {
         .auth()
         .verifySessionCookie(sessionCookie, true); // true = check revocation
 
-      // 🔍 Fetch user from your database
+      // 🔍 Find corresponding user in your DB
       const dbUser = await prisma.user.findUnique({
         where: { uid: decoded.uid },
       });
 
       if (!dbUser) {
+        console.warn("🚫 User not found in database:", decoded.email);
         return res.status(403).json({
           status: "error",
           message: "User not found in database",
         });
       }
 
-      // 🧩 Attach full user info (both internal + Firebase UID)
+      // 🧩 Attach merged user info (DB + Firebase)
       req.authUser = {
         id: dbUser.id,
         uid: dbUser.uid,
@@ -84,12 +86,9 @@ export function authGuard(requiredRole?: "USER" | "ADMIN") {
         });
       }
 
-      // 🧠 Optional: log successful verification
-      // console.debug(`[AuthGuard] Authenticated user: ${dbUser.email}`);
-
       return next();
     } catch (err: any) {
-      console.error("AuthGuard error:", err.message);
+      console.error("🔥 AuthGuard error:", err.message);
       return res.status(401).json({
         status: "error",
         message: "Invalid or expired session",

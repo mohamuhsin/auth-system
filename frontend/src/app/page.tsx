@@ -32,18 +32,23 @@ import { Separator } from "@/components/ui/separator";
 import { ModeToggle } from "@/components/theme-provider/mode-toggle";
 import { ThemeToggle } from "@/components/theme-provider/theme-toggle";
 
+/* ============================================================
+   🏁 Auth by Iventics — Modern, Clean Landing Page
+============================================================ */
 export default function Home() {
+  const year = new Date().getFullYear();
+
   return (
-    <main className="flex min-h-screen flex-col bg-background text-foreground font-sans scroll-smooth overflow-x-hidden">
+    <main className="flex min-h-screen flex-col bg-background text-foreground font-sans overflow-x-hidden scroll-smooth">
       {/* 🧭 NAVBAR */}
       <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 transition-all">
-        <div className="mx-auto flex h-[60px] w-full max-w-[1400px] items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-[60px] max-w-[1400px] items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* 🔰 Brand */}
           <Link
             href="/"
-            className="group flex items-center gap-2 font-semibold tracking-tight transition-all hover:opacity-90"
+            className="flex items-center gap-2 font-semibold tracking-tight hover:opacity-90 transition-opacity"
           >
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-border/40 group-hover:bg-primary/20 transition-colors">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-border/40 hover:bg-primary/20 transition-colors">
               <ShieldCheck className="size-4" />
             </div>
             <span className="text-sm sm:text-base whitespace-nowrap">
@@ -51,9 +56,9 @@ export default function Home() {
             </span>
           </Link>
 
-          {/* Desktop Actions */}
-          <div className="hidden sm:flex items-center justify-end flex-1">
-            <div className="flex items-center gap-3 mr-6">
+          {/* 🌐 Desktop Menu */}
+          <div className="hidden sm:flex items-center gap-5">
+            <div className="flex items-center gap-3">
               <Link href="/login">
                 <Button size="sm" className="font-medium">
                   Live Demo
@@ -70,35 +75,44 @@ export default function Home() {
                   className="font-medium flex items-center gap-1.5"
                 >
                   Docs
-                  <ArrowUpRight className="size-3 opacity-70 transition-transform group-hover:-translate-y-[1px] group-hover:translate-x-[1px]" />
+                  <ArrowUpRight className="size-3 opacity-70" />
                 </Button>
               </Link>
             </div>
+
             <Separator
               orientation="vertical"
-              className="mx-5 data-[orientation=vertical]:h-5"
+              className="h-5 mx-4 bg-border/60"
             />
+
             <ModeToggle />
           </div>
 
-          {/* Mobile Menu */}
+          {/* 📱 Mobile Menu */}
           <div className="sm:hidden">
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Open menu">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Open menu"
+                  className="hover:bg-accent/50"
+                >
                   <Menu className="size-5" />
                 </Button>
               </SheetTrigger>
+
               <SheetContent
                 side="right"
                 className="w-full max-w-[80vw] sm:max-w-[320px] p-0"
               >
                 <SheetHeader className="border-b border-border/50 px-6 py-4">
-                  <SheetTitle className="flex items-center gap-2 text-sm font-medium tracking-tight">
+                  <SheetTitle className="flex items-center gap-2 text-sm font-medium">
                     <ShieldCheck className="size-4 text-primary" />
                     Auth by Iventics
                   </SheetTitle>
                 </SheetHeader>
+
                 <nav className="flex flex-col space-y-1 px-6 py-6">
                   {[
                     { name: "Home", href: "/" },
@@ -106,22 +120,25 @@ export default function Home() {
                     {
                       name: "Docs on GitHub",
                       href: "https://github.com/mohamuhsin/auth-system",
+                      external: true,
                     },
-                  ].map((link) => (
+                  ].map(({ name, href, external }) => (
                     <Link
-                      key={link.name}
-                      href={link.href}
-                      target={link.name.includes("GitHub") ? "_blank" : "_self"}
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between rounded-md px-2 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                      key={name}
+                      href={href}
+                      target={external ? "_blank" : "_self"}
+                      rel={external ? "noopener noreferrer" : undefined}
+                      className="flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
                     >
-                      <span>{link.name}</span>
-                      {link.name.includes("GitHub") && (
+                      <span>{name}</span>
+                      {external && (
                         <ArrowUpRight className="size-4 opacity-70" />
                       )}
                     </Link>
                   ))}
+
                   <Separator className="my-6" />
+
                   <div>
                     <p className="text-xs text-muted-foreground mb-2">
                       Appearance
@@ -137,31 +154,27 @@ export default function Home() {
 
       {/* HERO */}
       <section className="relative flex flex-col items-center justify-center text-center px-4 sm:px-6 lg:px-8 pt-24 pb-20 overflow-hidden">
-        {/* Background Glow */}
+        {/* Glow Background */}
         <div className="absolute inset-0 -z-10 flex justify-center items-center">
           <div className="h-[400px] sm:h-[600px] w-[400px] sm:w-[600px] rounded-full bg-gradient-to-tr from-primary/25 via-purple-500/20 to-blue-500/10 blur-3xl opacity-40 animate-pulse" />
         </div>
 
-        {/* Icon */}
         <div className="relative flex size-16 sm:size-20 md:size-24 items-center justify-center rounded-3xl bg-primary/10 text-primary ring-1 ring-border/40 shadow-inner hover:scale-105 transition-transform duration-300">
           <ShieldCheck className="size-8 sm:size-9 md:size-10" />
         </div>
 
-        {/* Heading */}
         <h1 className="mt-8 text-[clamp(1.8rem,4vw,3.5rem)] font-bold tracking-tight bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent leading-tight max-w-[90vw]">
           Secure Auth. Universal Identity.
         </h1>
 
-        {/* Subtitle */}
         <p className="mt-4 max-w-[680px] text-[clamp(0.9rem,1.8vw,1.1rem)] text-muted-foreground px-2">
-          An open-source authentication system for modern web apps - fully
+          An open-source authentication system for modern web apps — fully
           extensible, production-ready, and easy to clone for any project.
         </p>
 
-        {/* CTA Buttons */}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link href="/login">
-            <Button size="lg" className="font-medium w-full sm:w-auto">
+            <Button size="lg" className="font-medium">
               Try Live Demo
             </Button>
           </Link>
@@ -173,7 +186,7 @@ export default function Home() {
             <Button
               size="lg"
               variant="outline"
-              className="w-full sm:w-auto hover:bg-accent/60 flex items-center gap-2 group"
+              className="flex items-center gap-2 group"
             >
               Clone on GitHub
               <ArrowUpRight className="size-4 opacity-70 group-hover:translate-x-[2px] group-hover:-translate-y-[2px] transition-transform duration-200" />
@@ -181,19 +194,18 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* Tech Badges */}
         <div className="mt-8 flex flex-wrap justify-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground px-2">
           {[
             "Next.js 15+",
             "Firebase Auth + Admin",
             "Prisma ORM",
             "Express API",
-          ].map((badge) => (
+          ].map((tech) => (
             <span
-              key={badge}
+              key={tech}
               className="rounded-full border border-border/40 px-3 py-1 hover:border-primary/50 transition-colors whitespace-nowrap"
             >
-              {badge}
+              {tech}
             </span>
           ))}
         </div>
@@ -211,12 +223,12 @@ export default function Home() {
             {
               icon: <Users className="size-6 text-primary" />,
               title: "Role-Based Access",
-              desc: "Admins, Merchants, and Creators - each with secure and personalized dashboards.",
+              desc: "Admins, Merchants, and Creators — each with secure and personalized dashboards.",
             },
             {
               icon: <Zap className="size-6 text-primary" />,
               title: "Plug & Play Architecture",
-              desc: "Integrate instantly into any app - minimal setup, maximum scalability.",
+              desc: "Integrate instantly into any app — minimal setup, maximum scalability.",
             },
           ].map((f) => (
             <Card
@@ -230,7 +242,7 @@ export default function Home() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <CardDescription className="text-sm leading-relaxed text-muted-foreground">
+                <CardDescription className="text-sm text-muted-foreground leading-relaxed">
                   {f.desc}
                 </CardDescription>
               </CardContent>
@@ -245,12 +257,13 @@ export default function Home() {
           <h2 className="text-xl sm:text-2xl font-semibold mb-12">
             Seamless Integrations
           </h2>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               {
                 icon: <Globe className="size-6 text-primary" />,
                 title: "Cross-Domain Sessions",
-                desc: "Unified login between frontend and backend - secure, consistent, and cookie-safe across subdomains.",
+                desc: "Unified login between frontend and backend — secure, consistent, and cookie-safe across subdomains.",
               },
               {
                 icon: <KeyRound className="size-6 text-primary" />,
@@ -262,20 +275,20 @@ export default function Home() {
                 title: "Next.js + Prisma Core",
                 desc: "Modern, type-safe full-stack foundation optimized for reliability and speed.",
               },
-            ].map((item) => (
+            ].map((i) => (
               <Card
-                key={item.title}
+                key={i.title}
                 className="text-center shadow-sm hover:shadow-md transition-shadow duration-300"
               >
                 <CardHeader className="flex flex-col items-center gap-3">
-                  {item.icon}
+                  {i.icon}
                   <CardTitle className="text-base sm:text-lg font-semibold">
-                    {item.title}
+                    {i.title}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <CardDescription className="text-sm leading-relaxed text-muted-foreground">
-                    {item.desc}
+                  <CardDescription className="text-sm text-muted-foreground leading-relaxed">
+                    {i.desc}
                   </CardDescription>
                 </CardContent>
               </Card>
@@ -286,12 +299,13 @@ export default function Home() {
 
       {/* FOOTER */}
       <footer className="border-t border-border/40 bg-background py-10 text-center text-sm text-muted-foreground px-4">
-        <p className="leading-relaxed">
-          © {new Date().getFullYear()}{" "}
+        <p>
+          © {year}{" "}
           <span className="font-medium text-foreground">
             Auth by Iventics Technologies
           </span>
         </p>
+
         <div className="mt-3 flex flex-wrap justify-center gap-4 text-xs sm:text-sm">
           <Link
             href="mailto:support@iventics.com"

@@ -10,7 +10,7 @@ const router = Router();
  * 🔐 POST /api/auth/signup-with-firebase
  * ------------------------------------------------------------
  * Handles first-time signups using Google/Firebase.
- * Creates user in DB, logs audit, and issues session cookie.
+ * Creates user in DB, logs audit, and issues secure session cookie.
  */
 router.post("/", async (req, res) => {
   try {
@@ -96,35 +96,30 @@ router.post("/", async (req, res) => {
       },
     });
 
-    // 🍪 Create secure Firebase session cookie
-    const cookieValue = await makeSessionCookie(idToken);
+    // 🍪 Create secure Firebase session cookie (already serialized)
+    const cookieHeader = await makeSessionCookie(idToken);
 
-    res
-      .cookie("__Secure-iventics_session", cookieValue, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "none",
-        domain: process.env.COOKIE_DOMAIN || ".iventics.com", // ✅ from env
-        path: "/",
-        maxAge: 1000 * 60 * 60 * 24 * 7,
-      })
-      .status(201)
-      .json({
-        status: "success",
-        message: "User created successfully",
-        user: {
-          id: newUser.id,
-          uid: newUser.uid,
-          email: newUser.email,
-          name: newUser.name,
-          avatarUrl: newUser.avatarUrl,
-          role: newUser.role,
-          isApproved: newUser.isApproved,
-        },
-        sessionId: session.id,
-      });
+    // ✅ Send the cookie properly
+    res.setHeader("Set-Cookie", cookieHeader);
+
+    // ✅ Return success response
+    res.status(201).json({
+      status: "success",
+      message: "User created successfully",
+      user: {
+        id: newUser.id,
+        uid: newUser.uid,
+        email: newUser.email,
+        name: newUser.name,
+        avatarUrl: newUser.avatarUrl,
+        role: newUser.role,
+        isApproved: newUser.isApproved,
+      },
+      sessionId: session.id,
+    });
   } catch (err: any) {
     console.error("🔥 signup-with-firebase error:", err.message);
+
     await logAudit(
       "SIGNUP_WITH_FIREBASE_ERROR",
       undefined,
