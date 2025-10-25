@@ -10,30 +10,34 @@ const router = Router();
  * 🔐 POST /api/auth/session
  * ------------------------------------------------------------
  * Exchanges Firebase ID token → Secure session cookie.
- * Creates a user if missing.
- * Automatically makes the first registered user ADMIN.
+ * Creates user if missing, sets cookie, returns user info.
  */
 router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { idToken } = req.body;
+
     if (!idToken) {
-      return res
-        .status(400)
-        .json({ status: "error", message: "Missing idToken" });
+      console.error("❌ No idToken in body");
+      return res.status(400).json({ error: "Missing idToken" });
     }
 
-    // 🔎 Verify Firebase ID token
+    console.log("🟢 Received idToken. Verifying...");
+
+    // Verify token
     const decoded = await admin.auth().verifyIdToken(idToken);
+    console.log("✅ Token verified for UID:", decoded.uid);
+
     const email = decoded.email || "";
     const name = decoded.name || null;
     const avatarUrl = decoded.picture || null;
 
-    // 🔧 Find or create user
+    // Check if user exists
     let user = await prisma.user.findUnique({
       where: { firebaseUid: decoded.uid },
     });
 
     if (!user) {
+      console.log("🆕 Creating new user...");
       const userCount = await prisma.user.count();
       const isFirstUser = userCount === 0;
 
@@ -56,31 +60,18 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       );
     }
 
-    // 🍪 Create Firebase session cookie (value only)
-    const sessionCookieValue = await makeSessionCookie(idToken);
+    console.log("🍪 Creating session cookie...");
+    const cookieHeader = await makeSessionCookie(idToken);
 
-    // ✅ Set secure cookie across *.iventics.com
-    const cookieName =
-      process.env.SESSION_COOKIE_NAME || "__Secure-iventics_session";
-    res.cookie(cookieName, sessionCookieValue, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      domain:
-        process.env.NODE_ENV === "production"
-          ? ".iventics.com" // shared across subdomains
-          : "localhost", // local dev
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    // IMPORTANT: if makeSessionCookie returns serialized cookie string
+    res.setHeader("Set-Cookie", cookieHeader);
 
-    // 🧾 Audit successful login
+    console.log("✅ Session cookie set for:", user.email);
+
     await logAudit("LOGIN", user.id, req.ip, req.headers["user-agent"]);
 
-    // ✅ Success response
     return res.status(200).json({
       status: "success",
-      message: "Session created successfully",
       user: {
         id: user.id,
         email: user.email,
@@ -89,8 +80,9 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
         isApproved: user.isApproved,
       },
     });
-  } catch (err) {
-    console.error("❌ /api/auth/session error:", (err as Error).message);
+  } catch (err: any) {
+    console.error("🚨 AUTH SESSION ERROR:", err.message);
+    console.error(err);
 
     await logAudit(
       "LOGIN_FAILED",
@@ -101,7 +93,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
 
     return res.status(500).json({
       status: "error",
-      message: (err as Error).message || "Internal Server Error",
+      message: err.message || "Internal server error",
     });
   }
 });
