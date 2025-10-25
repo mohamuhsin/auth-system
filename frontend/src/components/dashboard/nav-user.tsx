@@ -24,22 +24,17 @@ import { useAuth } from "@/context/authContext";
 import { useRouter } from "next/navigation";
 
 /* ============================================================
-   🌐 NavUser — Profile Dropdown (Aligned & Clean)
+   🌐 NavUser — Compact + Responsive Profile Dropdown
 ============================================================ */
 export function NavUser() {
   const { user, logout, loading } = useAuth();
   const router = useRouter();
 
-  /* ============================================================
-     🚦 Redirect if logged out on protected route
-  ============================================================ */
+  // 🚦 Redirect unauthenticated users
   useEffect(() => {
     if (!loading && !user) router.push("/login");
   }, [user, loading, router]);
 
-  /* ============================================================
-     🌀 Loading State
-  ============================================================ */
   if (loading)
     return (
       <div className="flex items-center justify-center h-10 w-10">
@@ -47,9 +42,6 @@ export function NavUser() {
       </div>
     );
 
-  /* ============================================================
-     🔑 No user → show Login button
-  ============================================================ */
   if (!user)
     return (
       <Button
@@ -61,9 +53,6 @@ export function NavUser() {
       </Button>
     );
 
-  /* ============================================================
-     🧩 Initials & Role Styling
-  ============================================================ */
   const initials =
     user.name
       ?.split(" ")
@@ -73,16 +62,13 @@ export function NavUser() {
       .toUpperCase() || "US";
 
   const roleColor = cn(
-    "border border-border/40 text-[11px] font-semibold px-1.5 py-[1px] rounded-md capitalize leading-none whitespace-nowrap",
+    "border border-border/40 text-[10.5px] font-semibold px-1.5 py-[1px] rounded-md capitalize leading-none whitespace-nowrap",
     user.role === "ADMIN" && "bg-primary/15 text-primary",
     user.role === "CREATOR" && "bg-emerald-500/15 text-emerald-500",
     user.role === "MERCHANT" && "bg-amber-500/15 text-amber-600",
     user.role === "USER" && "bg-muted text-muted-foreground"
   );
 
-  /* ============================================================
-     🚪 Logout Handler
-  ============================================================ */
   const handleLogout = async () => {
     try {
       await logout();
@@ -100,25 +86,30 @@ export function NavUser() {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="icon"
           aria-label="User menu"
           className={cn(
-            "relative flex size-[38px] items-center justify-center rounded-full overflow-hidden",
+            "relative flex items-center rounded-full overflow-hidden",
             "border border-border bg-background/50 hover:bg-accent/50",
             "hover:ring-2 hover:ring-accent/30 active:scale-[0.97]",
-            "shadow-sm transition-all duration-150"
+            "shadow-sm transition-all duration-150 px-1.5 sm:px-2"
           )}
         >
-          <Avatar className="size-full rounded-full">
+          {/* 🧩 Avatar */}
+          <Avatar className="size-8 sm:size-9 rounded-full">
             <AvatarImage
               src={user.avatarUrl || ""}
               alt={user.name || "User"}
               className="object-cover"
             />
-            <AvatarFallback className="size-full rounded-full bg-muted text-[11px] font-semibold uppercase flex items-center justify-center">
+            <AvatarFallback className="rounded-full bg-muted text-[11px] font-semibold uppercase flex items-center justify-center">
               {initials}
             </AvatarFallback>
           </Avatar>
+
+          {/* 🧱 Username (shown only on mobile) */}
+          <span className="ml-2 text-sm font-medium text-foreground truncate sm:hidden max-w-[90px]">
+            {user.name || "User"}
+          </span>
         </Button>
       </DropdownMenuTrigger>
 
@@ -133,23 +124,22 @@ export function NavUser() {
       >
         {/* Header */}
         <DropdownMenuLabel className="p-0 font-normal">
-          <div className="flex items-center gap-3 px-3 py-2.5">
-            <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40 shrink-0">
+          <div className="flex items-center gap-2.5 px-3 py-2">
+            <Avatar className="h-9 w-9 rounded-full ring-1 ring-border/40 shrink-0">
               <AvatarImage src={user.avatarUrl || ""} alt={user.name || ""} />
-              <AvatarFallback className="rounded-full bg-muted text-xs font-semibold">
+              <AvatarFallback className="rounded-full bg-muted text-[11px] font-semibold">
                 {initials}
               </AvatarFallback>
             </Avatar>
 
-            {/* ✅ Keep name + role aligned on same line */}
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-[15px] font-medium text-foreground truncate">
+            <div className="flex flex-col leading-tight min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-[14.5px] font-medium truncate max-w-[130px]">
                   {user.name || "User"}
                 </span>
                 {user.role && <span className={roleColor}>{user.role}</span>}
               </div>
-              <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+              <span className="text-[12px] text-muted-foreground truncate max-w-[160px]">
                 {user.email}
               </span>
             </div>
@@ -161,7 +151,7 @@ export function NavUser() {
         {/* Menu Items */}
         <DropdownMenuGroup>
           <DropdownMenuItem
-            className="text-[14.5px] cursor-pointer hover:bg-accent/50 transition-colors"
+            className="text-[14px] cursor-pointer hover:bg-accent/50 transition-colors"
             onClick={() => router.push("/profile")}
           >
             <IconUserCircle className="size-4 mr-2 text-muted-foreground/80" />
@@ -169,7 +159,7 @@ export function NavUser() {
           </DropdownMenuItem>
 
           <DropdownMenuItem
-            className="text-[14.5px] cursor-pointer hover:bg-accent/50 transition-colors"
+            className="text-[14px] cursor-pointer hover:bg-accent/50 transition-colors"
             onClick={() => router.push("/security")}
           >
             <IconShieldLock className="size-4 mr-2 text-muted-foreground/80" />
@@ -177,7 +167,7 @@ export function NavUser() {
           </DropdownMenuItem>
 
           <DropdownMenuItem
-            className="text-[14.5px] cursor-pointer hover:bg-accent/50 transition-colors"
+            className="text-[14px] cursor-pointer hover:bg-accent/50 transition-colors"
             onClick={() => router.push("/billing")}
           >
             <IconCreditCard className="size-4 mr-2 text-muted-foreground/80" />
@@ -191,7 +181,7 @@ export function NavUser() {
         <DropdownMenuItem
           onClick={handleLogout}
           className={cn(
-            "text-[14.5px] text-destructive focus:text-destructive cursor-pointer font-medium",
+            "text-[14px] text-destructive focus:text-destructive cursor-pointer font-medium",
             "hover:bg-destructive/10 transition-colors"
           )}
         >
