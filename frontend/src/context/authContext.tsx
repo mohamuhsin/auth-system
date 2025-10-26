@@ -31,6 +31,7 @@ interface ApiResponse {
   id?: string;
   createdAt?: string;
   updatedAt?: string;
+  error?: string;
 }
 
 /* ============================================================
@@ -51,7 +52,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 /* ============================================================
-   🌐 AuthProvider — manages global user session
+   🌍 AuthProvider — Global Auth State Manager
 ============================================================ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -59,13 +60,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   /* ============================================================
-     🧩 Fetch Session from Backend
+     🧩 Fetch Session — Verify Cookie from Backend
   ============================================================ */
   const fetchSession = useCallback(async (retries = 2) => {
     try {
       const res = await apiRequest<ApiResponse>("/users/me");
 
-      if (res?.status === "success" && res.email) {
+      if ((res?.status === "success" || res?.email) && !res?.error) {
         const validRoles = ["USER", "ADMIN", "CREATOR", "MERCHANT"] as const;
         const role = validRoles.includes(res.role as any)
           ? (res.role as User["role"])
@@ -74,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const newUser: User = {
           id: res.id || "unknown",
           firebaseUid: res.uid || "unknown",
-          email: res.email,
+          email: res.email || "",
           name: res.name || null,
           avatarUrl: res.avatarUrl || null,
           role,
@@ -92,22 +93,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn("Retrying session fetch...");
         return fetchSession(retries - 1);
       }
-      console.warn("Session fetch failed:", err);
+      console.warn("❌ Session fetch failed:", err.message || err);
       setUser(null);
     } finally {
       setLoading(false);
+      console.log("✅ Auth state initialized — session checked");
     }
   }, []);
 
   /* ============================================================
-     🚀 Initialize session on mount
+     🚀 Initialize Session on Mount
   ============================================================ */
   useEffect(() => {
     fetchSession();
   }, [fetchSession]);
 
   /* ============================================================
-     🔑 Login — Firebase → Backend cookie session
+     🔑 Login — Firebase → Backend Cookie Session
   ============================================================ */
   const loginWithFirebase = async (firebaseUser: any): Promise<ApiResponse> => {
     const idToken = await getIdToken(firebaseUser, true);
@@ -117,12 +119,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: { idToken, userAgent: navigator.userAgent },
     });
 
+    // ✅ Allow browser to store cookie before fetching session
+    await new Promise((r) => setTimeout(r, 600));
+
     await fetchSession();
+    router.replace("/dashboard");
     return { ...res, status: res.status ?? "success" };
   };
 
   /* ============================================================
-     🆕 Signup — Firebase → Backend user creation
+     🆕 Signup — Firebase → Backend Cookie Session
   ============================================================ */
   const signupWithFirebase = async (
     firebaseUser: any,
@@ -135,7 +141,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: { idToken, userAgent: navigator.userAgent, ...extra },
     });
 
+    // ✅ Wait before checking cookie
+    await new Promise((r) => setTimeout(r, 600));
+
     await fetchSession();
+    router.replace("/dashboard");
     return { ...res, status: res.status ?? "success" };
   };
 
@@ -166,7 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchSession]);
 
   /* ============================================================
-     🌍 Context Provider
+     🌍 Provide Context Globally
   ============================================================ */
   return (
     <AuthContext.Provider
@@ -185,7 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 /* ============================================================
-   🪶 Hook: useAuth
+   🪶 useAuth Hook
 ============================================================ */
 export function useAuth() {
   const ctx = useContext(AuthContext);

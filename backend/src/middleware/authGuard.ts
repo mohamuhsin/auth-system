@@ -26,12 +26,9 @@ export interface AuthenticatedRequest extends Request {
 /**
  * 🛡️ authGuard(requiredRole?)
  * ------------------------------------------------------------
- * Verifies Firebase session cookie and attaches user to req.authUser.
- * Optionally enforces role-based access control.
- *
- * Usage:
- *   app.get("/api/me", authGuard(), handler)
- *   app.get("/api/admin", authGuard(Role.ADMIN), handler)
+ * • Verifies Firebase session cookie (shared across .iventics.com)
+ * • Merges Firebase + Prisma user data
+ * • Optionally enforces role-based access control
  */
 export function authGuard(requiredRole?: Role) {
   return async (
@@ -43,8 +40,14 @@ export function authGuard(requiredRole?: Role) {
       process.env.SESSION_COOKIE_NAME || "__Secure-iventics_session";
 
     try {
+      // 🍪 Support cookies from cross-domain requests
       const sessionCookie =
-        req.cookies?.[cookieName] || req.signedCookies?.[cookieName];
+        req.cookies?.[cookieName] ||
+        req.signedCookies?.[cookieName] ||
+        (req.headers.cookie || "")
+          .split("; ")
+          .find((c) => c.startsWith(`${cookieName}=`))
+          ?.split("=")[1];
 
       if (!sessionCookie) {
         logger.warn({ path: req.path, ip: req.ip }, "No session cookie found");
@@ -53,10 +56,9 @@ export function authGuard(requiredRole?: Role) {
           null,
           req.ip,
           req.headers["user-agent"],
-          {
-            reason: "NO_SESSION_COOKIE",
-          }
+          { reason: "NO_SESSION_COOKIE" }
         );
+
         return res.status(401).json({
           status: "error",
           code: 401,
@@ -64,7 +66,7 @@ export function authGuard(requiredRole?: Role) {
         });
       }
 
-      // ✅ Verify Firebase session cookie (checks for revocation)
+      // ✅ Verify Firebase session cookie (and check for revocation)
       const decoded = await admin
         .auth()
         .verifySessionCookie(sessionCookie, true);
@@ -89,6 +91,7 @@ export function authGuard(requiredRole?: Role) {
             email: decoded.email,
           }
         );
+
         return res.status(403).json({
           status: "error",
           code: 403,
@@ -96,7 +99,7 @@ export function authGuard(requiredRole?: Role) {
         });
       }
 
-      // 🚫 Check account status
+      // 🚫 Account inactive or suspended
       if (dbUser.status !== "ACTIVE") {
         logger.warn(
           { id: dbUser.id, status: dbUser.status },
@@ -107,10 +110,9 @@ export function authGuard(requiredRole?: Role) {
           dbUser.id,
           req.ip,
           req.headers["user-agent"],
-          {
-            reason: "ACCOUNT_INACTIVE",
-          }
+          { reason: "ACCOUNT_INACTIVE" }
         );
+
         return res.status(403).json({
           status: "error",
           code: 403,
@@ -118,7 +120,7 @@ export function authGuard(requiredRole?: Role) {
         });
       }
 
-      // 🧩 Attach merged user info
+      // 🧩 Attach merged user info for downstream routes
       req.authUser = {
         id: dbUser.id,
         uid: dbUser.uid,
@@ -130,7 +132,7 @@ export function authGuard(requiredRole?: Role) {
         photoURL: (decoded as any).picture || null,
       };
 
-      // 🔒 Role-based guard (if required)
+      // 🔒 Enforce required role (if specified)
       if (requiredRole && dbUser.role !== requiredRole) {
         logger.warn(
           {
@@ -164,8 +166,8 @@ export function authGuard(requiredRole?: Role) {
     } catch (err: any) {
       logger.error({
         msg: "AuthGuard error",
-        code: err.code,
-        detail: err.message,
+        code: err?.code,
+        detail: err?.message,
         path: req.path,
       });
 
@@ -176,7 +178,7 @@ export function authGuard(requiredRole?: Role) {
         req.headers["user-agent"],
         {
           reason: "INVALID_SESSION",
-          detail: err.message,
+          detail: err?.message,
         }
       );
 
