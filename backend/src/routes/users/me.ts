@@ -8,8 +8,8 @@ const router = Router();
 /**
  * 👤 GET /api/users/me
  * ------------------------------------------------------------
- * Returns the authenticated user's profile based on the verified session.
- * Uses merged Firebase + DB data (authGuard attaches req.authUser).
+ * Returns authenticated user's profile based on verified session.
+ * Uses merged Firebase + DB data (attached by authGuard).
  */
 router.get("/", authGuard(), async (req: AuthenticatedRequest, res) => {
   try {
@@ -21,43 +21,39 @@ router.get("/", authGuard(), async (req: AuthenticatedRequest, res) => {
         null,
         req.ip,
         req.headers["user-agent"],
-        {
-          reason: "NO_AUTH_USER",
-        }
+        { reason: "NO_AUTH_USER" }
       );
 
       return res.status(401).json({
         status: "error",
         code: 401,
-        message: "Not authenticated",
+        message: "No valid session cookie found.",
       });
     }
 
-    // 🧾 Record audit log for profile view
+    // 🧾 Record audit log (USER_UPDATE used to represent profile view)
     await logAudit(
-      AuditAction.USER_UPDATE, // Re-use USER_UPDATE to represent profile view/read
+      AuditAction.USER_UPDATE,
       user.id,
       req.ip,
       req.headers["user-agent"],
-      { action: "PROFILE_VIEW" }
+      { event: "PROFILE_VIEW" }
     );
 
-    // ✅ Unified user profile response
+    // ✅ Unified response — matches frontend AuthContext expectations
     return res.status(200).json({
       status: "success",
       code: 200,
-      user: {
-        id: user.id,
-        uid: user.uid,
-        email: user.email,
-        role: user.role,
-        name: user.name ?? null,
-        avatarUrl: user.avatarUrl ?? user.photoURL ?? null,
-        isApproved: user.isApproved,
-      },
+      id: user.id,
+      uid: user.uid,
+      email: user.email,
+      name: user.name ?? null,
+      avatarUrl: user.avatarUrl ?? user.photoURL ?? null,
+      role: user.role,
+      isApproved: user.isApproved ?? false,
     });
   } catch (err: any) {
-    console.error("User profile error:", err.message);
+    console.error("❌ /users/me error:", err.message);
 
     await logAudit(
       AuditAction.USER_UPDATE,
@@ -74,6 +70,7 @@ router.get("/", authGuard(), async (req: AuthenticatedRequest, res) => {
       status: "error",
       code: 500,
       message: "Failed to fetch profile",
+      error: err.message,
     });
   }
 });

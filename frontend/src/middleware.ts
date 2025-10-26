@@ -2,18 +2,17 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /* ============================================================
-   🧩 Auth Middleware — Level 2.0 (Cross-domain + Secure)
+   🧩 Auth Middleware — Level 2.1 (Cross-domain Safe)
    ------------------------------------------------------------
-   • Enforces protected routes
-   • Persists Firebase session cookie across subdomains
-   • Redirects logged-in users away from auth pages
+   • Does NOT try to read HttpOnly Firebase cookies (unreadable across subdomains)
+   • Lets frontend AuthProvider handle validation
+   • Redirects logged-in users away from auth pages only
 ============================================================ */
 
 const SESSION_COOKIE =
   process.env.NEXT_PUBLIC_SESSION_COOKIE_NAME || "__Secure-iventics_session";
 
-const PUBLIC_PATHS = [
-  "/", // Landing page
+const AUTH_PAGES = [
   "/login",
   "/signup",
   "/forgot-password",
@@ -22,56 +21,29 @@ const PUBLIC_PATHS = [
 ];
 
 /**
- * 🚦 Core Middleware Logic
+ * 🚦 Middleware Logic
  */
 export function middleware(req: NextRequest) {
-  const { pathname, origin } = req.nextUrl;
+  const { pathname } = req.nextUrl;
 
-  // ✅ Normalize path safely (ensure "/" stays "/")
+  // ✅ Normalize path safely
   const path = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
 
-  // 🔐 Check session presence
+  // ✅ Check only cookie presence (not validity)
   const cookieHeader = req.headers.get("cookie") || "";
-  const hasSession =
-    req.cookies.has(SESSION_COOKIE) || cookieHeader.includes(SESSION_COOKIE);
+  const hasSession = cookieHeader.includes(SESSION_COOKIE);
 
-  // ✅ Public route whitelist + static assets
-  const isPublicRoute =
-    PUBLIC_PATHS.includes(path) ||
-    path.startsWith("/api") ||
-    path.startsWith("/_next") ||
-    /\.(ico|svg|png|jpg|jpeg|gif|webp|avif)$/.test(path);
-
-  if (isPublicRoute) {
-    // 🚫 Prevent logged-in users from revisiting auth pages
-    if (
-      hasSession &&
-      ["/login", "/signup", "/forgot-password", "/reset-password"].includes(
-        path
-      )
-    ) {
-      if (process.env.NODE_ENV === "development")
-        console.log("🔁 Redirecting logged-in user to /dashboard");
-      return NextResponse.redirect(new URL("/dashboard", req.url));
-    }
-
-    return NextResponse.next();
+  // 🚫 Prevent logged-in users from revisiting auth pages
+  if (hasSession && AUTH_PAGES.includes(path)) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  // 🔒 Require session for all other routes
-  if (!hasSession) {
-    const loginUrl = new URL("/login", origin);
-    loginUrl.searchParams.set("from", pathname);
-    if (process.env.NODE_ENV === "development")
-      console.log("🚫 No session found → redirecting to login");
-    return NextResponse.redirect(loginUrl);
-  }
-
+  // ✅ Let everything else pass (frontend handles protection)
   return NextResponse.next();
 }
 
 /**
- * ⚙️ Matcher Config — exclude static assets & Next.js internals
+ * ⚙️ Matcher Config
  */
 export const config = {
   matcher: [

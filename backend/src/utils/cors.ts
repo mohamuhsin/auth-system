@@ -4,14 +4,17 @@ import { logAudit } from "./audit";
 import { AuditAction } from "@prisma/client";
 
 /**
- * 🌍 CORS Middleware — Level 2.0 Hardened
+ * 🌍 CORS Middleware — Level 2.0 Hardened (Final)
  * ------------------------------------------------------------
- * Dynamically validates allowed origins for cross-domain cookies.
- * Supports sub-domains (spin.ugapay.ug) and Postman/CLI (no origin).
+ * ✅ Works with cross-domain cookies (.iventics.com)
+ * ✅ Handles wildcards (e.g., spin.ugapay.ug)
+ * ✅ Includes `Access-Control-Allow-Credentials`
+ * ✅ Logs & audits blocked origins safely
  *
- * Example ENV:
+ * Example .env:
  * AUTH_ALLOWED_ORIGINS=https://auth.iventics.com,https://auth-api.iventics.com,https://ugapay.ug,http://localhost:3000
  */
+
 const allowedOrigins = (process.env.AUTH_ALLOWED_ORIGINS || "")
   .split(",")
   .map((s) => s.trim().replace(/\/$/, ""))
@@ -25,32 +28,34 @@ if (!allowedOrigins.length) {
 
 const corsConfig: CorsOptions = {
   origin(origin, callback) {
-    // Allow same-origin, SSR, or Postman calls
+    // Allow Postman, curl, SSR, same-origin
     if (!origin) return callback(null, true);
 
-    // Strict match
+    // ✅ Exact match
     if (allowedOrigins.includes(origin)) return callback(null, true);
 
-    // Wildcard sub-domain match
-    const match = allowedOrigins.some((allowed) => {
+    // ✅ Wildcard subdomain match
+    const allowed = allowedOrigins.find((allowed) => {
       const base = allowed.replace(/^https?:\/\//, "");
       return origin === allowed || origin.endsWith(`.${base}`);
     });
-    if (match) return callback(null, true);
+    if (allowed) return callback(null, true);
 
-    // 🚫 Blocked origin
-    logger.warn({ origin }, "Blocked CORS origin");
+    // 🚫 Otherwise block
+    logger.warn({ origin }, "🚫 Blocked by CORS policy");
 
-    // Optional audit record
     void logAudit(AuditAction.RATE_LIMIT_HIT, null, null, null, {
       reason: "CORS_ORIGIN_BLOCKED",
       origin,
     });
 
-    return callback(new Error("CORS: Origin not allowed"));
+    return callback(new Error(`CORS: Origin not allowed → ${origin}`));
   },
 
-  credentials: true, // cross-site cookies
+  // 🔒 Required for cross-domain cookies
+  credentials: true,
+
+  // Standardized safe defaults
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
@@ -59,7 +64,7 @@ const corsConfig: CorsOptions = {
     "Accept",
     "Origin",
   ],
-  exposedHeaders: ["Set-Cookie"],
+  exposedHeaders: ["Set-Cookie"], // let browser see the cookie
   optionsSuccessStatus: 204,
 };
 
