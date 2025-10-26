@@ -62,14 +62,23 @@ export function LoginForm({
       return;
     }
 
-    const result = await loginWithEmailPassword(values.email, values.password);
+    try {
+      const result = await loginWithEmailPassword(
+        values.email,
+        values.password
+      );
 
-    if (result?.ok) {
-      toastMessage("Welcome back!", { type: "success" });
-      form.reset();
-      router.replace("/dashboard");
-    } else {
-      toastMessage(result?.message || "Login failed. Please try again.", {
+      if (result?.ok) {
+        toastMessage("🎉 Welcome back!", { type: "success" });
+        form.reset();
+        router.replace("/dashboard");
+      } else {
+        toastMessage(result?.message || "Login failed. Please try again.", {
+          type: "error",
+        });
+      }
+    } catch (err: any) {
+      toastMessage(err?.message || "Login failed. Please try again.", {
         type: "error",
       });
     }
@@ -102,7 +111,7 @@ export function LoginForm({
           throw new Error(result?.message || "Session creation failed.");
         }
 
-        toastMessage("Signed in successfully! Redirecting...", {
+        toastMessage("✅ Signed in successfully! Redirecting...", {
           type: "success",
         });
         router.replace("/dashboard");

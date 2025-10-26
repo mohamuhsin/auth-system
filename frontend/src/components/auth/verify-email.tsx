@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 /* ============================================================
@@ -10,7 +9,7 @@
    • Smooth production-safe UX
 ============================================================ */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { onAuthStateChanged } from "firebase/auth";
@@ -32,8 +31,20 @@ export function VerifyEmailNotice() {
   const [resending, setResending] = useState(false);
   const [checking, setChecking] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Keep a ref to the polling timer so we can safely clear it
+  const pollRef = useRef<number | null>(null);
+
+  // Helper to clear existing poll interval
+  const clearPoll = () => {
+    if (pollRef.current !== null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  };
 
   /* ============================================================
      🧭 Initialize user + auto-check verification
@@ -43,39 +54,61 @@ export function VerifyEmailNotice() {
     if (emailParam) setUserEmail(emailParam);
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      clearPoll();
+
       if (!user) {
         setChecking(false);
         return;
       }
 
+      // Use Firebase user's email if no param provided
       if (!emailParam && user.email) setUserEmail(user.email);
 
-      // Check immediately on mount
-      await user.reload();
+      try {
+        await user.reload();
+      } catch {
+        // safely ignore reload errors
+      }
+
       if (user.emailVerified) {
         toastMessage("✅ Your email has been verified!", { type: "success" });
-        setTimeout(() => router.replace("/dashboard"), 1000);
+        setTimeout(() => router.replace("/dashboard"), 800);
         return;
       }
 
-      // Poll every 5 seconds to detect verification
-      const poll = setInterval(async () => {
-        await user.reload();
-        if (user.emailVerified) {
-          clearInterval(poll);
+      // Start polling every 5 seconds
+      pollRef.current = window.setInterval(async () => {
+        const current = auth.currentUser;
+        if (!current) {
+          clearPoll();
+          setChecking(false);
+          return;
+        }
+
+        try {
+          await current.reload();
+        } catch {
+          // ignore reload errors
+        }
+
+        if (current.emailVerified) {
+          clearPoll();
           toastMessage("🎉 Email verified! Redirecting...", {
             type: "success",
           });
           router.replace("/dashboard");
         }
-      }, 5000);
+      }, 5000) as unknown as number;
 
       setChecking(false);
-      return () => clearInterval(poll);
     });
 
-    return () => unsubscribe();
-  }, [router, searchParams]);
+    return () => {
+      clearPoll();
+      unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
 
   /* ============================================================
      🔁 Resend Verification Email
@@ -90,12 +123,17 @@ export function VerifyEmailNotice() {
 
     try {
       setResending(true);
-      await resendVerificationEmail();
-      toastMessage("📧 Verification email resent successfully.", {
-        type: "success",
-      });
-    } catch (err: any) {
-      console.error("Resend error:", err);
+      const res = await resendVerificationEmail();
+      if (res.ok) {
+        toastMessage("📧 Verification email resent successfully.", {
+          type: "success",
+        });
+      } else {
+        toastMessage(res.message || "Failed to resend verification email.", {
+          type: "error",
+        });
+      }
+    } catch {
       toastMessage("Failed to resend verification email.", { type: "error" });
     } finally {
       setResending(false);
@@ -115,13 +153,13 @@ export function VerifyEmailNotice() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 px-6">
-      <Card className="w-full max-w-sm border border-border/60 shadow-md bg-background/95 backdrop-blur">
+      <Card className="w-full max-w-sm border border-border/60 bg-background/95 shadow-md backdrop-blur">
         <CardHeader className="text-center">
-          <div className="flex justify-center mb-2">
+          <div className="mb-2 flex justify-center">
             <MailCheck className="size-10 text-primary" />
           </div>
 
-          <CardTitle className="text-xl font-display">
+          <CardTitle className="font-display text-xl">
             Verify your email
           </CardTitle>
 
@@ -129,7 +167,7 @@ export function VerifyEmailNotice() {
             We’ve sent a verification link{" "}
             {userEmail ? (
               <>
-                to <span className="font-medium text-primary">{userEmail}</span>
+                to <span className="text-primary font-medium">{userEmail}</span>
               </>
             ) : (
               "to your registered email address"
@@ -139,7 +177,7 @@ export function VerifyEmailNotice() {
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="flex flex-col items-center gap-4 mt-2">
+        <CardContent className="mt-2 flex flex-col items-center gap-4">
           <Button
             onClick={handleResend}
             disabled={resending}
@@ -148,11 +186,11 @@ export function VerifyEmailNotice() {
           >
             {resending ? (
               <>
-                <Loader2 className="size-4 mr-2 animate-spin" /> Sending...
+                <Loader2 className="mr-2 size-4 animate-spin" /> Sending…
               </>
             ) : (
               <>
-                <MailWarning className="size-4 mr-2" /> Resend verification
+                <MailWarning className="mr-2 size-4" /> Resend verification
                 email
               </>
             )}
@@ -160,7 +198,7 @@ export function VerifyEmailNotice() {
 
           <Link
             href="/login"
-            className="text-sm text-primary hover:underline underline-offset-4"
+            className="text-sm text-primary underline-offset-4 hover:underline"
           >
             Back to Login
           </Link>
