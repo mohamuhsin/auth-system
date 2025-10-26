@@ -7,43 +7,95 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/* ===========================
+   USER MODEL
+=========================== */
 model User {
-  id             String   @id @default(cuid())
-  uid            String   @unique               
-  email          String   @unique
-  name           String?
-  avatarUrl      String?
-  role           Role     @default(USER)
-  isApproved     Boolean  @default(false)
-  emailVerified  Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String       @id @default(cuid())
+  uid             String       @unique
+  email           String       @unique
+  name            String?
+  avatarUrl       String?
+  role            Role         @default(USER)
+  status          String       @default("ACTIVE")
+  primaryProvider AuthProvider @default(PASSWORD)
+  emailVerified   Boolean      @default(false)
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+  isApproved      Boolean      @default(false)
+  termsAcceptedAt DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  sessions        Session[]
+  auditLogs       AuditLog[]   @relation("UserAuditLogs")
 
-  sessions       Session[]
-  auditLogs      AuditLog[] @relation("UserAuditLogs") // optional for clarity
+  @@index([uid])
+  @@index([email])
 }
 
+/* ===========================
+   SESSION MODEL
+=========================== */
 model Session {
   id         String   @id @default(cuid())
+  tokenHash  String   @unique
   userId     String
-  user       User     @relation(fields: [userId], references: [id])
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   ipAddress  String?
   userAgent  String?
   createdAt  DateTime @default(now())
+  revokedAt  DateTime?
   expiresAt  DateTime
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
 }
 
+/* ===========================
+   AUDIT LOG MODEL
+=========================== */
 model AuditLog {
-  id         String   @id @default(cuid())
-  userId     String?
-  user       User?    @relation("UserAuditLogs", fields: [userId], references: [id])
-  action     String
-  ipAddress  String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
+  id        String       @id @default(cuid())
+  userId    String?
+  user      User?        @relation("UserAuditLogs", fields: [userId], references: [id], onDelete: SetNull)
+  action    AuditAction
+  message   String?
+  metadata  Json?
+  requestId String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime     @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
 }
 
+/* ===========================
+   ENUMS
+=========================== */
 enum Role {
   USER
   ADMIN
+}
+
+enum AuthProvider {
+  GOOGLE
+  PASSWORD
+  CUSTOM
+}
+
+enum AuditAction {
+  USER_SIGNUP
+  USER_LOGIN
+  USER_LOGOUT
+  USER_LOGOUT_FAILED
+  USER_LOGOUT_NO_COOKIE
+  USER_LOGOUT_ERROR
+  SESSION_REFRESH
+  SESSION_REVOKE
+  USER_UPDATE
+  USER_APPROVE
+  USER_SUSPEND
+  USER_DELETE
+  RATE_LIMIT_HIT
 }

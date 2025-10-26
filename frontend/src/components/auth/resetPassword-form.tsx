@@ -4,8 +4,9 @@
 /* ============================================================
    🔑 ResetPasswordForm — Secure Firebase Password Reset
    ------------------------------------------------------------
-   Handles URL-based reset (oobCode), verifies, updates password,
-   and redirects to login with unified toast feedback.
+   • Handles URL-based reset (oobCode)
+   • Verifies and updates password securely
+   • Unified toasts + safe redirects
 ============================================================ */
 
 import { useState, useEffect } from "react";
@@ -89,12 +90,12 @@ export function ResetPasswordForm({
       async () => {
         await confirmPasswordReset(auth, oobCode, values.password);
 
-        toastMessage("Your password has been updated successfully!", {
+        toastMessage("✅ Your password has been updated successfully!", {
           type: "success",
         });
 
-        // Redirect after success
-        setTimeout(() => router.replace("/login"), 1200);
+        // Redirect smoothly after success
+        setTimeout(() => router.replace("/login"), 1500);
       },
       {
         loading: "Updating password...",
@@ -119,7 +120,7 @@ export function ResetPasswordForm({
           break;
         case "auth/weak-password":
           toastMessage(
-            "Your password is too weak. Use at least 8 characters with a number and uppercase letter.",
+            "Weak password. Use at least 8 characters with a number and uppercase letter.",
             { type: "warning" }
           );
           break;
@@ -223,6 +224,11 @@ export function ResetPasswordForm({
                   </Field>
                 )}
               />
+
+              <FieldDescription>
+                Must be at least 8 characters long and include a number and an
+                uppercase letter.
+              </FieldDescription>
 
               {/* Submit */}
               <Field>

@@ -20,15 +20,15 @@ import type { User } from "@/types/user";
 ============================================================ */
 interface ApiResponse {
   status?: string;
-  statusCode?: number;
   message?: string;
-  uid?: string;
-  firebaseUid?: string;
   email?: string;
   name?: string | null;
   avatarUrl?: string | null;
   role?: string;
   isApproved?: boolean;
+  statusCode?: number;
+  uid?: string;
+  id?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -48,9 +48,6 @@ interface AuthContextValue {
   refreshSession: () => Promise<void>;
 }
 
-/* ============================================================
-   ⚙️ Context Initialization
-============================================================ */
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 /* ============================================================
@@ -62,26 +59,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   /* ============================================================
-     🟦 Fetch current session (/users/me)
-     - Wrapped in useCallback to keep it stable across renders
+     🧩 Fetch Session from Backend
   ============================================================ */
   const fetchSession = useCallback(async (retries = 2) => {
     try {
       const res = await apiRequest<ApiResponse>("/users/me");
 
-      if (res.status === "success" && res.email) {
+      if (res?.status === "success" && res.email) {
         const validRoles = ["USER", "ADMIN", "CREATOR", "MERCHANT"] as const;
-        const normalizedRole = validRoles.includes(res.role as any)
+        const role = validRoles.includes(res.role as any)
           ? (res.role as User["role"])
           : "USER";
 
         const newUser: User = {
-          id: res.uid || res.firebaseUid || "unknown",
-          firebaseUid: res.firebaseUid || res.uid || "unknown",
+          id: res.id || "unknown",
+          firebaseUid: res.uid || "unknown",
           email: res.email,
           name: res.name || null,
           avatarUrl: res.avatarUrl || null,
-          role: normalizedRole,
+          role,
           isApproved: res.isApproved ?? false,
           createdAt: res.createdAt || new Date().toISOString(),
           updatedAt: res.updatedAt || new Date().toISOString(),
@@ -91,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setUser(null);
       }
-    } catch (err) {
+    } catch (err: any) {
       if (retries > 0) {
         console.warn("Retrying session fetch...");
         return fetchSession(retries - 1);
@@ -104,49 +100,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /* ============================================================
-     🧠 Initialize session on mount
+     🚀 Initialize session on mount
   ============================================================ */
   useEffect(() => {
     fetchSession();
   }, [fetchSession]);
 
   /* ============================================================
-     🔑 Login — Backend-verified Firebase session cookie
+     🔑 Login — Firebase → Backend cookie session
   ============================================================ */
   const loginWithFirebase = async (firebaseUser: any): Promise<ApiResponse> => {
     const idToken = await getIdToken(firebaseUser, true);
 
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/login-with-firebase`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include", // ✅ allows cookies
-        body: JSON.stringify({
-          idToken,
-          userAgent: navigator.userAgent,
-        }),
-      }
-    );
-
-    const data: ApiResponse = await res.json().catch(() => ({}));
-
-    if (res.status === 404)
-      return { status: "error", statusCode: 404, message: "NOT_FOUND" };
-
-    if (!res.ok)
-      return {
-        status: "error",
-        statusCode: res.status,
-        message: data?.message || "Login failed.",
-      };
+    const res = await apiRequest<ApiResponse>("/auth/login-with-firebase", {
+      method: "POST",
+      body: { idToken, userAgent: navigator.userAgent },
+    });
 
     await fetchSession();
-    return { ...data, status: data.status ?? "success" };
+    return { ...res, status: res.status ?? "success" };
   };
 
   /* ============================================================
-     🟢 Signup — Backend-verified Firebase session cookie
+     🆕 Signup — Firebase → Backend user creation
   ============================================================ */
   const signupWithFirebase = async (
     firebaseUser: any,
@@ -154,38 +130,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ): Promise<ApiResponse> => {
     const idToken = await getIdToken(firebaseUser, true);
 
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/signup-with-firebase`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include", // ✅ cookie session cross-domain
-        body: JSON.stringify({
-          idToken,
-          userAgent: navigator.userAgent,
-          ...extra,
-        }),
-      }
-    );
-
-    const data: ApiResponse = await res.json().catch(() => ({}));
-
-    if (res.status === 409)
-      return { status: "error", statusCode: 409, message: "ALREADY_EXISTS" };
-
-    if (!res.ok)
-      return {
-        status: "error",
-        statusCode: res.status,
-        message: data?.message || "Signup failed.",
-      };
+    const res = await apiRequest<ApiResponse>("/auth/signup-with-firebase", {
+      method: "POST",
+      body: { idToken, userAgent: navigator.userAgent, ...extra },
+    });
 
     await fetchSession();
-    return { ...data, status: data.status ?? "success" };
+    return { ...res, status: res.status ?? "success" };
   };
 
   /* ============================================================
-     🚪 Logout — Clears backend + Firebase + redirects to /login
+     🚪 Logout — Backend + Firebase + Router
   ============================================================ */
   const logout = async () => {
     await toastAsync(
@@ -204,14 +159,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /* ============================================================
-     🔄 Manual Refresh (optional)
+     🔁 Manual Session Refresh (optional)
   ============================================================ */
   const refreshSession = useCallback(async () => {
     await fetchSession();
   }, [fetchSession]);
 
   /* ============================================================
-     🧩 Provide Context
+     🌍 Context Provider
   ============================================================ */
   return (
     <AuthContext.Provider

@@ -34,7 +34,7 @@ import { toastAsync, toastMessage } from "@/lib/toast";
 import { signupWithEmailPassword } from "@/lib/auth-email";
 
 /* ============================================================
-   🟢 SignupForm — Email & Google Signup (Backend Verified)
+   🟢 SignupForm — Level 2.0 (Secure, Backend-Verified)
 ============================================================ */
 export function SignupForm({
   className,
@@ -74,12 +74,20 @@ export function SignupForm({
     );
 
     if (result?.ok) {
+      toastMessage("Account created! Verify your email to continue.", {
+        type: "success",
+      });
+      form.reset();
       router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
+    } else {
+      toastMessage(result?.message || "Signup failed. Please try again.", {
+        type: "error",
+      });
     }
   }
 
   /* ============================================================
-     🔵 Google Signup — secure backend-verified flow
+     🔵 Google Signup — Secure Firebase → Backend Flow
   ============================================================ */
   async function handleGoogleSignup() {
     await toastAsync(
@@ -95,21 +103,22 @@ export function SignupForm({
           avatarUrl: googleUser.photoURL ?? undefined,
         });
 
-        if (result.status !== "success") {
-          if (result.statusCode === 409) {
+        if (!result || result.status !== "success") {
+          // Handle existing or failed account creation
+          if (result?.statusCode === 409) {
             toastMessage("Account already exists. Redirecting to login...", {
               type: "warning",
             });
             setTimeout(() => router.push("/login"), 1200);
             return;
           }
-          throw new Error(result.message || "Signup verification failed");
+          throw new Error(result?.message || "Signup verification failed.");
         }
 
         toastMessage("Signed up successfully with Google!", {
           type: "success",
         });
-        router.push("/dashboard");
+        router.replace("/dashboard");
       },
       {
         loading: "Connecting to Google...",
@@ -146,6 +155,7 @@ export function SignupForm({
                   onClick={handleGoogleSignup}
                   disabled={form.formState.isSubmitting}
                 >
+                  {/* Inline SVG preserved */}
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 48 48"

@@ -12,18 +12,24 @@ export const API_BASE =
 
 export interface ApiError extends Error {
   status?: number;
+  data?: any;
+  requestUrl?: string;
 }
 
 /**
- * Enhanced type for options so body can be any JSON-like value.
+ * Extended fetch options — allows sending JSON objects directly.
  */
 export interface ApiRequestOptions extends RequestInit {
-  body?: any; // 👈 allows { idToken }, { email }, etc.
+  body?: any;
+  skipAuthCheck?: boolean; // optional future use (e.g. public endpoints)
 }
 
 /**
- * Safe API request wrapper with unified error handling.
- * Automatically stringifies objects and maintains session cookies.
+ * Unified API request wrapper.
+ * Automatically:
+ *  - Sends secure cookies
+ *  - Parses JSON responses
+ *  - Handles timeouts & structured errors
  */
 export async function apiRequest<T>(
   path: string,
@@ -32,14 +38,13 @@ export async function apiRequest<T>(
   const url = path.startsWith("/")
     ? `${API_BASE}${path}`
     : `${API_BASE}/${path}`;
-
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000); // 15 s safety timeout
+  const timeout = setTimeout(() => controller.abort(), 15_000); // ⏱️ 15s safety timeout
 
   try {
     const res = await fetch(url, {
       method: options.method || "GET",
-      credentials: "include", // 🔐 send cookies with cross-domain requests
+      credentials: "include", // ✅ required for cookie-based sessions
       signal: controller.signal,
       headers: {
         Accept: "application/json",
@@ -56,24 +61,54 @@ export async function apiRequest<T>(
 
     clearTimeout(timeout);
 
+    // 🧩 Handle non-2xx responses
     if (!res.ok) {
-      let message = `API Error ${res.status}`;
-      try {
-        const json = await res.json();
-        if (json?.message) message = json.message;
-      } catch {
-        /* ignore non-JSON errors */
+      const contentType = res.headers.get("content-type") || "";
+      let data: any = null;
+
+      if (contentType.includes("application/json")) {
+        try {
+          data = await res.json();
+        } catch {
+          data = null;
+        }
       }
+
+      const message =
+        data?.message ||
+        data?.error ||
+        `API request failed with status ${res.status}`;
 
       const error = new Error(message) as ApiError;
       error.status = res.status;
+      error.data = data;
+      error.requestUrl = url;
       throw error;
     }
 
-    // Gracefully handle empty bodies
-    return (await res.json().catch(() => ({}))) as T;
-  } catch (err) {
+    // 🧠 Gracefully handle empty JSON bodies
+    const text = await res.text();
+    if (!text) return {} as T;
+
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return {} as T;
+    }
+  } catch (err: any) {
     clearTimeout(timeout);
+
+    // ⏰ Timeout handling
+    if (err.name === "AbortError") {
+      const timeoutError = new Error(
+        "Request timed out after 15 seconds"
+      ) as ApiError;
+      timeoutError.status = 408;
+      timeoutError.requestUrl = path;
+      console.error("🌐 Timeout:", timeoutError);
+      throw timeoutError;
+    }
+
     console.error("🌐 API request failed:", err);
     throw err;
   }

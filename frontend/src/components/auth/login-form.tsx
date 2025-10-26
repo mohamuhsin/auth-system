@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -34,7 +35,7 @@ import { toastAsync, toastMessage } from "@/lib/toast";
 import { loginWithEmailPassword } from "@/lib/auth-email";
 
 /* ============================================================
-   🔐 LoginForm — Handles Email+Password and Google Login
+   🔐 LoginForm — Level 2.0 Hardened & Type-Safe
 ============================================================ */
 export function LoginForm({
   className,
@@ -62,13 +63,20 @@ export function LoginForm({
     }
 
     const result = await loginWithEmailPassword(values.email, values.password);
+
     if (result?.ok) {
-      router.push("/dashboard");
+      toastMessage("Welcome back!", { type: "success" });
+      form.reset();
+      router.replace("/dashboard");
+    } else {
+      toastMessage(result?.message || "Login failed. Please try again.", {
+        type: "error",
+      });
     }
   }
 
   /* ============================================================
-     🔵 Google Login — secure backend-verified flow
+     🔵 Google Login — Secure Firebase → Backend Session
   ============================================================ */
   async function handleGoogleLogin() {
     await toastAsync(
@@ -76,26 +84,28 @@ export function LoginForm({
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: "select_account" });
 
+        // 🔑 Firebase Google OAuth
         const userCred = await signInWithPopup(auth, provider);
         const googleUser = userCred.user;
 
+        // 🔒 Backend-verified session cookie
         const result = await loginWithFirebase(googleUser);
 
         if (!result || result.status !== "success") {
-          if (result.statusCode === 404) {
+          if ((result as any)?.statusCode === 404) {
             toastMessage("No account found. Please sign up first.", {
               type: "warning",
             });
             router.push("/signup");
             return;
           }
-          throw new Error(result.message || "Session creation failed");
+          throw new Error(result?.message || "Session creation failed.");
         }
 
         toastMessage("Signed in successfully! Redirecting...", {
           type: "success",
         });
-        router.push("/dashboard");
+        router.replace("/dashboard");
       },
       {
         loading: "Connecting to Google...",
@@ -129,6 +139,7 @@ export function LoginForm({
                   onClick={handleGoogleLogin}
                   disabled={form.formState.isSubmitting}
                 >
+                  {/* Inline Google SVG preserved */}
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 48 48"

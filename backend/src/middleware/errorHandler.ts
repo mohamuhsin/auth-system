@@ -2,41 +2,64 @@ import { Request, Response, NextFunction } from "express";
 import { logger } from "../utils/logger";
 import { safeError } from "../utils/errors";
 
-/**
- * 🧰 Global Error Handler (Level 1.5)
- * ------------------------------------------------------------
- * Logs unexpected errors and returns a safe, consistent JSON
- * response without leaking stack traces or sensitive details.
- */
 export function errorHandler(
-  err: any,
-  _req: Request,
+  err: unknown,
+  req: Request,
   res: Response,
   _next: NextFunction
 ) {
-  // 🔍 Log safely with stack trace in development
+  const isProd = process.env.NODE_ENV === "production";
+
+  if (res.headersSent) return _next(err);
+
+  const e =
+    err && typeof err === "object"
+      ? (err as {
+          name?: string;
+          message?: string;
+          code?: string;
+          status?: number;
+          stack?: string;
+        })
+      : { message: String(err) };
+
+  const status = e.status ?? mapToHttpStatus(e.code) ?? 500;
+  const msg =
+    status === 500
+      ? "Internal server error"
+      : e.message || "Something went wrong";
+
   logger.error({
-    name: err?.name || "UnknownError",
-    message: safeError(err),
-    stack: process.env.NODE_ENV !== "production" ? err?.stack : undefined,
-    code: err?.code || undefined,
+    name: e.name ?? "UnknownError",
+    code: e.code ?? "UNKNOWN",
+    message: safeError(e),
+    stack: isProd ? undefined : e.stack,
+    status,
   });
 
-  // 🧾 Determine HTTP status
-  const statusCode = err.status || 500;
-
-  // 🧩 Safe message for client
-  const message =
-    statusCode === 500
-      ? "Internal server error"
-      : err.message || "Something went wrong";
-
-  // 🎯 Unified structured response
-  res.status(statusCode).json({
+  res.status(status).json({
     success: false,
     status: "error",
-    code: statusCode,
-    message,
-    ...(process.env.NODE_ENV !== "production" && { stack: err?.stack }),
+    code: status,
+    message: msg,
+    ...(isProd ? {} : { stack: e.stack }),
   });
+}
+
+function mapToHttpStatus(code?: string): number | undefined {
+  switch (code) {
+    case "P2002":
+      return 409;
+    case "auth/invalid-id-token":
+    case "auth/id-token-expired":
+      return 401;
+    case "auth/user-disabled":
+      return 403;
+    case "auth/user-not-found":
+      return 404;
+    case "auth/email-already-exists":
+      return 409;
+    default:
+      return undefined;
+  }
 }
