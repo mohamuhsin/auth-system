@@ -1,4 +1,4 @@
-import cookie from "cookie";
+import * as cookie from "cookie";
 import admin from "../services/firebaseAdmin";
 import { logger } from "./logger";
 
@@ -7,7 +7,7 @@ import { logger } from "./logger";
  * ------------------------------------------------------------
  * • Issues Secure + SameSite=None cookies scoped to `.iventics.com`
  * • Works across auth-api.iventics.com ↔ auth.iventics.com
- * • Adds structured debug logging for Firebase errors
+ * • Includes structured debug logging for Firebase Admin errors
  */
 
 const NAME = process.env.SESSION_COOKIE_NAME || "__Secure-iventics_session";
@@ -16,10 +16,10 @@ const DOMAIN =
 const TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 7);
 
 /* ============================================================
-   🔑 makeSessionCookie — exchange ID token for session cookie
+   🔑 makeSessionCookie — exchange ID token for a secure cookie
 ============================================================ */
 export async function makeSessionCookie(idToken: string) {
-  const expiresIn = TTL_DAYS * 24 * 60 * 60 * 1000; // ms
+  const expiresIn = TTL_DAYS * 24 * 60 * 60 * 1000; // 7 days in ms
 
   try {
     const sessionCookie = await admin
@@ -31,7 +31,7 @@ export async function makeSessionCookie(idToken: string) {
       secure: true,
       sameSite: "none",
       path: "/",
-      domain: DOMAIN,
+      domain: DOMAIN, // shared between auth-api and auth frontends
       maxAge: expiresIn / 1000,
     });
 
@@ -48,7 +48,6 @@ export async function makeSessionCookie(idToken: string) {
       maxAge: expiresIn / 1000,
     };
   } catch (err: any) {
-    // 🔍 Deep debug log — shows the real Firebase error info
     console.error("🔥 Firebase createSessionCookie error:", {
       code: err?.code,
       message: err?.message,
@@ -66,7 +65,7 @@ export async function makeSessionCookie(idToken: string) {
 }
 
 /* ============================================================
-   🚪 clearSessionCookie — delete cross-domain cookie
+   🚪 clearSessionCookie — deletes cookie across all subdomains
 ============================================================ */
 export function clearSessionCookie() {
   return cookie.serialize(NAME, "", {
