@@ -12,7 +12,7 @@ import { getIdToken, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { auth } from "@/services/firebase";
 import { apiRequest } from "@/lib/api";
-import { toastAsync } from "@/lib/toast";
+import { toastAsync, toastMessage } from "@/lib/toast";
 import type { User } from "@/types/user";
 
 /* ============================================================
@@ -110,15 +110,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /* ============================================================
      🔑 Login — Firebase → Backend Cookie Session
+     ------------------------------------------------------------
+     • Verifies Firebase token with backend
+     • Creates cookie session
+     • Redirects → /dashboard
+     • Handles 403 (unverified) and 404 (missing user)
   ============================================================ */
   const loginWithFirebase = async (firebaseUser: any): Promise<ApiResponse> => {
     try {
       const idToken = await getIdToken(firebaseUser, true);
-
       const res = await apiRequest<ApiResponse>("/auth/login-with-firebase", {
         method: "POST",
         body: { idToken, userAgent: navigator.userAgent },
       });
+
+      if (res?.statusCode === 403 || res?.status === "403") {
+        toastMessage("Please verify your email before logging in.", {
+          type: "warning",
+        });
+        router.replace("/verify-email");
+        return res;
+      }
+
+      if (res?.statusCode === 404 || res?.status === "404") {
+        toastMessage("No account found. Redirecting to signup...", {
+          type: "warning",
+        });
+        router.replace("/signup");
+        return res;
+      }
 
       // Wait briefly for cookie propagation
       await new Promise((r) => setTimeout(r, 600));
@@ -128,15 +148,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { ...res, status: res.status ?? "success" };
     } catch (err: any) {
       console.error("❌ Login error:", err.message);
+      toastMessage(err.message || "Login failed. Please try again.", {
+        type: "error",
+      });
       return {
         status: "error",
-        message: err.message || "Login failed. Please try again.",
+        message: err.message || "Login failed.",
       };
     }
   };
 
   /* ============================================================
-     🆕 Signup — Firebase → Backend Cookie Session + Verify Redirect
+     🆕 Signup — Firebase → Backend Cookie Session
+     ------------------------------------------------------------
+     • Verifies Firebase token → backend user
+     • Returns 202 if pending verification
+     • Sends verification email & redirects → /verify-email
+     • Otherwise auto-login → /dashboard
   ============================================================ */
   const signupWithFirebase = async (
     firebaseUser: any,
@@ -144,13 +172,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ): Promise<ApiResponse> => {
     try {
       const idToken = await getIdToken(firebaseUser, true);
-
       const res = await apiRequest<ApiResponse>("/auth/signup-with-firebase", {
         method: "POST",
         body: { idToken, userAgent: navigator.userAgent, ...extra },
       });
 
-      // ✅ Normalize possible backend variations
+      if (res?.statusCode === 202 || res?.status === "pending_verification") {
+        // email/password unverified case
+        try {
+          await firebaseUser.sendEmailVerification();
+          toastMessage("Verification email sent! Please check your inbox.", {
+            type: "success",
+          });
+        } catch (err: any) {
+          console.warn("⚠️ Could not send verification email:", err.message);
+        }
+        await signOut(auth);
+        router.replace("/verify-email");
+        return { ...res, status: "pending_verification" };
+      }
+
       if (res?.status === "error" || res?.error) {
         throw new Error(res.message || "Signup failed on server");
       }
@@ -159,26 +200,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await new Promise((r) => setTimeout(r, 800));
       await fetchSession();
 
-      // 🚦 Redirect based on email verification state
-      if (!firebaseUser.emailVerified) {
-        try {
-          await firebaseUser.sendEmailVerification();
-          console.log("📧 Verification email sent to", firebaseUser.email);
-        } catch (err: any) {
-          console.warn("⚠️ Could not send verification email:", err.message);
-        }
-        router.replace("/verify-email");
-      } else {
-        router.replace("/dashboard");
-      }
-
+      // verified / Google signup
+      router.replace("/dashboard");
       return { ...res, status: "success" };
     } catch (err: any) {
       console.error("❌ signupWithFirebase error:", err.message);
+      toastMessage(err.message || "Signup failed. Please try again.", {
+        type: "error",
+      });
       return {
         status: "error",
-        message: err.message || "Signup failed. Please try again.",
-        error: err.message,
+        message: err.message || "Signup failed.",
       };
     }
   };
@@ -203,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /* ============================================================
-     🔁 Manual Session Refresh (optional)
+     🔁 Manual Session Refresh
   ============================================================ */
   const refreshSession = useCallback(async () => {
     await fetchSession();

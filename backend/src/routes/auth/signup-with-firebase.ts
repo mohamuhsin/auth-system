@@ -14,6 +14,8 @@ const router = Router();
  * ------------------------------------------------------------
  * Verifies Firebase ID token → creates new user → issues session cookie.
  * Auto-assigns ADMIN to first user; logs audit trail.
+ *
+ * Frontend calls this after Firebase signup (Email/Password or Google).
  */
 router.post("/", async (req: Request, res: Response) => {
   try {
@@ -23,7 +25,7 @@ router.post("/", async (req: Request, res: Response) => {
       logger.warn("🚫 Missing ID token during signup");
       return res.status(400).json({
         status: "error",
-        message: "Missing ID token",
+        message: "Missing ID token.",
       });
     }
 
@@ -34,6 +36,7 @@ router.post("/", async (req: Request, res: Response) => {
     try {
       decoded = await admin.auth().verifyIdToken(idToken, true);
     } catch (verifyErr: any) {
+      logger.warn("⚠️ Invalid Firebase token:", verifyErr.message);
       await logAudit(
         AuditAction.USER_SIGNUP,
         null,
@@ -99,6 +102,7 @@ router.post("/", async (req: Request, res: Response) => {
     /* ============================================================
        🧩 Create new user record
     ============================================================ */
+    const provider = decoded.firebase?.sign_in_provider || "firebase";
     const newUser = await prisma.user.create({
       data: {
         uid: decoded.uid,
@@ -112,7 +116,7 @@ router.post("/", async (req: Request, res: Response) => {
     });
 
     logger.info(
-      `✅ New user created: ${newUser.email} (${assignedRole}) [verified=${newUser.emailVerified}]`
+      `✅ New user created: ${newUser.email} (${assignedRole}) [verified=${newUser.emailVerified}] [provider=${provider}]`
     );
 
     await logAudit(
@@ -121,13 +125,25 @@ router.post("/", async (req: Request, res: Response) => {
       req.ip,
       req.headers["user-agent"],
       {
-        provider: decoded.firebase?.sign_in_provider || "firebase",
+        provider,
         role: assignedRole,
       }
     );
 
     /* ============================================================
-       🍪 Create secure session cookie
+       ⚠️ If email not verified (Email/Password signup)
+       → don't auto-login; return special flag.
+    ============================================================ */
+    if (!decoded.email_verified && provider === "password") {
+      logger.info(`📧 Email signup pending verification: ${newUser.email}`);
+      return res.status(202).json({
+        status: "pending_verification",
+        message: "Account created. Please verify your email before logging in.",
+      });
+    }
+
+    /* ============================================================
+       🍪 Create secure session cookie (Google or verified email)
     ============================================================ */
     const { cookieHeader, rawToken, expiresAt } = await makeSessionCookie(
       idToken
@@ -162,7 +178,7 @@ router.post("/", async (req: Request, res: Response) => {
     res.setHeader("Set-Cookie", cookieHeader);
     res.status(201).json({
       status: "success",
-      message: "User created successfully",
+      message: "User created and logged in successfully.",
       user: {
         id: newUser.id,
         firebaseUid: newUser.uid,
@@ -180,7 +196,7 @@ router.post("/", async (req: Request, res: Response) => {
       `🍪 Session created for ${newUser.email} (sessionId=${session.id})`
     );
   } catch (err: any) {
-    logger.error("🔥 Signup-with-firebase failed:", err);
+    logger.error("🔥 signup-with-firebase failed:", err);
 
     await logAudit(
       AuditAction.USER_SIGNUP,
@@ -188,14 +204,14 @@ router.post("/", async (req: Request, res: Response) => {
       req.ip,
       req.headers["user-agent"],
       {
-        reason: "ERROR",
+        reason: "SERVER_ERROR",
         detail: err.message,
       }
     );
 
     res.status(500).json({
       status: "error",
-      message: "Something went wrong creating the user.",
+      message: "Internal server error during signup.",
     });
   }
 });

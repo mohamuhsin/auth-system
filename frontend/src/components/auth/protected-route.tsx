@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,6 +8,10 @@ import { useAuth } from "@/context/authContext";
 
 /* ============================================================
    🔒 ProtectedRoute — Guards private pages (with fade loader)
+   ------------------------------------------------------------
+   • Waits for AuthContext to finish loading
+   • Redirects safely with timeout fallback
+   • Prevents infinite "verifying session..." stuck states
 ============================================================ */
 export function ProtectedRoute({
   children,
@@ -20,15 +24,36 @@ export function ProtectedRoute({
 }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const redirectedRef = useRef(false);
+  const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 🧭 Redirect if no session and loading completed
+  // 🧭 Handle redirect if no user after loading
   useEffect(() => {
-    if (!loading && !user) {
-      // Short delay prevents UI flicker on route transitions
+    // Avoid multiple redirects
+    if (!loading && !user && !redirectedRef.current) {
+      redirectedRef.current = true;
       const timeout = setTimeout(() => router.replace(redirectTo), 200);
       return () => clearTimeout(timeout);
     }
   }, [user, loading, router, redirectTo]);
+
+  // 🕓 Safety fallback — if still loading too long (10s), force reset
+  useEffect(() => {
+    if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
+
+    // only start safety timer if still loading
+    if (loading) {
+      safetyTimeoutRef.current = setTimeout(() => {
+        console.warn("⚠️ Auth verification timeout — redirecting to login.");
+        redirectedRef.current = true;
+        router.replace(redirectTo);
+      }, 10000); // 10 seconds
+    }
+
+    return () => {
+      if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
+    };
+  }, [loading, router, redirectTo]);
 
   // 🌀 While verifying session
   if (loading || !user) {

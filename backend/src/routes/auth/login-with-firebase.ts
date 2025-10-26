@@ -15,7 +15,7 @@ const router = Router();
  * Verifies Firebase ID token → issues secure session cookie.
  * Updates user's verification status, records session + audit log.
  *
- * Frontend: called by loginWithEmailPassword() or Google login.
+ * Handles both Google and Email/Password logins.
  */
 router.post("/", async (req: Request, res: Response) => {
   try {
@@ -36,6 +36,7 @@ router.post("/", async (req: Request, res: Response) => {
     try {
       decoded = await admin.auth().verifyIdToken(idToken, true);
     } catch (verifyErr: any) {
+      logger.warn("⚠️ Invalid Firebase token:", verifyErr.message);
       await logAudit(
         AuditAction.USER_LOGIN,
         null,
@@ -49,7 +50,7 @@ router.post("/", async (req: Request, res: Response) => {
 
       return res.status(401).json({
         status: "error",
-        message: "Invalid or expired token.",
+        message: "Invalid or expired Firebase token.",
       });
     }
 
@@ -71,11 +72,12 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     /* ============================================================
-       👤 Find User
+       👤 Find user in DB
     ============================================================ */
     const user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
+      logger.warn(`❌ Login failed — No user found for email: ${email}`);
       await logAudit(
         AuditAction.USER_LOGIN,
         null,
@@ -87,6 +89,7 @@ router.post("/", async (req: Request, res: Response) => {
         }
       );
 
+      // 👇 Key for frontend to detect “no account”
       return res.status(404).json({
         status: "error",
         message: "Account not found.",
@@ -94,7 +97,8 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     /* ============================================================
-       📧 Email verification check
+       📧 Check email verification
+       (If unverified both in Firebase and DB → block)
     ============================================================ */
     if (!decoded.email_verified && !user.emailVerified) {
       await logAudit(
@@ -107,17 +111,20 @@ router.post("/", async (req: Request, res: Response) => {
         }
       );
 
+      logger.warn(`🚫 Unverified email login attempt: ${user.email}`);
       return res.status(403).json({
         status: "error",
         message: "Please verify your email before logging in.",
       });
     }
 
-    // ✅ Sync Firebase email_verified to DB
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { emailVerified: decoded.email_verified ?? false },
-    });
+    // ✅ Sync Firebase verification to DB if changed
+    if (decoded.email_verified !== user.emailVerified) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified: decoded.email_verified ?? false },
+      });
+    }
 
     /* ============================================================
        🍪 Create secure session cookie
@@ -137,7 +144,7 @@ router.post("/", async (req: Request, res: Response) => {
       null;
 
     /* ============================================================
-       🧾 Create session record (hashed token)
+       🧾 Create session record
     ============================================================ */
     const session = await prisma.session.create({
       data: {
@@ -150,7 +157,7 @@ router.post("/", async (req: Request, res: Response) => {
     });
 
     /* ============================================================
-       📤 Respond + Set-Cookie
+       📤 Respond with cookie + user info
     ============================================================ */
     res.setHeader("Set-Cookie", cookieHeader);
     res.status(200).json({
@@ -167,7 +174,7 @@ router.post("/", async (req: Request, res: Response) => {
     });
 
     /* ============================================================
-       🧾 Audit log (async)
+       🧾 Async audit log
     ============================================================ */
     await logAudit(
       AuditAction.USER_LOGIN,
@@ -175,28 +182,28 @@ router.post("/", async (req: Request, res: Response) => {
       req.ip,
       req.headers["user-agent"],
       {
-        method: "FIREBASE",
+        method: decoded.firebase?.sign_in_provider || "FIREBASE",
         sessionId: session.id,
       }
     );
 
     logger.info(`✅ User ${user.email} logged in successfully`);
   } catch (err: any) {
-    logger.error("🔥 Login-with-firebase failed:", err);
+    logger.error("🔥 login-with-firebase failed:", err);
     await logAudit(
       AuditAction.USER_LOGIN,
       null,
       req.ip,
       req.headers["user-agent"],
       {
-        reason: "ERROR",
+        reason: "SERVER_ERROR",
         detail: err.message,
       }
     );
 
     return res.status(500).json({
       status: "error",
-      message: "Something went wrong creating the session.",
+      message: "Internal server error during login.",
     });
   }
 });

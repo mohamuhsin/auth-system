@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -34,7 +35,7 @@ import { toastAsync, toastMessage } from "@/lib/toast";
 import { signupWithEmailPassword } from "@/lib/auth-email";
 
 /* ============================================================
-   🟢 SignupForm — Level 2.0 (Secure, Backend-Verified)
+   🟢 SignupForm — Level 2.1 (Hardened + Type-Safe)
 ============================================================ */
 export function SignupForm({
   className,
@@ -67,20 +68,26 @@ export function SignupForm({
       return;
     }
 
-    const result = await signupWithEmailPassword(
-      values.email,
-      values.password,
-      values.name
-    );
+    try {
+      const result = await signupWithEmailPassword(
+        values.email,
+        values.password,
+        values.name
+      );
 
-    if (result?.ok) {
-      toastMessage("Account created! Verify your email to continue.", {
-        type: "success",
-      });
-      form.reset();
-      router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
-    } else {
-      toastMessage(result?.message || "Signup failed. Please try again.", {
+      if (result?.ok) {
+        toastMessage("✅ Account created! Verify your email to continue.", {
+          type: "success",
+        });
+        form.reset();
+        router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
+      } else {
+        toastMessage(result?.message || "Signup failed. Please try again.", {
+          type: "error",
+        });
+      }
+    } catch (err: any) {
+      toastMessage(err?.message || "Signup failed. Please try again.", {
         type: "error",
       });
     }
@@ -104,8 +111,8 @@ export function SignupForm({
         });
 
         if (!result || result.status !== "success") {
-          // Handle existing or failed account creation
-          if (result?.statusCode === 409) {
+          // Existing or failed account
+          if ((result as any)?.statusCode === 409) {
             toastMessage("Account already exists. Redirecting to login...", {
               type: "warning",
             });
@@ -115,7 +122,7 @@ export function SignupForm({
           throw new Error(result?.message || "Signup verification failed.");
         }
 
-        toastMessage("Signed up successfully with Google!", {
+        toastMessage("🎉 Signed up successfully with Google!", {
           type: "success",
         });
         router.replace("/dashboard");
@@ -155,11 +162,10 @@ export function SignupForm({
                   onClick={handleGoogleSignup}
                   disabled={form.formState.isSubmitting}
                 >
-                  {/* Inline SVG preserved */}
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 48 48"
-                    className="size-5 mr-2"
+                    className="mr-2 size-5"
                     aria-hidden="true"
                   >
                     <path
@@ -250,6 +256,9 @@ export function SignupForm({
                         type="button"
                         onClick={() => setShowPassword((p) => !p)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
                       >
                         {showPassword ? (
                           <EyeOff className="size-4" />
@@ -278,11 +287,15 @@ export function SignupForm({
                         id="confirm-password"
                         type={showConfirm ? "text" : "password"}
                         className="pr-10"
+                        autoComplete="new-password"
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirm((p) => !p)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={
+                          showConfirm ? "Hide password" : "Show password"
+                        }
                       >
                         {showConfirm ? (
                           <EyeOff className="size-4" />
@@ -297,11 +310,11 @@ export function SignupForm({
               />
 
               <FieldDescription>
-                Must be at least 8 characters long and include a number and an
+                Must be at least 8 characters and include a number and an
                 uppercase letter.
               </FieldDescription>
 
-              {/* Submit */}
+              {/* 🔘 Submit */}
               <Field>
                 <Button
                   type="submit"
