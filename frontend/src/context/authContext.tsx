@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const newUser: User = {
           id: res.id || "unknown",
           firebaseUid: res.uid || "unknown",
-          email: res.email || "",
+          email: res.email ?? "",
           name: res.name || null,
           avatarUrl: res.avatarUrl || null,
           role,
@@ -119,16 +119,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: { idToken, userAgent: navigator.userAgent },
     });
 
-    // ✅ Allow browser to store cookie before fetching session
+    // Wait briefly for cookie to propagate
     await new Promise((r) => setTimeout(r, 600));
-
     await fetchSession();
+
     router.replace("/dashboard");
     return { ...res, status: res.status ?? "success" };
   };
 
   /* ============================================================
-     🆕 Signup — Firebase → Backend Cookie Session
+     🆕 Signup — Firebase → Backend Cookie Session + Verify Redirect
   ============================================================ */
   const signupWithFirebase = async (
     firebaseUser: any,
@@ -141,11 +141,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: { idToken, userAgent: navigator.userAgent, ...extra },
     });
 
-    // ✅ Wait before checking cookie
+    // Wait before checking cookie
     await new Promise((r) => setTimeout(r, 600));
-
     await fetchSession();
-    router.replace("/dashboard");
+
+    // 🚦 Redirect based on email verification state
+    if (!firebaseUser.emailVerified) {
+      try {
+        await firebaseUser.sendEmailVerification();
+        console.log("📧 Verification email sent to", firebaseUser.email);
+      } catch (err: any) {
+        console.warn("⚠️ Failed to send verification email:", err.message);
+      }
+      router.replace("/verify-email");
+    } else {
+      router.replace("/dashboard");
+    }
+
     return { ...res, status: res.status ?? "success" };
   };
 

@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 /* ============================================================
    🧩 Auth Middleware — Level 2.1 (Cross-domain Safe)
    ------------------------------------------------------------
-   • Does NOT try to read HttpOnly Firebase cookies (unreadable across subdomains)
+   • Does NOT read HttpOnly Firebase cookies
    • Lets frontend AuthProvider handle validation
    • Redirects logged-in users away from auth pages only
 ============================================================ */
@@ -20,25 +20,30 @@ const AUTH_PAGES = [
   "/verify-email",
 ];
 
-/**
- * 🚦 Middleware Logic
- */
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // ✅ Normalize path safely
+  // ⛔ Skip Next.js internals and static assets
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||
+    pathname.match(/\.(ico|png|jpg|jpeg|svg|gif|webp|avif)$/)
+  ) {
+    return NextResponse.next();
+  }
+
+  // ✅ Normalize path
   const path = pathname === "/" ? "/" : pathname.replace(/\/$/, "");
 
-  // ✅ Check only cookie presence (not validity)
+  // ✅ Check only if cookie exists
   const cookieHeader = req.headers.get("cookie") || "";
   const hasSession = cookieHeader.includes(SESSION_COOKIE);
 
-  // 🚫 Prevent logged-in users from revisiting auth pages
+  // 🚫 Redirect logged-in users away from auth pages
   if (hasSession && AUTH_PAGES.includes(path)) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  // ✅ Let everything else pass (frontend handles protection)
   return NextResponse.next();
 }
 
