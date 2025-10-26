@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 /* ============================================================
@@ -5,8 +6,8 @@
    ------------------------------------------------------------
    • Confirms verification email was sent
    • Allows resending using centralized helper
-   • Auto-redirects once verified
-   • Production-safe feedback + retry flow
+   • Auto-checks and redirects once verified
+   • Smooth production-safe UX
 ============================================================ */
 
 import { useState, useEffect } from "react";
@@ -29,8 +30,8 @@ import { MailCheck, MailWarning, Loader2 } from "lucide-react";
 
 export function VerifyEmailNotice() {
   const [resending, setResending] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -49,20 +50,28 @@ export function VerifyEmailNotice() {
 
       if (!emailParam && user.email) setUserEmail(user.email);
 
-      try {
-        // Refresh Firebase user to check current verification state
-        await user.reload();
-
-        if (user.emailVerified) {
-          toastMessage("✅ Your email has been verified!", { type: "success" });
-          setTimeout(() => router.replace("/login"), 1000);
-          return;
-        }
-      } catch (err) {
-        console.error("Error checking verification:", err);
+      // Check immediately on mount
+      await user.reload();
+      if (user.emailVerified) {
+        toastMessage("✅ Your email has been verified!", { type: "success" });
+        setTimeout(() => router.replace("/dashboard"), 1000);
+        return;
       }
 
+      // Poll every 5 seconds to detect verification
+      const poll = setInterval(async () => {
+        await user.reload();
+        if (user.emailVerified) {
+          clearInterval(poll);
+          toastMessage("🎉 Email verified! Redirecting...", {
+            type: "success",
+          });
+          router.replace("/dashboard");
+        }
+      }, 5000);
+
       setChecking(false);
+      return () => clearInterval(poll);
     });
 
     return () => unsubscribe();
@@ -72,15 +81,21 @@ export function VerifyEmailNotice() {
      🔁 Resend Verification Email
   ============================================================ */
   const handleResend = async () => {
+    if (!auth.currentUser) {
+      toastMessage("You need to be signed in to resend verification.", {
+        type: "error",
+      });
+      return;
+    }
+
     try {
       setResending(true);
-      const result = await resendVerificationEmail();
-      if (result?.ok) {
-        toastMessage("Verification email resent successfully.", {
-          type: "success",
-        });
-      }
-    } catch {
+      await resendVerificationEmail();
+      toastMessage("📧 Verification email resent successfully.", {
+        type: "success",
+      });
+    } catch (err: any) {
+      console.error("Resend error:", err);
       toastMessage("Failed to resend verification email.", { type: "error" });
     } finally {
       setResending(false);
@@ -110,7 +125,7 @@ export function VerifyEmailNotice() {
             Verify your email
           </CardTitle>
 
-          <CardDescription className="mt-2 text-sm">
+          <CardDescription className="mt-2 text-sm leading-relaxed">
             We’ve sent a verification link{" "}
             {userEmail ? (
               <>
@@ -129,6 +144,7 @@ export function VerifyEmailNotice() {
             onClick={handleResend}
             disabled={resending}
             className="w-full"
+            variant="outline"
           >
             {resending ? (
               <>

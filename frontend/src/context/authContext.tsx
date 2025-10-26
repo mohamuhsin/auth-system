@@ -112,19 +112,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
      🔑 Login — Firebase → Backend Cookie Session
   ============================================================ */
   const loginWithFirebase = async (firebaseUser: any): Promise<ApiResponse> => {
-    const idToken = await getIdToken(firebaseUser, true);
+    try {
+      const idToken = await getIdToken(firebaseUser, true);
 
-    const res = await apiRequest<ApiResponse>("/auth/login-with-firebase", {
-      method: "POST",
-      body: { idToken, userAgent: navigator.userAgent },
-    });
+      const res = await apiRequest<ApiResponse>("/auth/login-with-firebase", {
+        method: "POST",
+        body: { idToken, userAgent: navigator.userAgent },
+      });
 
-    // Wait briefly for cookie to propagate
-    await new Promise((r) => setTimeout(r, 600));
-    await fetchSession();
+      // Wait briefly for cookie propagation
+      await new Promise((r) => setTimeout(r, 600));
+      await fetchSession();
 
-    router.replace("/dashboard");
-    return { ...res, status: res.status ?? "success" };
+      router.replace("/dashboard");
+      return { ...res, status: res.status ?? "success" };
+    } catch (err: any) {
+      console.error("❌ Login error:", err.message);
+      return {
+        status: "error",
+        message: err.message || "Login failed. Please try again.",
+      };
+    }
   };
 
   /* ============================================================
@@ -134,31 +142,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     firebaseUser: any,
     extra?: { name?: string; avatarUrl?: string }
   ): Promise<ApiResponse> => {
-    const idToken = await getIdToken(firebaseUser, true);
+    try {
+      const idToken = await getIdToken(firebaseUser, true);
 
-    const res = await apiRequest<ApiResponse>("/auth/signup-with-firebase", {
-      method: "POST",
-      body: { idToken, userAgent: navigator.userAgent, ...extra },
-    });
+      const res = await apiRequest<ApiResponse>("/auth/signup-with-firebase", {
+        method: "POST",
+        body: { idToken, userAgent: navigator.userAgent, ...extra },
+      });
 
-    // Wait before checking cookie
-    await new Promise((r) => setTimeout(r, 600));
-    await fetchSession();
-
-    // 🚦 Redirect based on email verification state
-    if (!firebaseUser.emailVerified) {
-      try {
-        await firebaseUser.sendEmailVerification();
-        console.log("📧 Verification email sent to", firebaseUser.email);
-      } catch (err: any) {
-        console.warn("⚠️ Failed to send verification email:", err.message);
+      // ✅ Normalize possible backend variations
+      if (res?.status === "error" || res?.error) {
+        throw new Error(res.message || "Signup failed on server");
       }
-      router.replace("/verify-email");
-    } else {
-      router.replace("/dashboard");
-    }
 
-    return { ...res, status: res.status ?? "success" };
+      // Wait briefly for cookie propagation
+      await new Promise((r) => setTimeout(r, 800));
+      await fetchSession();
+
+      // 🚦 Redirect based on email verification state
+      if (!firebaseUser.emailVerified) {
+        try {
+          await firebaseUser.sendEmailVerification();
+          console.log("📧 Verification email sent to", firebaseUser.email);
+        } catch (err: any) {
+          console.warn("⚠️ Could not send verification email:", err.message);
+        }
+        router.replace("/verify-email");
+      } else {
+        router.replace("/dashboard");
+      }
+
+      return { ...res, status: "success" };
+    } catch (err: any) {
+      console.error("❌ signupWithFirebase error:", err.message);
+      return {
+        status: "error",
+        message: err.message || "Signup failed. Please try again.",
+        error: err.message,
+      };
+    }
   };
 
   /* ============================================================
