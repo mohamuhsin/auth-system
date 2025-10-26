@@ -6,11 +6,17 @@
    • Confirms verification email was sent
    • Allows resending using centralized helper
    • Auto-redirects once verified
+   • Production-safe feedback + retry flow
 ============================================================ */
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/services/firebase";
+import { resendVerificationEmail } from "@/lib/auth-email";
+import { toastMessage } from "@/lib/toast";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,10 +26,6 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { MailCheck, MailWarning, Loader2 } from "lucide-react";
-import { toastMessage } from "@/lib/toast";
-import { auth } from "@/services/firebase";
-import { onAuthStateChanged } from "firebase/auth";
-import { resendVerificationEmail } from "@/lib/auth-email";
 
 export function VerifyEmailNotice() {
   const [resending, setResending] = useState(false);
@@ -33,7 +35,7 @@ export function VerifyEmailNotice() {
   const searchParams = useSearchParams();
 
   /* ============================================================
-     🧭 Initialize user & email state
+     🧭 Initialize user + auto-check verification
   ============================================================ */
   useEffect(() => {
     const emailParam = searchParams.get("email");
@@ -45,16 +47,19 @@ export function VerifyEmailNotice() {
         return;
       }
 
-      // Pull email from Firebase if not in query
       if (!emailParam && user.email) setUserEmail(user.email);
 
-      // 🔁 Refresh to check if email has been verified
-      await user.reload();
+      try {
+        // Refresh Firebase user to check current verification state
+        await user.reload();
 
-      if (user.emailVerified) {
-        toastMessage("Your email has been verified!", { type: "success" });
-        setTimeout(() => router.replace("/login"), 1000);
-        return;
+        if (user.emailVerified) {
+          toastMessage("✅ Your email has been verified!", { type: "success" });
+          setTimeout(() => router.replace("/login"), 1000);
+          return;
+        }
+      } catch (err) {
+        console.error("Error checking verification:", err);
       }
 
       setChecking(false);
@@ -67,9 +72,19 @@ export function VerifyEmailNotice() {
      🔁 Resend Verification Email
   ============================================================ */
   const handleResend = async () => {
-    setResending(true);
-    await resendVerificationEmail();
-    setResending(false);
+    try {
+      setResending(true);
+      const result = await resendVerificationEmail();
+      if (result?.ok) {
+        toastMessage("Verification email resent successfully.", {
+          type: "success",
+        });
+      }
+    } catch {
+      toastMessage("Failed to resend verification email.", { type: "error" });
+    } finally {
+      setResending(false);
+    }
   };
 
   /* ============================================================

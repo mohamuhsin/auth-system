@@ -1,17 +1,20 @@
 "use client";
 
-import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
 
 /* ============================================================
-   🔥 Firebase Web SDK — Client-Safe Initialization
-   Works in Next.js 15+ (App Router, Static + SSR)
+   🔥 Firebase Web SDK — Client-Safe Initialization (Level 2.0)
+   ------------------------------------------------------------
+   • Works seamlessly in Next.js 15+ (App Router + SSR)
+   • Protects against double initialization
+   • Supports analytics only when browser-supported
 ============================================================ */
 
 /**
- * 🧱 Runtime-safe env loader
- * Avoids undefined vars during build (Vercel or local)
+ * 🧱 Runtime-safe environment loader
+ * Logs missing variables in dev, silently ignores in production.
  */
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "",
@@ -23,29 +26,45 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID ?? "",
 };
 
-// ✅ Ensure we never run initialization during build-time (SSR)
+// 🧩 Validate minimal config in dev
+if (process.env.NODE_ENV === "development") {
+  const missing = Object.entries(firebaseConfig)
+    .filter((entry) => !entry[1]) // ✅ no unused variable warning
+    .map((entry) => entry[0]);
+  if (missing.length) {
+    console.warn("⚠️ Missing Firebase env vars:", missing.join(", "));
+  }
+}
+
+// ============================================================
+// 🧠 Safe Initialization
+// ============================================================
+
 let app: FirebaseApp;
 let auth: Auth;
 let analytics: Analytics | null = null;
 
 if (typeof window !== "undefined") {
-  // Initialize only on the client
-  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  // ✅ Initialize client-side only
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
   auth = getAuth(app);
 
-  // Safe Analytics init (browser only)
+  // ✅ Optional Analytics (browser-only)
   isSupported()
     .then((supported) => {
       if (supported) analytics = getAnalytics(app);
     })
     .catch(() => null);
+
+  if (process.env.NODE_ENV === "development")
+    console.log("🔥 Firebase initialized (client)");
 } else {
-  // Provide placeholders for server-side (to avoid build errors)
+  // 🚫 SSR placeholder (avoid reference errors)
   app = {} as FirebaseApp;
   auth = {} as Auth;
 }
 
-/* ============================================================
-   🧩 Exports
-============================================================ */
+// ============================================================
+// 📦 Exports
+// ============================================================
 export { app, auth, analytics };

@@ -1,113 +1,202 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
+import crypto from "crypto";
 import admin from "../../services/firebaseAdmin";
 import prisma from "../../prisma/client";
 import { makeSessionCookie } from "../../utils/cookies";
 import { logAudit } from "../../utils/audit";
+import { AuditAction } from "@prisma/client";
+import { logger } from "../../utils/logger";
 
 const router = Router();
 
 /**
  * 🔐 POST /api/auth/login-with-firebase
  * ------------------------------------------------------------
- * Verifies Firebase ID token and creates a secure session cookie.
- * Existing users only — new users must sign up via /signup-with-firebase.
+ * Verifies Firebase ID token → issues secure session cookie.
+ * Updates user's verification status, records session + audit log.
+ *
+ * Frontend: called by loginWithEmailPassword() or Google login.
  */
-router.post("/", async (req, res) => {
+router.post("/", async (req: Request, res: Response) => {
   try {
     const { idToken, userAgent } = req.body;
 
-    // 🧩 Validate input
     if (!idToken) {
+      logger.warn("🚫 Missing ID token in login request");
       return res.status(400).json({
         status: "error",
         message: "Missing ID token",
       });
     }
 
-    // ✅ Verify Firebase ID token
+    /* ============================================================
+       🔍 Verify Firebase token
+    ============================================================ */
     let decoded;
     try {
       decoded = await admin.auth().verifyIdToken(idToken, true);
-    } catch (verifyErr) {
-      console.error("❌ Invalid Firebase token:", verifyErr);
+    } catch (verifyErr: any) {
+      await logAudit(
+        AuditAction.USER_LOGIN,
+        null,
+        req.ip,
+        req.headers["user-agent"],
+        {
+          reason: "INVALID_TOKEN",
+          detail: verifyErr.message,
+        }
+      );
+
       return res.status(401).json({
         status: "error",
-        message: "Invalid or expired token",
+        message: "Invalid or expired token.",
       });
     }
 
-    // ✅ Find user by email
-    const existingUser = await prisma.user.findUnique({
-      where: { email: decoded.email! },
-    });
-
-    if (!existingUser) {
+    const email = decoded.email;
+    if (!email) {
       await logAudit(
-        "LOGIN_FAILED_USER_NOT_FOUND",
-        undefined,
+        AuditAction.USER_LOGIN,
+        null,
         req.ip,
-        req.headers["user-agent"]
+        req.headers["user-agent"],
+        {
+          reason: "NO_EMAIL_IN_TOKEN",
+        }
+      );
+      return res.status(400).json({
+        status: "error",
+        message: "Token missing email field.",
+      });
+    }
+
+    /* ============================================================
+       👤 Find User
+    ============================================================ */
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      await logAudit(
+        AuditAction.USER_LOGIN,
+        null,
+        req.ip,
+        req.headers["user-agent"],
+        {
+          reason: "USER_NOT_FOUND",
+          email,
+        }
       );
 
       return res.status(404).json({
         status: "error",
-        message: "No account found. Please sign up first.",
+        message: "Account not found.",
       });
     }
 
-    // 🧩 Optional — sync email verification
+    /* ============================================================
+       📧 Email verification check
+    ============================================================ */
+    if (!decoded.email_verified && !user.emailVerified) {
+      await logAudit(
+        AuditAction.USER_LOGIN,
+        user.id,
+        req.ip,
+        req.headers["user-agent"],
+        {
+          reason: "UNVERIFIED_EMAIL",
+        }
+      );
+
+      return res.status(403).json({
+        status: "error",
+        message: "Please verify your email before logging in.",
+      });
+    }
+
+    // ✅ Sync Firebase email_verified to DB
     await prisma.user.update({
-      where: { id: existingUser.id },
+      where: { id: user.id },
       data: { emailVerified: decoded.email_verified ?? false },
     });
 
-    // ✅ Create session record in DB
+    /* ============================================================
+       🍪 Create secure session cookie
+    ============================================================ */
+    const { cookieHeader, rawToken, expiresAt } = await makeSessionCookie(
+      idToken
+    );
+
+    const ua =
+      (Array.isArray(userAgent) ? userAgent.join("; ") : userAgent) ??
+      req.headers["user-agent"] ??
+      null;
+
+    const ip =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.socket?.remoteAddress ||
+      null;
+
+    /* ============================================================
+       🧾 Create session record (hashed token)
+    ============================================================ */
     const session = await prisma.session.create({
       data: {
-        userId: existingUser.id,
-        ipAddress:
-          (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-          req.socket?.remoteAddress ||
-          null,
-        userAgent: userAgent ?? req.headers["user-agent"] ?? null,
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // 7 days
+        tokenHash: crypto.createHash("sha256").update(rawToken).digest("hex"),
+        userId: user.id,
+        ipAddress: ip,
+        userAgent: ua,
+        expiresAt,
       },
     });
 
-    // ✅ Generate a secure Firebase session cookie (already serialized)
-    const cookieHeader = await makeSessionCookie(idToken);
-
-    // ✅ Send cookie to browser
+    /* ============================================================
+       📤 Respond + Set-Cookie
+    ============================================================ */
     res.setHeader("Set-Cookie", cookieHeader);
-
-    // ✅ Respond success
     res.status(200).json({
       status: "success",
       message: "Login successful",
-      userId: existingUser.id,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
       sessionId: session.id,
+      expiresAt,
     });
 
-    // 🧾 Record successful login
+    /* ============================================================
+       🧾 Audit log (async)
+    ============================================================ */
     await logAudit(
-      "LOGIN_WITH_FIREBASE",
-      existingUser.id,
+      AuditAction.USER_LOGIN,
+      user.id,
       req.ip,
-      req.headers["user-agent"]
+      req.headers["user-agent"],
+      {
+        method: "FIREBASE",
+        sessionId: session.id,
+      }
     );
-  } catch (err: any) {
-    console.error("🔥 login-with-firebase error:", err.message);
 
+    logger.info(`✅ User ${user.email} logged in successfully`);
+  } catch (err: any) {
+    logger.error("🔥 Login-with-firebase failed:", err);
     await logAudit(
-      "LOGIN_WITH_FIREBASE_ERROR",
-      undefined,
+      AuditAction.USER_LOGIN,
+      null,
       req.ip,
-      req.headers["user-agent"]
+      req.headers["user-agent"],
+      {
+        reason: "ERROR",
+        detail: err.message,
+      }
     );
 
     return res.status(500).json({
       status: "error",
-      message: "Something went wrong creating the session",
+      message: "Something went wrong creating the session.",
     });
   }
 });

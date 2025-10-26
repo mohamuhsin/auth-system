@@ -1,34 +1,47 @@
 /**
- * 🧩 User Model — Shared between frontend & backend
+ * 🧩 User Model — Shared between Frontend & Backend (Level 2.0)
  * ------------------------------------------------------------
- * Mirrors Prisma `User` model and /api/users/me response.
- * Used across React context, UI components, and API clients.
+ * Mirrors Prisma `User` model + `/api/users/me` response.
+ * Used across React Context, UI components, and API clients.
+ *
+ * ✅  Type-safe with backend
+ * ✅  Works seamlessly with Firebase
+ * ✅  Supports multi-role systems (Admin, Creator, Merchant, etc.)
  */
 export interface User {
-  /** Internal database UUID */
+  /** 🔹 Internal database UUID (Prisma `User.id`) */
   id: string;
 
-  /** Firebase UID for cross-system identity mapping */
+  /** 🔹 Firebase UID for cross-system identity mapping */
   firebaseUid: string;
 
-  /** Primary contact email (unique) */
+  /** 📧 Primary contact email (unique) */
   email: string;
 
-  /** Display name (optional) */
+  /** 🧑 Display name */
   name?: string | null;
 
-  /** Avatar image URL (Firebase, social, or uploaded) */
+  /** 🖼️ Avatar image URL (Firebase, social, or uploaded) */
   avatarUrl?: string | null;
 
-  /** Role within the Iventics Auth ecosystem */
+  /** 🏷️ Role within the Iventics Auth ecosystem */
   role: "ADMIN" | "USER" | "CREATOR" | "MERCHANT";
 
-  /** Whether the account is approved (for restricted systems) */
+  /** ✅ Whether the account is approved (e.g. for restricted systems) */
   isApproved: boolean;
 
-  /** ISO timestamp of record creation */
+  /** 🕒 ISO timestamp of record creation (backend `createdAt`) */
   createdAt: string;
 
-  /** ISO timestamp of last update */
+  /** 🔄 ISO timestamp of last update (backend `updatedAt`) */
   updatedAt: string;
+
+  /** ⚙️ Optional status field (matches Prisma `status`) */
+  status?: "ACTIVE" | "SUSPENDED" | "PENDING" | string;
+
+  /** 🌐 Optional provider (e.g., GOOGLE, PASSWORD, CUSTOM) */
+  primaryProvider?: "GOOGLE" | "PASSWORD" | "CUSTOM";
+
+  /** 🧭 Optional last login timestamp (ISO) */
+  lastLoginAt?: string | null;
 }

@@ -3,6 +3,9 @@
 
 import { toast } from "sonner";
 
+/* ============================================================
+   🔔 Toast Types
+============================================================ */
 export interface ToastOptions {
   type?: "success" | "error" | "info" | "warning" | "loading";
   duration?: number;
@@ -11,7 +14,7 @@ export interface ToastOptions {
 }
 
 /* ============================================================
-   🪶 toastMessage — Simple, instant toast
+   🪶 toastMessage — Lightweight Immediate Toast
 ============================================================ */
 export function toastMessage(
   message: string,
@@ -22,37 +25,42 @@ export function toastMessage(
     onAction,
   }: ToastOptions = {}
 ) {
-  const opts = {
-    duration,
-    action:
-      actionLabel && onAction
-        ? { label: actionLabel, onClick: onAction }
-        : undefined,
-  };
+  try {
+    const opts = {
+      duration,
+      action:
+        actionLabel && onAction
+          ? { label: actionLabel, onClick: onAction }
+          : undefined,
+    };
 
-  switch (type) {
-    case "success":
-      toast.success(message, opts);
-      break;
-    case "error":
-      toast.error(message, opts);
-      break;
-    case "warning":
-      toast.warning(message, opts);
-      break;
-    case "info":
-      toast.info(message, opts);
-      break;
-    case "loading":
-      toast.loading(message, opts);
-      break;
-    default:
-      toast(message, opts);
+    switch (type) {
+      case "success":
+        toast.success(message, opts);
+        break;
+      case "error":
+        toast.error(message, opts);
+        break;
+      case "warning":
+        toast.warning(message, opts);
+        break;
+      case "info":
+        toast.info(message, opts);
+        break;
+      case "loading":
+        toast.loading(message, opts);
+        break;
+      default:
+        toast(message, opts);
+    }
+  } catch (err) {
+    // Prevent runtime crash if Sonner misbehaves
+    console.error("Toast render error:", err);
   }
 }
 
 /* ============================================================
-   ⚙️ toastAsync — Async wrapper for auto feedback
+   ⚙️ toastAsync — Promise Wrapper with Auto Feedback
 ============================================================ */
 export async function toastAsync<T>(
   fn: () => Promise<T>,
@@ -61,12 +69,13 @@ export async function toastAsync<T>(
 ): Promise<T | undefined> {
   const { loading, success, error } = {
     loading: "Processing...",
-    success: "Done successfully!",
+    success: "Completed successfully!",
     error: "Something went wrong.",
     ...messages,
   };
 
   try {
+    // Sonner’s toast.promise returns void; we cast to Promise<T>
     const wrapped = toast.promise(fn(), {
       loading,
       success,
@@ -86,4 +95,7 @@ export async function toastAsync<T>(
   }
 }
 
+/* ============================================================
+   🧱 Export Base
+============================================================ */
 export { toast };

@@ -1,58 +1,78 @@
 import { Router } from "express";
 import { authGuard, AuthenticatedRequest } from "../../middleware/authGuard";
 import { logAudit } from "../../utils/audit";
+import { AuditAction } from "@prisma/client";
 
 const router = Router();
 
 /**
  * 👤 GET /api/users/me
  * ------------------------------------------------------------
- * Returns the authenticated user's profile based on Firebase session cookie.
- * Includes name, avatar, and role info merged from DB + Firebase.
+ * Returns the authenticated user's profile based on the verified session.
+ * Uses merged Firebase + DB data (authGuard attaches req.authUser).
  */
 router.get("/", authGuard(), async (req: AuthenticatedRequest, res) => {
   try {
     const user = req.authUser;
 
     if (!user) {
+      await logAudit(
+        AuditAction.USER_LOGIN,
+        null,
+        req.ip,
+        req.headers["user-agent"],
+        {
+          reason: "NO_AUTH_USER",
+        }
+      );
+
       return res.status(401).json({
         status: "error",
+        code: 401,
         message: "Not authenticated",
       });
     }
 
-    // 🧾 Record profile view (use internal DB id if available)
+    // 🧾 Record audit log for profile view
     await logAudit(
-      "USER_PROFILE_VIEWED",
-      user.id, // ✅ use internal UUID for FK consistency
+      AuditAction.USER_UPDATE, // Re-use USER_UPDATE to represent profile view/read
+      user.id,
       req.ip,
-      req.headers["user-agent"]
+      req.headers["user-agent"],
+      { action: "PROFILE_VIEW" }
     );
 
-    // ✅ Return unified user profile object
+    // ✅ Unified user profile response
     return res.status(200).json({
       status: "success",
-      id: user.id,
-      uid: user.uid,
-      email: user.email,
-      role: user.role,
-      name: user.name || null,
-      avatarUrl: user.avatarUrl || user.photoURL || null,
-      isApproved: user.isApproved,
+      code: 200,
+      user: {
+        id: user.id,
+        uid: user.uid,
+        email: user.email,
+        role: user.role,
+        name: user.name ?? null,
+        avatarUrl: user.avatarUrl ?? user.photoURL ?? null,
+        isApproved: user.isApproved,
+      },
     });
   } catch (err: any) {
     console.error("User profile error:", err.message);
 
-    // 🧾 Log unexpected error
     await logAudit(
-      "USER_PROFILE_ERROR",
-      undefined,
+      AuditAction.USER_UPDATE,
+      null,
       req.ip,
-      req.headers["user-agent"]
+      req.headers["user-agent"],
+      {
+        reason: "PROFILE_FETCH_ERROR",
+        detail: err.message,
+      }
     );
 
     return res.status(500).json({
       status: "error",
+      code: 500,
       message: "Failed to fetch profile",
     });
   }

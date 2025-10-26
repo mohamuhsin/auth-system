@@ -3,7 +3,8 @@
 /* ============================================================
    🔑 ForgotPasswordForm — Secure Password Reset via Firebase
    ------------------------------------------------------------
-   Unified with toastAsync + shared requestPasswordReset helper
+   Unified with toastAsync + shared requestPasswordReset helper.
+   Redirects user to /login after successful email dispatch.
 ============================================================ */
 
 import { Controller, useForm } from "react-hook-form";
@@ -32,12 +33,11 @@ import {
   forgotPasswordSchema,
   type ForgotPasswordValues,
 } from "@/lib/validators/auth";
-
 import { toastAsync, toastMessage } from "@/lib/toast";
 import { requestPasswordReset } from "@/lib/auth-email";
 
 /* ============================================================
-   🔐 ForgotPasswordForm — Request reset link via Firebase
+   🔐 ForgotPasswordForm — Level 2.0
 ============================================================ */
 export function ForgotPasswordForm({
   className,
@@ -55,7 +55,7 @@ export function ForgotPasswordForm({
      ✉️ Handle Password Reset
   ============================================================ */
   async function onSubmit(values: ForgotPasswordValues) {
-    if (!values.email) {
+    if (!values.email.trim()) {
       toastMessage("Please enter your email address first.", {
         type: "warning",
       });
@@ -70,14 +70,17 @@ export function ForgotPasswordForm({
           throw new Error("Failed to send password reset link.");
         }
 
-        // Optional small delay before redirect
-        setTimeout(() => router.push("/login"), 2500);
+        toastMessage("Password reset email sent! Check your inbox.", {
+          type: "success",
+        });
+
+        // Optional UX delay before redirect
+        setTimeout(() => router.replace("/login"), 2500);
       },
       {
-        loading: "Sending reset link...",
-        success:
-          "Password reset email sent! Check your inbox (and spam folder).",
-        error: "Unable to send reset link. Please try again later.",
+        loading: "Sending password reset link...",
+        success: "Password reset email sent!",
+        error: "Failed to send reset link. Please try again.",
       }
     );
   }
