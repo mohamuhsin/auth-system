@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* ============================================================
-   🌐 API Client — Iventics Auth System (Frontend)
+   🌐 API Client — Level 2.0 Hardened
    ------------------------------------------------------------
-   Handles secure cross-domain requests with cookies.
-   Compatible with Express backend + Firebase sessions.
+   • Secure cross-domain requests (cookies + CORS)
+   • Auto-retry for transient network errors
+   • Consistent error normalization
 ============================================================ */
 
 export const API_BASE =
@@ -14,22 +15,29 @@ export interface ApiError extends Error {
   status?: number;
   data?: any;
   requestUrl?: string;
+  isNetworkError?: boolean;
 }
 
-/**
- * Extended fetch options — allows sending JSON objects directly.
- */
 export interface ApiRequestOptions extends RequestInit {
   body?: any;
-  skipAuthCheck?: boolean; // optional future use (e.g. public endpoints)
+  skipAuthCheck?: boolean; // reserved for public endpoints
 }
 
 /**
- * Unified API request wrapper.
- * Automatically:
- *  - Sends secure cookies
- *  - Parses JSON responses
- *  - Handles timeouts & structured errors
+ * 🧠 Helper to safely parse JSON bodies
+ */
+async function parseJsonSafe(res: Response) {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * 🔄 Unified API request wrapper
  */
 export async function apiRequest<T>(
   path: string,
@@ -44,7 +52,8 @@ export async function apiRequest<T>(
   try {
     const res = await fetch(url, {
       method: options.method || "GET",
-      credentials: "include", // ✅ required for cookie-based sessions
+      credentials: "include", // ✅ must include cookies cross-domain
+      mode: "cors", // ✅ ensures proper CORS handling
       signal: controller.signal,
       headers: {
         Accept: "application/json",
@@ -61,19 +70,9 @@ export async function apiRequest<T>(
 
     clearTimeout(timeout);
 
-    // 🧩 Handle non-2xx responses
+    // 🧩 Normalize error responses
     if (!res.ok) {
-      const contentType = res.headers.get("content-type") || "";
-      let data: any = null;
-
-      if (contentType.includes("application/json")) {
-        try {
-          data = await res.json();
-        } catch {
-          data = null;
-        }
-      }
-
+      const data = await parseJsonSafe(res);
       const message =
         data?.message ||
         data?.error ||
@@ -86,27 +85,29 @@ export async function apiRequest<T>(
       throw error;
     }
 
-    // 🧠 Gracefully handle empty JSON bodies
-    const text = await res.text();
-    if (!text) return {} as T;
-
-    try {
-      return JSON.parse(text) as T;
-    } catch {
-      return {} as T;
-    }
+    return (await parseJsonSafe(res)) as T;
   } catch (err: any) {
     clearTimeout(timeout);
 
-    // ⏰ Timeout handling
+    // ⏰ Timeout
     if (err.name === "AbortError") {
       const timeoutError = new Error(
         "Request timed out after 15 seconds"
       ) as ApiError;
       timeoutError.status = 408;
-      timeoutError.requestUrl = path;
-      console.error("🌐 Timeout:", timeoutError);
+      timeoutError.requestUrl = url;
       throw timeoutError;
+    }
+
+    // 🌐 Network or CORS failure
+    if (err instanceof TypeError && err.message === "Failed to fetch") {
+      const networkError = new Error(
+        "Network error or CORS policy blocked the request."
+      ) as ApiError;
+      networkError.isNetworkError = true;
+      networkError.status = 0;
+      networkError.requestUrl = url;
+      throw networkError;
     }
 
     console.error("🌐 API request failed:", err);

@@ -3,23 +3,16 @@ import admin from "../services/firebaseAdmin";
 import { logger } from "./logger";
 
 /**
- * 🍪 Cookie Utility — Level 2.0 Hardened
+ * 🍪 Cookie Utility — Level 2.0 (Cross-Domain Safe)
  * ------------------------------------------------------------
- * - Creates & clears secure cross-domain session cookies
- * - Uses Firebase Admin to exchange ID tokens
- * - Designed for multi-subdomain deployments under iventics.com
+ * - Always issues Secure + SameSite=None + .iventics.com domain
+ * - Ensures cookies work across auth-api.iventics.com and auth.iventics.com
  */
 
 const NAME = process.env.SESSION_COOKIE_NAME || "__Secure-iventics_session";
-const DOMAIN =
-  process.env.NODE_ENV === "production" ? ".iventics.com" : undefined;
+const DOMAIN = ".iventics.com"; // ✅ Always enforce for production-like behavior
 const TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 7);
 
-/**
- * 🔑 makeSessionCookie
- * Exchanges a Firebase ID token for a secure, HTTP-only session cookie.
- * Returns structured metadata for controllers and DB storage.
- */
 export async function makeSessionCookie(idToken: string) {
   const expiresIn = TTL_DAYS * 24 * 60 * 60 * 1000; // 7 days
   try {
@@ -32,13 +25,13 @@ export async function makeSessionCookie(idToken: string) {
       secure: true,
       sameSite: "none",
       path: "/",
-      domain: DOMAIN,
+      domain: DOMAIN, // ✅ explicitly shared between subdomains
       maxAge: expiresIn / 1000,
     });
 
     return {
-      cookieHeader, // serialized Set-Cookie header
-      rawToken: sessionCookie, // raw Firebase cookie string
+      cookieHeader,
+      rawToken: sessionCookie,
       expiresAt: new Date(Date.now() + expiresIn),
       maxAge: expiresIn / 1000,
     };
@@ -53,8 +46,7 @@ export async function makeSessionCookie(idToken: string) {
 }
 
 /**
- * 🚪 clearSessionCookie
- * Clears the session cookie from the browser (used during logout).
+ * 🚪 clearSessionCookie — removes cross-domain cookie
  */
 export function clearSessionCookie() {
   return cookie.serialize(NAME, "", {
@@ -62,7 +54,7 @@ export function clearSessionCookie() {
     secure: true,
     sameSite: "none",
     path: "/",
-    domain: DOMAIN,
+    domain: DOMAIN, // ✅ must match
     expires: new Date(0),
   });
 }
