@@ -14,7 +14,11 @@ export interface ToastOptions {
 }
 
 /* ============================================================
-   🪶 toastMessage — Lightweight Immediate Toast
+   🪶 toastMessage — Immediate Toast Notification
+   ------------------------------------------------------------
+   • Use for instant feedback messages
+   • Supports all toast types
+   • Gracefully handles Sonner runtime errors
 ============================================================ */
 export function toastMessage(
   message: string,
@@ -24,15 +28,15 @@ export function toastMessage(
     actionLabel,
     onAction,
   }: ToastOptions = {}
-) {
+): void {
   try {
-    const opts = {
+    const opts: Record<string, any> = {
       duration,
-      action:
-        actionLabel && onAction
-          ? { label: actionLabel, onClick: onAction }
-          : undefined,
     };
+
+    if (actionLabel && onAction) {
+      opts.action = { label: actionLabel, onClick: onAction };
+    }
 
     switch (type) {
       case "success":
@@ -52,19 +56,27 @@ export function toastMessage(
         break;
       default:
         toast(message, opts);
+        break;
     }
   } catch (err) {
-    // Prevent runtime crash if Sonner misbehaves
     console.error("Toast render error:", err);
   }
 }
 
 /* ============================================================
-   ⚙️ toastAsync — Promise Wrapper with Auto Feedback
+   ⚙️ toastAsync — Async Promise Wrapper
+   ------------------------------------------------------------
+   • Wraps async operations for UX feedback
+   • Shows loading, success, and error toasts
+   • Returns resolved value or undefined on failure
 ============================================================ */
 export async function toastAsync<T>(
   fn: () => Promise<T>,
-  messages?: { loading?: string; success?: string; error?: string },
+  messages?: {
+    loading?: string;
+    success?: string;
+    error?: string;
+  },
   duration = 4000
 ): Promise<T | undefined> {
   const { loading, success, error } = {
@@ -75,15 +87,15 @@ export async function toastAsync<T>(
   };
 
   try {
-    // Sonner’s toast.promise returns void; we cast to Promise<T>
-    const wrapped = toast.promise(fn(), {
+    // ✅ Sonner's toast.promise automatically handles states
+    const result = (await toast.promise(fn(), {
       loading,
       success,
       error,
       duration,
-    }) as unknown as Promise<T>;
+    })) as T;
 
-    return await wrapped;
+    return result;
   } catch (err: any) {
     const msg =
       err?.message ||
