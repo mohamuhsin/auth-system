@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, Request, Response } from "express";
 import admin from "../../services/firebaseAdmin";
 import prisma from "../../prisma/client";
 import { makeSessionCookie } from "../../utils/cookies";
@@ -11,10 +11,9 @@ const router = Router();
  * 🔐 POST /api/auth/session
  * ------------------------------------------------------------
  * Exchanges a Firebase ID Token → Secure session cookie.
- * Enforces email verification (for password users).
- * Creates/links user and session record in DB.
+ * Used by frontend on page reload or new browser start.
  */
-router.post("/", async (req: Request, res: Response, _next: NextFunction) => {
+router.post("/", async (req: Request, res: Response) => {
   try {
     const { idToken } = req.body;
 
@@ -24,7 +23,7 @@ router.post("/", async (req: Request, res: Response, _next: NextFunction) => {
         .json({ status: "error", message: "Missing idToken" });
     }
 
-    console.log("🟢 Received ID token. Verifying via Firebase...");
+    console.log("🟢 Verifying Firebase ID token...");
     const decoded = await admin.auth().verifyIdToken(idToken, true);
 
     const provider = decoded.firebase?.sign_in_provider ?? "password";
@@ -32,32 +31,27 @@ router.post("/", async (req: Request, res: Response, _next: NextFunction) => {
     const name = decoded.name ?? null;
     const avatarUrl = decoded.picture ?? null;
 
-    // 🔐 Enforce email verification for password logins only
+    // 🚫 Enforce verified email for password sign-ins
     if (provider === "password" && !decoded.email_verified) {
       console.warn(`⛔ Unverified email attempt: ${email}`);
-      await logAudit(
-        "USER_LOGIN",
-        null,
-        req.ip ?? null,
-        req.headers["user-agent"] ?? null,
-        { reason: "UNVERIFIED_EMAIL" }
-      );
-
+      await logAudit("USER_LOGIN", null, req.ip, req.headers["user-agent"], {
+        reason: "UNVERIFIED_EMAIL",
+      });
       return res.status(403).json({
         status: "error",
         message: "Please verify your email address before logging in.",
       });
     }
 
-    // 🔍 Find or create user
+    // 🧩 Find or create user
     let user = await prisma.user.findFirst({
       where: { OR: [{ uid: decoded.uid }, { email }] },
     });
 
+    const isFirstUser = (await prisma.user.count()) === 0;
+
     if (!user) {
       console.log("🆕 Creating new user record...");
-      const isFirstUser = (await prisma.user.count()) === 0;
-
       user = await prisma.user.create({
         data: {
           uid: decoded.uid,
@@ -73,14 +67,8 @@ router.post("/", async (req: Request, res: Response, _next: NextFunction) => {
         },
       });
 
-      await logAudit(
-        "USER_SIGNUP",
-        user.id,
-        req.ip ?? null,
-        req.headers["user-agent"] ?? null
-      );
+      await logAudit("USER_SIGNUP", user.id, req.ip, req.headers["user-agent"]);
     } else {
-      // ✅ Update metadata if needed
       user = await prisma.user.update({
         where: { id: user.id },
         data: {
@@ -93,13 +81,12 @@ router.post("/", async (req: Request, res: Response, _next: NextFunction) => {
       });
     }
 
-    // 🍪 Create secure session cookie (Firebase session cookie)
-    console.log("🍪 Creating session cookie...");
+    // 🍪 Create secure session cookie
     const { cookieHeader, rawToken, expiresAt } = await makeSessionCookie(
       idToken
     );
 
-    // 💾 Save session in DB (store only hashed token)
+    // 💾 Save session (store only hashed token)
     await prisma.session.create({
       data: {
         userId: user.id,
@@ -110,17 +97,11 @@ router.post("/", async (req: Request, res: Response, _next: NextFunction) => {
       },
     });
 
-    // ✅ Send cookie back to client
+    // ✅ Return cookie
     res.setHeader("Set-Cookie", cookieHeader);
     console.log(`✅ Session cookie set for ${user.email}`);
 
-    // 🧾 Audit successful login
-    await logAudit(
-      "USER_LOGIN",
-      user.id,
-      req.ip ?? null,
-      req.headers["user-agent"] ?? null
-    );
+    await logAudit("USER_LOGIN", user.id, req.ip, req.headers["user-agent"]);
 
     return res.status(200).json({
       status: "success",
@@ -139,27 +120,20 @@ router.post("/", async (req: Request, res: Response, _next: NextFunction) => {
   } catch (err: any) {
     console.error("🚨 AUTH SESSION ERROR:", err);
 
+    // 🔁 Unique constraint (duplicate email)
     if (err.code === "P2002") {
-      await logAudit(
-        "USER_SIGNUP",
-        null,
-        req.ip ?? null,
-        req.headers["user-agent"] ?? null,
-        { reason: "DUPLICATE_EMAIL" }
-      );
+      await logAudit("USER_SIGNUP", null, req.ip, req.headers["user-agent"], {
+        reason: "DUPLICATE_EMAIL",
+      });
       return res.status(409).json({
         status: "error",
         message: "A user with this email already exists.",
       });
     }
 
-    await logAudit(
-      "USER_LOGIN",
-      null,
-      req.ip ?? null,
-      req.headers["user-agent"] ?? null,
-      { reason: err.message || "LOGIN_FAILED" }
-    );
+    await logAudit("USER_LOGIN", null, req.ip, req.headers["user-agent"], {
+      reason: err.message || "LOGIN_FAILED",
+    });
 
     return res.status(500).json({
       status: "error",

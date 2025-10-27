@@ -1,11 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* ============================================================
-   🌐 API Client — Level 2.0 Hardened
+   🌐 API Client — Level 2.5 Hardened (Auth by Iventics)
    ------------------------------------------------------------
    • Secure cross-domain requests (cookies + CORS)
-   • Auto-retry for transient network errors
+   • Silent token refresh on 401 (if Firebase user exists)
+   • Auto-retry with exponential backoff
    • Consistent error normalization
 ============================================================ */
+
+import { auth } from "@/services/firebase";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
@@ -21,11 +24,12 @@ export interface ApiError extends Error {
 export interface ApiRequestOptions extends RequestInit {
   body?: any;
   skipAuthCheck?: boolean; // reserved for public endpoints
+  retryCount?: number;
 }
 
-/**
- * 🧠 Helper to safely parse JSON bodies
- */
+/* ============================================================
+   🧠 Safe JSON parser
+============================================================ */
 async function parseJsonSafe(res: Response) {
   const text = await res.text();
   if (!text) return {};
@@ -36,10 +40,10 @@ async function parseJsonSafe(res: Response) {
   }
 }
 
-/**
- * 🔄 Unified API request wrapper
- */
-export async function apiRequest<T>(
+/* ============================================================
+   🔁 Core API request wrapper
+============================================================ */
+export async function apiRequest<T = any>(
   path: string,
   options: ApiRequestOptions = {}
 ): Promise<T> {
@@ -52,8 +56,8 @@ export async function apiRequest<T>(
   try {
     const res = await fetch(url, {
       method: options.method || "GET",
-      credentials: "include", // ✅ must include cookies cross-domain
-      mode: "cors", // ✅ ensures proper CORS handling
+      credentials: "include", // ✅ include cookies cross-domain
+      mode: "cors",
       signal: controller.signal,
       headers: {
         Accept: "application/json",
@@ -70,7 +74,9 @@ export async function apiRequest<T>(
 
     clearTimeout(timeout);
 
-    // 🧩 Normalize error responses
+    /* ------------------------------------------------------------
+       🧩 Handle non-OK responses
+    ------------------------------------------------------------ */
     if (!res.ok) {
       const data = await parseJsonSafe(res);
       const message =
@@ -82,6 +88,29 @@ export async function apiRequest<T>(
       error.status = res.status;
       error.data = data;
       error.requestUrl = url;
+
+      /* 🔄 401 → try to refresh backend cookie via Firebase ID token */
+      if (res.status === 401 && !options.skipAuthCheck) {
+        try {
+          const firebaseUser = auth.currentUser;
+          if (firebaseUser) {
+            const idToken = await firebaseUser.getIdToken(true);
+            await apiRequest("/auth/session", {
+              method: "POST",
+              body: { idToken },
+              skipAuthCheck: true,
+            });
+            // retry original request once
+            return apiRequest<T>(path, {
+              ...options,
+              retryCount: (options.retryCount || 0) + 1,
+            });
+          }
+        } catch (refreshErr) {
+          console.warn("⚠️ Token refresh failed:", refreshErr);
+        }
+      }
+
       throw error;
     }
 
@@ -89,7 +118,7 @@ export async function apiRequest<T>(
   } catch (err: any) {
     clearTimeout(timeout);
 
-    // ⏰ Timeout
+    /* ⏰ Timeout */
     if (err.name === "AbortError") {
       const timeoutError = new Error(
         "Request timed out after 15 seconds"
@@ -99,7 +128,7 @@ export async function apiRequest<T>(
       throw timeoutError;
     }
 
-    // 🌐 Network or CORS failure
+    /* 🌐 Network or CORS failure */
     if (err instanceof TypeError && err.message === "Failed to fetch") {
       const networkError = new Error(
         "Network error or CORS policy blocked the request."
@@ -107,6 +136,16 @@ export async function apiRequest<T>(
       networkError.isNetworkError = true;
       networkError.status = 0;
       networkError.requestUrl = url;
+
+      /* simple exponential retry (max 2) */
+      const retry = options.retryCount ?? 0;
+      if (retry < 2) {
+        const delay = Math.pow(2, retry) * 500;
+        console.warn(`🌐 Retry #${retry + 1} after ${delay}ms: ${url}`);
+        await new Promise((r) => setTimeout(r, delay));
+        return apiRequest<T>(path, { ...options, retryCount: retry + 1 });
+      }
+
       throw networkError;
     }
 
