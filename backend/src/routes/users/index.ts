@@ -6,22 +6,39 @@ import all from "./all";
 const router = Router();
 
 /**
- * 👥 User Routes — Level 2.0
+ * 👥 USER ROUTES — Level 2.5 Hardened (Auth by Iventics)
  * ------------------------------------------------------------
- * - GET /api/users/me  → Authenticated user profile
- * - GET /api/users/all → ADMIN-only (list all users)
+ * • /api/users/me  → Returns authenticated user's profile
+ * • /api/users/all → ADMIN-only (list all users)
  *
- * All subroutes include their own authGuard and audit logging.
+ * Each subroute:
+ *  - Implements its own `authGuard()`
+ *  - Handles audit logging internally
+ *  - Returns unified `{ status, code, message }` structure
  */
 router.use("/me", me);
 router.use("/all", all);
 
-// 🩺 Optional lightweight route health check
+/**
+ * 🩺 Lightweight route health check
+ * ------------------------------------------------------------
+ * Useful for API uptime monitors or service discovery.
+ */
 router.get("/", (_req, res) =>
-  res.status(200).json({ ok: true, routes: ["/me", "/all"] })
+  res.status(200).json({
+    ok: true,
+    service: "auth-api",
+    routes: ["/me", "/all"],
+  })
 );
 
-// 🧠 Log during server startup
-logger.info("📦 Mounted User Routes → [/me, /all]");
+/**
+ * 🧠 Startup log — confirms route mount during server boot
+ */
+logger.info({
+  msg: "📦 Mounted User Routes",
+  basePath: "/api/users",
+  endpoints: ["/me", "/all"],
+});
 
 export default router;

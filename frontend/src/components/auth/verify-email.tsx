@@ -1,12 +1,12 @@
 "use client";
 
 /* ============================================================
-   ✉️ VerifyEmailNotice — Post-Signup Email Verification Screen
+   ✉️ VerifyEmailNotice — Post-Signup Verification Screen
    ------------------------------------------------------------
    • Confirms verification email was sent
-   • Allows resending using centralized helper
-   • Auto-checks and redirects once verified
-   • Smooth production-safe UX
+   • Allows resending (via helper)
+   • Auto-polls Firebase until verified
+   • Smooth & consistent with Auth UI design
 ============================================================ */
 
 import { useState, useEffect, useRef } from "react";
@@ -21,12 +21,16 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
-import { MailCheck, MailWarning, Loader2 } from "lucide-react";
+import { Loader2, MailCheck, MailWarning } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
+/* ============================================================
+   🧩 Component
+============================================================ */
 export function VerifyEmailNotice() {
   const [resending, setResending] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -34,11 +38,8 @@ export function VerifyEmailNotice() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  // Keep a ref to the polling timer so we can safely clear it
   const pollRef = useRef<number | null>(null);
 
-  // Helper to clear existing poll interval
   const clearPoll = () => {
     if (pollRef.current !== null) {
       window.clearInterval(pollRef.current);
@@ -47,7 +48,7 @@ export function VerifyEmailNotice() {
   };
 
   /* ============================================================
-     🧭 Initialize user + auto-check verification
+     🧭 Initialize user + Auto-poll verification
   ============================================================ */
   useEffect(() => {
     const emailParam = searchParams.get("email");
@@ -55,19 +56,17 @@ export function VerifyEmailNotice() {
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       clearPoll();
-
       if (!user) {
         setChecking(false);
         return;
       }
 
-      // Use Firebase user's email if no param provided
       if (!emailParam && user.email) setUserEmail(user.email);
 
       try {
         await user.reload();
       } catch {
-        // safely ignore reload errors
+        // ignore
       }
 
       if (user.emailVerified) {
@@ -76,7 +75,6 @@ export function VerifyEmailNotice() {
         return;
       }
 
-      // Start polling every 5 seconds
       pollRef.current = window.setInterval(async () => {
         const current = auth.currentUser;
         if (!current) {
@@ -88,7 +86,7 @@ export function VerifyEmailNotice() {
         try {
           await current.reload();
         } catch {
-          // ignore reload errors
+          // ignore
         }
 
         if (current.emailVerified) {
@@ -141,7 +139,7 @@ export function VerifyEmailNotice() {
   };
 
   /* ============================================================
-     🧩 UI
+     🧩 UI — Consistent with Login / Signup Design
   ============================================================ */
   if (checking) {
     return (
@@ -153,57 +151,69 @@ export function VerifyEmailNotice() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 px-6">
-      <Card className="w-full max-w-sm border border-border/60 bg-background/95 shadow-md backdrop-blur">
-        <CardHeader className="text-center">
-          <div className="mb-2 flex justify-center">
-            <MailCheck className="size-10 text-primary" />
-          </div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key="verify-card"
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.96 }}
+          transition={{ duration: 0.25 }}
+          className="w-full max-w-sm"
+        >
+          <Card className="border border-border/60 bg-background/95 shadow-md backdrop-blur">
+            <CardHeader className="text-center">
+              <div className="mb-3 flex justify-center">
+                <MailCheck className="size-10 text-primary" />
+              </div>
+              <CardTitle className="font-display text-xl">
+                Verify your email
+              </CardTitle>
+              <CardDescription className="mt-2 text-sm leading-relaxed">
+                We’ve sent a verification link{" "}
+                {userEmail ? (
+                  <>
+                    to{" "}
+                    <span className="font-medium text-primary">
+                      {userEmail}
+                    </span>
+                  </>
+                ) : (
+                  "to your registered email address"
+                )}
+                . <br />
+                Please check your inbox and confirm to activate your account.
+              </CardDescription>
+            </CardHeader>
 
-          <CardTitle className="font-display text-xl">
-            Verify your email
-          </CardTitle>
+            <CardContent className="mt-2 flex flex-col items-center gap-4">
+              <Button
+                onClick={handleResend}
+                disabled={resending}
+                variant="outline"
+                className="w-full"
+              >
+                {resending ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" /> Sending…
+                  </>
+                ) : (
+                  <>
+                    <MailWarning className="mr-2 size-4" /> Resend verification
+                    email
+                  </>
+                )}
+              </Button>
 
-          <CardDescription className="mt-2 text-sm leading-relaxed">
-            We’ve sent a verification link{" "}
-            {userEmail ? (
-              <>
-                to <span className="text-primary font-medium">{userEmail}</span>
-              </>
-            ) : (
-              "to your registered email address"
-            )}
-            . <br />
-            Please check your inbox and confirm to activate your account.
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="mt-2 flex flex-col items-center gap-4">
-          <Button
-            onClick={handleResend}
-            disabled={resending}
-            className="w-full"
-            variant="outline"
-          >
-            {resending ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin" /> Sending…
-              </>
-            ) : (
-              <>
-                <MailWarning className="mr-2 size-4" /> Resend verification
-                email
-              </>
-            )}
-          </Button>
-
-          <Link
-            href="/login"
-            className="text-sm text-primary underline-offset-4 hover:underline"
-          >
-            Back to Login
-          </Link>
-        </CardContent>
-      </Card>
+              <Link
+                href="/login"
+                className="text-sm text-primary underline-offset-4 hover:underline"
+              >
+                Back to Login
+              </Link>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </AnimatePresence>
     </main>
   );
 }

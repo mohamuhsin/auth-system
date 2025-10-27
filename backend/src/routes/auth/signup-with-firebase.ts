@@ -15,13 +15,13 @@ const router = Router();
  * Verifies Firebase ID token → creates new user → issues session cookie.
  * Auto-assigns ADMIN to first user; logs audit trail.
  *
- * Frontend calls this after Firebase signup (Email/Password or Google).
+ * Called by frontend after Firebase signup (Email/Password or Google).
  */
 router.post("/", async (req: Request, res: Response) => {
   try {
     const { idToken, name, avatarUrl, userAgent } = req.body;
 
-    if (!idToken) {
+    if (!idToken || typeof idToken !== "string") {
       logger.warn("🚫 Missing ID token during signup");
       return res.status(400).json({
         status: "error",
@@ -72,7 +72,7 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     /* ============================================================
-       🔎 Check for existing account
+       🔎 Prevent duplicate account
     ============================================================ */
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -88,21 +88,20 @@ router.post("/", async (req: Request, res: Response) => {
 
       return res.status(409).json({
         status: "error",
-        message: "Account already exists. Please log in.",
+        message: "Account already exists. Please log in instead.",
       });
     }
 
     /* ============================================================
        👑 Determine role (first user → ADMIN)
     ============================================================ */
-    const userCount = await prisma.user.count();
-    const isFirstUser = userCount === 0;
+    const isFirstUser = (await prisma.user.count()) === 0;
     const assignedRole = isFirstUser ? Role.ADMIN : Role.USER;
 
     /* ============================================================
        🧩 Create new user record
     ============================================================ */
-    const provider = decoded.firebase?.sign_in_provider || "firebase";
+    const provider = decoded.firebase?.sign_in_provider || "password";
     const newUser = await prisma.user.create({
       data: {
         uid: decoded.uid,
@@ -110,13 +109,16 @@ router.post("/", async (req: Request, res: Response) => {
         name: name ?? decoded.name ?? null,
         avatarUrl: avatarUrl ?? decoded.picture ?? null,
         emailVerified: decoded.email_verified ?? false,
+        emailVerifiedAt: decoded.email_verified ? new Date() : null,
+        primaryProvider: provider === "google.com" ? "GOOGLE" : "PASSWORD",
         role: assignedRole,
         isApproved: isFirstUser,
+        status: "ACTIVE",
       },
     });
 
     logger.info(
-      `✅ New user created: ${newUser.email} (${assignedRole}) [verified=${newUser.emailVerified}] [provider=${provider}]`
+      `✅ User created: ${newUser.email} [role=${assignedRole}] [provider=${provider}] [verified=${newUser.emailVerified}]`
     );
 
     await logAudit(
@@ -131,8 +133,7 @@ router.post("/", async (req: Request, res: Response) => {
     );
 
     /* ============================================================
-       ⚠️ If email not verified (Email/Password signup)
-       → don't auto-login; return special flag.
+       ⚠️ Email not verified → do NOT issue session cookie
     ============================================================ */
     if (!decoded.email_verified && provider === "password") {
       logger.info(`📧 Email signup pending verification: ${newUser.email}`);
@@ -143,7 +144,7 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     /* ============================================================
-       🍪 Create secure session cookie (Google or verified email)
+       🍪 Create secure session cookie (for Google or verified email)
     ============================================================ */
     const { cookieHeader, rawToken, expiresAt } = await makeSessionCookie(
       idToken
@@ -160,12 +161,12 @@ router.post("/", async (req: Request, res: Response) => {
       null;
 
     /* ============================================================
-       💾 Create session record (hashed)
+       💾 Save session record (hashed token)
     ============================================================ */
     const session = await prisma.session.create({
       data: {
-        tokenHash: crypto.createHash("sha256").update(rawToken).digest("hex"),
         userId: newUser.id,
+        tokenHash: crypto.createHash("sha256").update(rawToken).digest("hex"),
         ipAddress: ip,
         userAgent: ua,
         expiresAt,
@@ -173,7 +174,7 @@ router.post("/", async (req: Request, res: Response) => {
     });
 
     /* ============================================================
-       📤 Respond + Set-Cookie
+       📤 Send response + Set-Cookie
     ============================================================ */
     res.setHeader("Set-Cookie", cookieHeader);
     res.status(201).json({
@@ -187,6 +188,7 @@ router.post("/", async (req: Request, res: Response) => {
         avatarUrl: newUser.avatarUrl,
         role: newUser.role,
         isApproved: newUser.isApproved,
+        emailVerified: newUser.emailVerified,
       },
       sessionId: session.id,
       expiresAt,

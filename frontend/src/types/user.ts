@@ -1,13 +1,37 @@
 /**
- * 🧩 User Model — Shared between Frontend & Backend (Level 2.0)
+ * 🧩 User Model — Shared between Frontend & Backend (Level 2.5)
  * ------------------------------------------------------------
  * Mirrors Prisma `User` model + `/api/users/me` response.
  * Used across React Context, UI components, and API clients.
  *
  * ✅  Type-safe with backend
  * ✅  Works seamlessly with Firebase
- * ✅  Supports multi-role systems (Admin, Creator, Merchant, etc.)
+ * ✅  Supports multi-role & multi-provider systems
+ * ✅  Ready for admin dashboards & analytics
  */
+
+/* ============================================================
+   🏷️ Role & Provider Constants
+   ------------------------------------------------------------
+   Exported constants make role-based logic and autocomplete
+   reliable in UI forms, dashboards, and access guards.
+============================================================ */
+
+export const USER_ROLES = ["ADMIN", "USER", "CREATOR", "MERCHANT"] as const;
+export type UserRole = (typeof USER_ROLES)[number];
+
+export const AUTH_PROVIDERS = ["GOOGLE", "PASSWORD", "CUSTOM"] as const;
+export type AuthProvider = (typeof AUTH_PROVIDERS)[number];
+
+export type UserStatus = "ACTIVE" | "SUSPENDED" | "PENDING" | string;
+
+/* ============================================================
+   👤 User Interface
+   ------------------------------------------------------------
+   Mirrors backend Prisma schema + enriched fields for frontend
+   usage (timestamps, provider info, and status).
+============================================================ */
+
 export interface User {
   /** 🔹 Internal database UUID (Prisma `User.id`) */
   id: string;
@@ -25,9 +49,9 @@ export interface User {
   avatarUrl?: string | null;
 
   /** 🏷️ Role within the Iventics Auth ecosystem */
-  role: "ADMIN" | "USER" | "CREATOR" | "MERCHANT";
+  role: UserRole;
 
-  /** ✅ Whether the account is approved (e.g. for restricted systems) */
+  /** ✅ Whether the account is approved (e.g., for restricted systems) */
   isApproved: boolean;
 
   /** 🕒 ISO timestamp of record creation (backend `createdAt`) */
@@ -37,10 +61,10 @@ export interface User {
   updatedAt: string;
 
   /** ⚙️ Optional status field (matches Prisma `status`) */
-  status?: "ACTIVE" | "SUSPENDED" | "PENDING" | string;
+  status?: UserStatus;
 
   /** 🌐 Optional provider (e.g., GOOGLE, PASSWORD, CUSTOM) */
-  primaryProvider?: "GOOGLE" | "PASSWORD" | "CUSTOM";
+  primaryProvider?: AuthProvider;
 
   /** 🧭 Optional last login timestamp (ISO) */
   lastLoginAt?: string | null;
