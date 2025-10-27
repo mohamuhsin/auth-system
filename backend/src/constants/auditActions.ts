@@ -105,6 +105,28 @@ export const AUDIT_ACTIONS: Record<
   },
 
   // ============================================================
+  // 🔐 PASSWORD & EMAIL EVENTS
+  // ============================================================
+  PASSWORD_RESET: {
+    label: "Password Reset",
+    description: "User requested a password reset email.",
+    category: "Security",
+    severity: "INFO",
+  },
+  PASSWORD_CHANGE: {
+    label: "Password Changed",
+    description: "User successfully changed their password.",
+    category: "Security",
+    severity: "INFO",
+  },
+  EMAIL_VERIFIED: {
+    label: "Email Verified",
+    description: "User verified their email address successfully.",
+    category: "Security",
+    severity: "INFO",
+  },
+
+  // ============================================================
   // ⚙️ SYSTEM
   // ============================================================
   RATE_LIMIT_HIT: {
