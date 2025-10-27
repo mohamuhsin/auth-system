@@ -11,24 +11,21 @@ import { apiRequest } from "@/lib/api";
 import { toastAsync, toastMessage } from "@/lib/toast";
 
 /* ============================================================
-   Shared types
+   Shared types & helpers
 ============================================================ */
 export interface AuthResult {
   ok: boolean;
   message?: string;
 }
 
-/** Normalize any apiRequest result into a unified shape */
 function normalizeApi(res: any): {
   ok: boolean;
   status?: number;
   message?: string;
 } {
-  // Case 1: native fetch Response
   if (res && typeof res === "object" && "ok" in res && "status" in res) {
     return { ok: !!res.ok, status: Number(res.status), message: undefined };
   }
-  // Case 2: JSON { status:"success"|"error", statusCode?:number, message?:string }
   if (res && typeof res === "object") {
     const statusStr = (res.status ?? res.statusText) as string | undefined;
     const statusNum =
@@ -38,11 +35,9 @@ function normalizeApi(res: any): {
       (typeof statusNum === "number" && statusNum >= 200 && statusNum < 300);
     return { ok, status: statusNum, message: res.message };
   }
-  // Fallback
   return { ok: false, status: undefined, message: undefined };
 }
 
-/** Helper: redirect with a slight delay after toast */
 function go(path: string, delay = 800) {
   setTimeout(() => {
     if (typeof window !== "undefined") window.location.href = path;
@@ -50,13 +45,7 @@ function go(path: string, delay = 800) {
 }
 
 /* ============================================================
-   Signup — Email + Password
-   Flow:
-   - Create Firebase user
-   - Send verification email
-   - Call /auth/signup-with-firebase
-   - If backend 202 => sign out, go to /verify-email
-   - If backend ok (201) => go dashboard (rare: already-verified)
+   🆕 Signup — Email + Password
 ============================================================ */
 export async function signupWithEmailPassword(
   email: string,
@@ -66,17 +55,13 @@ export async function signupWithEmailPassword(
   try {
     const result = await toastAsync(
       async () => {
-        // 1) Firebase account
         const cred = await createUserWithEmailAndPassword(
           auth,
           email,
           password
         );
-
-        // 2) Always send verification email
         await sendEmailVerification(cred.user);
 
-        // 3) Register in backend
         const idToken = await cred.user.getIdToken(true);
         const raw = await apiRequest("/auth/signup-with-firebase", {
           method: "POST",
@@ -85,26 +70,23 @@ export async function signupWithEmailPassword(
         });
         const res = normalizeApi(raw);
 
-        // 4) Handle backend statuses
+        // Handle backend 202 (pending verification)
         if (res.status === 202) {
-          // Pending email verification (expected for password signups)
           await signOut(auth);
           toastMessage(
             "✅ Account created! Please verify your email before logging in.",
             { type: "success" }
           );
           go(`/verify-email?email=${encodeURIComponent(email)}`, 1200);
-          return { ok: true };
+          return { ok: true, message: "Verification pending." };
         }
 
         if (res.ok) {
-          // Verified flow (e.g., rare case or provider linkage)
           toastMessage("🎉 Account created successfully!", { type: "success" });
           go("/dashboard", 900);
           return { ok: true };
         }
 
-        // Errors surfaced by backend
         if (res.status === 409) {
           toastMessage("Account already exists. Redirecting to login...", {
             type: "warning",
@@ -113,7 +95,10 @@ export async function signupWithEmailPassword(
           return { ok: false, message: "Account already exists." };
         }
 
-        throw new Error(res.message || "Signup failed. Please try again.");
+        return {
+          ok: false,
+          message: res.message || "Signup failed. Please try again.",
+        };
       },
       {
         loading: "Creating your account...",
@@ -149,12 +134,7 @@ export async function signupWithEmailPassword(
 }
 
 /* ============================================================
-   Login — Email + Password
-   Flow:
-   - Firebase signIn
-   - Block if unverified (local Firebase flag)
-   - Exchange ID token with backend /auth/login-with-firebase
-   - Handle 403 (unverified), 404 (no account), success => dashboard
+   🔑 Login — Email + Password
 ============================================================ */
 export async function loginWithEmailPassword(
   email: string,
@@ -163,10 +143,8 @@ export async function loginWithEmailPassword(
   try {
     const result = await toastAsync(
       async () => {
-        // 1) Firebase sign-in
         const cred = await signInWithEmailAndPassword(auth, email, password);
 
-        // 2) Local verification guard (fast UX)
         if (!cred.user.emailVerified) {
           await signOut(auth);
           toastMessage("Please verify your email before signing in.", {
@@ -176,7 +154,6 @@ export async function loginWithEmailPassword(
           return { ok: false, message: "Email not verified." };
         }
 
-        // 3) Exchange with backend
         const idToken = await cred.user.getIdToken(true);
         const raw = await apiRequest("/auth/login-with-firebase", {
           method: "POST",
@@ -185,7 +162,6 @@ export async function loginWithEmailPassword(
         });
         const res = normalizeApi(raw);
 
-        // 4) Handle backend statuses
         if (res.status === 403) {
           toastMessage("Please verify your email before logging in.", {
             type: "warning",
@@ -193,6 +169,7 @@ export async function loginWithEmailPassword(
           go(`/verify-email?email=${encodeURIComponent(email)}`, 800);
           return { ok: false, message: "Email not verified." };
         }
+
         if (res.status === 404) {
           toastMessage("No account found. Redirecting to signup...", {
             type: "warning",
@@ -200,11 +177,11 @@ export async function loginWithEmailPassword(
           go("/signup", 1200);
           return { ok: false, message: "User not found." };
         }
+
         if (!res.ok) {
-          throw new Error(res.message || "Login failed.");
+          return { ok: false, message: res.message || "Login failed." };
         }
 
-        // ✅ Success → dashboard
         toastMessage("🎉 Welcome back!", { type: "success" });
         go("/dashboard", 500);
         return { ok: true };
@@ -225,7 +202,7 @@ export async function loginWithEmailPassword(
 }
 
 /* ============================================================
-   Password Reset
+   🔁 Password Reset
 ============================================================ */
 export async function requestPasswordReset(email: string): Promise<AuthResult> {
   try {
@@ -262,7 +239,7 @@ export async function requestPasswordReset(email: string): Promise<AuthResult> {
 }
 
 /* ============================================================
-   Resend Verification Email
+   ✉️ Resend Verification Email
 ============================================================ */
 export async function resendVerificationEmail(): Promise<AuthResult> {
   const user = auth.currentUser;
@@ -295,9 +272,7 @@ export async function resendVerificationEmail(): Promise<AuthResult> {
     if (code === "auth/too-many-requests") {
       toastMessage(
         "You’ve requested too many verification emails. Try again later.",
-        {
-          type: "warning",
-        }
+        { type: "warning" }
       );
       return { ok: false, message: "Too many requests." };
     }
