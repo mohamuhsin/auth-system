@@ -3,11 +3,11 @@ import admin from "../services/firebaseAdmin";
 import { logger } from "./logger";
 
 /**
- * 🍪 Cookie Utility — Level 2.0 Hardened
+ * 🍪 Cookie Utility — Level 2.5 Hardened (Auth by Iventics)
  * ------------------------------------------------------------
  * • Issues Secure + SameSite=None cookies scoped to `.iventics.com`
  * • Works across auth-api.iventics.com ↔ auth.iventics.com
- * • Includes structured debug logging for Firebase Admin errors
+ * • Gracefully handles local dev and Firebase Admin errors
  */
 
 const NAME = process.env.SESSION_COOKIE_NAME || "__Secure-iventics_session";
@@ -16,48 +16,47 @@ const DOMAIN =
 const TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 7);
 
 /* ============================================================
-   🔑 makeSessionCookie — exchange ID token for a secure cookie
+   🔑 makeSessionCookie — Exchange Firebase ID token for session
 ============================================================ */
 export async function makeSessionCookie(idToken: string) {
   const expiresIn = TTL_DAYS * 24 * 60 * 60 * 1000; // 7 days in ms
 
   try {
+    // ✅ Create Firebase session cookie
     const sessionCookie = await admin
       .auth()
       .createSessionCookie(idToken, { expiresIn });
 
+    // ✅ Serialize secure cookie
     const cookieHeader = cookie.serialize(NAME, sessionCookie, {
       httpOnly: true,
       secure: true,
       sameSite: "none",
       path: "/",
-      domain: DOMAIN, // shared between auth-api and auth frontends
+      domain: DOMAIN,
       maxAge: expiresIn / 1000,
     });
 
     logger.info({
       msg: "✅ Session cookie created successfully",
-      domain: DOMAIN,
       name: NAME,
+      domain: DOMAIN,
+      ttlDays: TTL_DAYS,
     });
 
     return {
       cookieHeader,
+      cookieName: NAME,
       rawToken: sessionCookie,
       expiresAt: new Date(Date.now() + expiresIn),
       maxAge: expiresIn / 1000,
     };
   } catch (err: any) {
-    console.error("🔥 Firebase createSessionCookie error:", {
-      code: err?.code,
-      message: err?.message,
-      stack: err?.stack,
-    });
-
     logger.error({
-      msg: "❌ Failed to create session cookie",
+      msg: "❌ Failed to create Firebase session cookie",
       code: err?.code,
       error: err?.message,
+      stack: err?.stack,
     });
 
     throw new Error(`Session cookie creation failed: ${err?.message}`);
@@ -65,7 +64,7 @@ export async function makeSessionCookie(idToken: string) {
 }
 
 /* ============================================================
-   🚪 clearSessionCookie — deletes cookie across all subdomains
+   🚪 clearSessionCookie — Deletes cookie across all subdomains
 ============================================================ */
 export function clearSessionCookie() {
   return cookie.serialize(NAME, "", {

@@ -8,7 +8,13 @@ import {
   useState,
   useCallback,
 } from "react";
-import { getIdToken, signOut } from "firebase/auth";
+import {
+  getIdToken,
+  onAuthStateChanged,
+  signOut,
+  sendEmailVerification,
+  type User as FirebaseUser,
+} from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { auth } from "@/services/firebase";
 import { apiRequest } from "@/lib/api";
@@ -40,9 +46,9 @@ interface ApiResponse {
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  loginWithFirebase: (firebaseUser: any) => Promise<ApiResponse>;
+  loginWithFirebase: (firebaseUser: FirebaseUser) => Promise<ApiResponse>;
   signupWithFirebase: (
-    firebaseUser: any,
+    firebaseUser: FirebaseUser,
     extra?: { name?: string; avatarUrl?: string }
   ) => Promise<ApiResponse>;
   logout: () => Promise<void>;
@@ -102,21 +108,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /* ============================================================
-     🚀 Initialize Session on Mount
+     🚀 Initialize Session (Firebase + Backend Sync)
+     ------------------------------------------------------------
+     1️⃣ Listens to Firebase login state (cached users too)
+     2️⃣ If Firebase user exists but cookie expired → recreate session
+     3️⃣ Always ensures consistent backend + frontend state
   ============================================================ */
   useEffect(() => {
-    fetchSession();
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      try {
+        if (firebaseUser) {
+          // 1️⃣ Refresh Firebase token (force refresh if expired)
+          const idToken = await getIdToken(firebaseUser, true);
+
+          // 2️⃣ Sync with backend (creates or refreshes cookie session)
+          await apiRequest("/auth/session", {
+            method: "POST",
+            body: { idToken },
+          });
+
+          // 3️⃣ Fetch user details from backend
+          await fetchSession();
+        } else {
+          // No Firebase user → clear session
+          setUser(null);
+          setLoading(false);
+        }
+      } catch (err: any) {
+        console.warn("❌ Session restore failed:", err.message);
+        setUser(null);
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
   }, [fetchSession]);
 
   /* ============================================================
      🔑 Login — Firebase → Backend Cookie Session
-     ------------------------------------------------------------
-     • Verifies Firebase token with backend
-     • Creates cookie session
-     • Redirects → /dashboard
-     • Handles 403 (unverified) and 404 (missing user)
   ============================================================ */
-  const loginWithFirebase = async (firebaseUser: any): Promise<ApiResponse> => {
+  const loginWithFirebase = async (firebaseUser: FirebaseUser) => {
     try {
       const idToken = await getIdToken(firebaseUser, true);
       const res = await apiRequest<ApiResponse>("/auth/login-with-firebase", {
@@ -124,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: { idToken, userAgent: navigator.userAgent },
       });
 
-      if (res?.statusCode === 403 || res?.status === "403") {
+      if (res?.statusCode === 403) {
         toastMessage("Please verify your email before logging in.", {
           type: "warning",
         });
@@ -132,7 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return res;
       }
 
-      if (res?.statusCode === 404 || res?.status === "404") {
+      if (res?.statusCode === 404) {
         toastMessage("No account found. Redirecting to signup...", {
           type: "warning",
         });
@@ -160,16 +191,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /* ============================================================
      🆕 Signup — Firebase → Backend Cookie Session
-     ------------------------------------------------------------
-     • Verifies Firebase token → backend user
-     • Returns 202 if pending verification
-     • Sends verification email & redirects → /verify-email
-     • Otherwise auto-login → /dashboard
   ============================================================ */
   const signupWithFirebase = async (
-    firebaseUser: any,
+    firebaseUser: FirebaseUser,
     extra?: { name?: string; avatarUrl?: string }
-  ): Promise<ApiResponse> => {
+  ) => {
     try {
       const idToken = await getIdToken(firebaseUser, true);
       const res = await apiRequest<ApiResponse>("/auth/signup-with-firebase", {
@@ -177,10 +203,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: { idToken, userAgent: navigator.userAgent, ...extra },
       });
 
-      if (res?.statusCode === 202 || res?.status === "pending_verification") {
-        // email/password unverified case
+      if (res?.statusCode === 202) {
+        // email/password unverified
         try {
-          await firebaseUser.sendEmailVerification();
+          await sendEmailVerification(firebaseUser);
           toastMessage("Verification email sent! Please check your inbox.", {
             type: "success",
           });
@@ -196,11 +222,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(res.message || "Signup failed on server");
       }
 
-      // Wait briefly for cookie propagation
       await new Promise((r) => setTimeout(r, 800));
       await fetchSession();
-
-      // verified / Google signup
       router.replace("/dashboard");
       return { ...res, status: "success" };
     } catch (err: any) {

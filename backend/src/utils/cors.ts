@@ -4,15 +4,12 @@ import { logAudit } from "./audit";
 import { AuditAction } from "@prisma/client";
 
 /**
- * 🌍 CORS Middleware — Level 2.0 Hardened (Final)
+ * 🌍 CORS Middleware — Level 2.5 Hardened (Auth by Iventics)
  * ------------------------------------------------------------
  * ✅ Works with cross-domain cookies (.iventics.com)
- * ✅ Handles wildcards (e.g., spin.ugapay.ug)
- * ✅ Includes `Access-Control-Allow-Credentials`
- * ✅ Logs & audits blocked origins safely
- *
- * Example .env:
- * AUTH_ALLOWED_ORIGINS=https://auth.iventics.com,https://auth-api.iventics.com,https://ugapay.ug,http://localhost:3000
+ * ✅ Supports wildcards & local dev
+ * ✅ Logs & audits blocked origins
+ * ✅ Gracefully handles preflights
  */
 
 const allowedOrigins = (process.env.AUTH_ALLOWED_ORIGINS || "")
@@ -20,15 +17,25 @@ const allowedOrigins = (process.env.AUTH_ALLOWED_ORIGINS || "")
   .map((s) => s.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
+// 🧩 Always allow localhost in development
+if (process.env.NODE_ENV !== "production") {
+  if (!allowedOrigins.includes("http://localhost:3000")) {
+    allowedOrigins.push("http://localhost:3000");
+  }
+}
+
 if (!allowedOrigins.length) {
   logger.warn(
-    "⚠️  No AUTH_ALLOWED_ORIGINS defined — all origins will be blocked in production."
+    "⚠️ No AUTH_ALLOWED_ORIGINS defined — all origins will be blocked in production."
   );
 }
 
+/* ============================================================
+   ⚙️ CORS Config
+============================================================ */
 const corsConfig: CorsOptions = {
   origin(origin, callback) {
-    // Allow Postman, curl, SSR, same-origin
+    // 🧠 Allow server-to-server / Postman / SSR
     if (!origin) return callback(null, true);
 
     // ✅ Exact match
@@ -43,19 +50,17 @@ const corsConfig: CorsOptions = {
 
     // 🚫 Otherwise block
     logger.warn({ origin }, "🚫 Blocked by CORS policy");
-
     void logAudit(AuditAction.RATE_LIMIT_HIT, null, null, null, {
       reason: "CORS_ORIGIN_BLOCKED",
       origin,
     });
 
-    return callback(new Error(`CORS: Origin not allowed → ${origin}`));
+    // Let Express handle gracefully
+    const err = new Error(`CORS: Origin not allowed → ${origin}`);
+    return callback(err as Error);
   },
 
-  // 🔒 Required for cross-domain cookies
-  credentials: true,
-
-  // Standardized safe defaults
+  credentials: true, // ✅ required for cookies
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
@@ -64,8 +69,11 @@ const corsConfig: CorsOptions = {
     "Accept",
     "Origin",
   ],
-  exposedHeaders: ["Set-Cookie"], // let browser see the cookie
+  exposedHeaders: ["Set-Cookie"],
   optionsSuccessStatus: 204,
 };
 
+/* ============================================================
+   🧩 Export Middleware
+============================================================ */
 export const corsMiddleware = cors(corsConfig);
