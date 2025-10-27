@@ -8,10 +8,10 @@ import {
 } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { apiRequest } from "@/lib/api";
-import { toastAsync, toastMessage } from "@/lib/toast";
+import { toastAsync, toastMessage, toast } from "@/lib/toast";
 
 /* ============================================================
-   Shared types & helpers
+   🧩 Shared types & helpers
 ============================================================ */
 export interface AuthResult {
   ok: boolean;
@@ -38,6 +38,7 @@ function normalizeApi(res: any): {
   return { ok: false, status: undefined, message: undefined };
 }
 
+/** Safe redirect with delay */
 function go(path: string, delay = 800) {
   setTimeout(() => {
     if (typeof window !== "undefined") window.location.href = path;
@@ -45,7 +46,7 @@ function go(path: string, delay = 800) {
 }
 
 /* ============================================================
-   🆕 Signup — Email + Password
+   🆕 Signup — Email + Password  (Fixed Flow)
 ============================================================ */
 export async function signupWithEmailPassword(
   email: string,
@@ -53,64 +54,57 @@ export async function signupWithEmailPassword(
   name?: string
 ): Promise<AuthResult> {
   try {
-    const result = await toastAsync(
-      async () => {
-        const cred = await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
-        await sendEmailVerification(cred.user);
+    // manual control (not inside toastAsync) to avoid race with redirect
+    toastMessage("Creating your account...", { type: "loading" });
 
-        const idToken = await cred.user.getIdToken(true);
-        const raw = await apiRequest("/auth/signup-with-firebase", {
-          method: "POST",
-          credentials: "include",
-          body: { idToken, name },
-        });
-        const res = normalizeApi(raw);
+    // 1️⃣ Create Firebase user
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-        // Handle backend 202 (pending verification)
-        if (res.status === 202) {
-          await signOut(auth);
-          toastMessage(
-            "✅ Account created! Please verify your email before logging in.",
-            { type: "success" }
-          );
-          go(`/verify-email?email=${encodeURIComponent(email)}`, 1200);
-          return { ok: true, message: "Verification pending." };
-        }
+    // 2️⃣ Send verification email
+    await sendEmailVerification(cred.user);
 
-        if (res.ok) {
-          toastMessage("🎉 Account created successfully!", { type: "success" });
-          go("/dashboard", 900);
-          return { ok: true };
-        }
+    // 3️⃣ Register with backend
+    const idToken = await cred.user.getIdToken(true);
+    const raw = await apiRequest("/auth/signup-with-firebase", {
+      method: "POST",
+      credentials: "include",
+      body: { idToken, name },
+    });
+    const res = normalizeApi(raw);
 
-        if (res.status === 409) {
-          toastMessage("Account already exists. Redirecting to login...", {
-            type: "warning",
-          });
-          go("/login", 1200);
-          return { ok: false, message: "Account already exists." };
-        }
+    // 4️⃣ Handle backend response
+    if (res.status === 202) {
+      await signOut(auth);
+      toast.dismiss();
+      toastMessage(
+        "✅ Account created! Please verify your email before logging in.",
+        { type: "success" }
+      );
+      go(`/verify-email?email=${encodeURIComponent(email)}`, 1200);
+      return { ok: true, message: "Verification pending." };
+    }
 
-        return {
-          ok: false,
-          message: res.message || "Signup failed. Please try again.",
-        };
-      },
-      {
-        loading: "Creating your account...",
-        success: "Account created!",
-        error: "Signup failed.",
-      }
-    );
+    if (res.ok) {
+      toast.dismiss();
+      toastMessage("🎉 Account created successfully!", { type: "success" });
+      go("/dashboard", 900);
+      return { ok: true };
+    }
 
-    return result ?? { ok: false, message: "Unexpected signup result." };
+    if (res.status === 409) {
+      toast.dismiss();
+      toastMessage("Account already exists. Redirecting to login...", {
+        type: "warning",
+      });
+      go("/login", 1200);
+      return { ok: false, message: "Account already exists." };
+    }
+
+    throw new Error(res.message || "Signup failed. Please try again.");
   } catch (err: any) {
-    const code = err?.code as string | undefined;
+    toast.dismiss();
 
+    const code = err?.code as string | undefined;
     if (code === "auth/email-already-in-use") {
       toastMessage("Account already exists. Redirecting to login...", {
         type: "warning",
@@ -243,7 +237,6 @@ export async function requestPasswordReset(email: string): Promise<AuthResult> {
 ============================================================ */
 export async function resendVerificationEmail(): Promise<AuthResult> {
   const user = auth.currentUser;
-
   if (!user) {
     toastMessage("Please log in again first.", { type: "error" });
     go("/login", 1000);

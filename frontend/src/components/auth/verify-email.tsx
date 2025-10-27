@@ -38,11 +38,12 @@ export function VerifyEmailNotice() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const pollRef = useRef<number | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  /** Safely clear polling interval */
   const clearPoll = () => {
-    if (pollRef.current !== null) {
-      window.clearInterval(pollRef.current);
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
       pollRef.current = null;
     }
   };
@@ -56,6 +57,7 @@ export function VerifyEmailNotice() {
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       clearPoll();
+
       if (!user) {
         setChecking(false);
         return;
@@ -66,16 +68,18 @@ export function VerifyEmailNotice() {
       try {
         await user.reload();
       } catch {
-        // ignore
+        // Ignore reload errors (network, etc.)
       }
 
+      // ✅ Already verified
       if (user.emailVerified) {
         toastMessage("✅ Your email has been verified!", { type: "success" });
         setTimeout(() => router.replace("/dashboard"), 800);
         return;
       }
 
-      pollRef.current = window.setInterval(async () => {
+      // 🔁 Start polling every 5 seconds until verified
+      pollRef.current = setInterval(async () => {
         const current = auth.currentUser;
         if (!current) {
           clearPoll();
@@ -86,7 +90,7 @@ export function VerifyEmailNotice() {
         try {
           await current.reload();
         } catch {
-          // ignore
+          return; // ignore
         }
 
         if (current.emailVerified) {
@@ -96,7 +100,7 @@ export function VerifyEmailNotice() {
           });
           router.replace("/dashboard");
         }
-      }, 5000) as unknown as number;
+      }, 5000);
 
       setChecking(false);
     });
@@ -112,7 +116,9 @@ export function VerifyEmailNotice() {
      🔁 Resend Verification Email
   ============================================================ */
   const handleResend = async () => {
-    if (!auth.currentUser) {
+    const current = auth.currentUser;
+
+    if (!current) {
       toastMessage("You need to be signed in to resend verification.", {
         type: "error",
       });
@@ -139,7 +145,7 @@ export function VerifyEmailNotice() {
   };
 
   /* ============================================================
-     🧩 UI — Consistent with Login / Signup Design
+     🧩 UI — Consistent with Login / Signup design
   ============================================================ */
   if (checking) {
     return (
