@@ -7,12 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/* ===========================
-   USER MODEL
-=========================== */
+/**
+ * ============================================================
+ * 👤 USER MODEL — Core user identity
+ * ============================================================
+ */
 model User {
   id              String       @id @default(cuid())
-  uid             String       @unique
+  uid             String       @unique // Firebase UID
   email           String       @unique
   name            String?
   avatarUrl       String?
@@ -24,58 +26,74 @@ model User {
   lastLoginAt     DateTime?
   isApproved      Boolean      @default(false)
   termsAcceptedAt DateTime?
+  deletedAt       DateTime? // soft delete
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
-  sessions        Session[]
-  auditLogs       AuditLog[]   @relation("UserAuditLogs")
+
+  sessions  Session[]
+  auditLogs AuditLog[] @relation("UserAuditLogs")
 
   @@index([uid])
   @@index([email])
+  @@index([role])
+  @@index([status])
 }
 
-/* ===========================
-   SESSION MODEL
-=========================== */
+/**
+ * ============================================================
+ * 🔐 SESSION MODEL — Backend session cookies
+ * ============================================================
+ */
 model Session {
-  id         String   @id @default(cuid())
-  tokenHash  String   @unique
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ipAddress  String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
-  revokedAt  DateTime?
-  expiresAt  DateTime
+  id          String    @id @default(cuid())
+  tokenHash   String    @unique
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress   String?
+  userAgent   String?
+  device      String? // optional: "Chrome on Windows"
+  createdAt   DateTime  @default(now())
+  refreshedAt DateTime? // optional: when cookie renewed
+  revokedAt   DateTime?
+  expiresAt   DateTime
 
   @@index([userId, expiresAt])
   @@index([expiresAt])
+  @@index([tokenHash])
 }
 
-/* ===========================
-   AUDIT LOG MODEL
-=========================== */
+/**
+ * ============================================================
+ * 🧾 AUDIT LOG MODEL — System event logs
+ * ============================================================
+ */
 model AuditLog {
-  id        String       @id @default(cuid())
+  id        String      @id @default(cuid())
   userId    String?
-  user      User?        @relation("UserAuditLogs", fields: [userId], references: [id], onDelete: SetNull)
+  user      User?       @relation("UserAuditLogs", fields: [userId], references: [id], onDelete: SetNull)
   action    AuditAction
   message   String?
   metadata  Json?
+  source    String? // e.g. "auth", "api", "admin"
+  severity  String? // e.g. "INFO", "WARN", "ERROR"
   requestId String?
   ipAddress String?
   userAgent String?
-  createdAt DateTime     @default(now())
+  createdAt DateTime    @default(now())
 
   @@index([userId, createdAt])
   @@index([action, createdAt])
 }
 
-/* ===========================
-   ENUMS
-=========================== */
+/**
+ * ============================================================
+ * 🧩 ENUMS — Type-safe states & roles
+ * ============================================================
+ */
 enum Role {
   USER
   ADMIN
+  SUPERADMIN
 }
 
 enum AuthProvider {
@@ -97,5 +115,8 @@ enum AuditAction {
   USER_APPROVE
   USER_SUSPEND
   USER_DELETE
+  PASSWORD_RESET
+  PASSWORD_CHANGE
+  EMAIL_VERIFIED
   RATE_LIMIT_HIT
 }

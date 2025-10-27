@@ -6,7 +6,7 @@ import { logger } from "./logger";
  * 🍪 Cookie Utility — Level 2.5 Hardened (Auth by Iventics)
  * ------------------------------------------------------------
  * • Issues Secure + SameSite=None cookies scoped to `.iventics.com`
- * • Works across auth-api.iventics.com ↔ auth.iventics.com
+ * • Works seamlessly across `auth-api.iventics.com` ↔ `auth.iventics.com`
  * • Gracefully handles local dev and Firebase Admin errors
  */
 
@@ -16,10 +16,10 @@ const DOMAIN =
 const TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 7);
 
 /* ============================================================
-   🔑 makeSessionCookie — Exchange Firebase ID token for session
+   🔑 makeSessionCookie — Exchange Firebase ID token → session
 ============================================================ */
 export async function makeSessionCookie(idToken: string) {
-  const expiresIn = TTL_DAYS * 24 * 60 * 60 * 1000; // 7 days in ms
+  const expiresIn = TTL_DAYS * 24 * 60 * 60 * 1000; // days → ms
 
   try {
     // ✅ Create Firebase session cookie
@@ -52,11 +52,12 @@ export async function makeSessionCookie(idToken: string) {
       maxAge: expiresIn / 1000,
     };
   } catch (err: any) {
+    // 🚫 Never swallow admin SDK errors silently
     logger.error({
       msg: "❌ Failed to create Firebase session cookie",
       code: err?.code,
       error: err?.message,
-      stack: err?.stack,
+      stack: process.env.NODE_ENV === "development" ? err?.stack : undefined,
     });
 
     throw new Error(`Session cookie creation failed: ${err?.message}`);
@@ -64,7 +65,7 @@ export async function makeSessionCookie(idToken: string) {
 }
 
 /* ============================================================
-   🚪 clearSessionCookie — Deletes cookie across all subdomains
+   🚪 clearSessionCookie — Delete cookie across all subdomains
 ============================================================ */
 export function clearSessionCookie() {
   return cookie.serialize(NAME, "", {
@@ -73,6 +74,6 @@ export function clearSessionCookie() {
     sameSite: "none",
     path: "/",
     domain: DOMAIN,
-    expires: new Date(0),
+    expires: new Date(0), // immediately invalid
   });
 }

@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic"; // ✅ Prevents static pre-render
+
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { ChartAreaInteractive } from "@/components/dashboard/chart-area-interactive";
@@ -12,9 +14,9 @@ import data from "./data.json";
 /**
  * 🧭 Dashboard Page (Protected)
  * ------------------------------------------------------------
- * - Requires user to be authenticated (via ProtectedRoute)
- * - Uses shared Sidebar + Header layout
- * - Renders dashboard widgets and data table
+ * • Requires user authentication
+ * • Uses shared Sidebar + Header layout
+ * • Displays analytics, cards, and data table
  */
 export default function DashboardPage() {
   return (
@@ -32,22 +34,20 @@ export default function DashboardPage() {
 
         {/* 📊 Main Dashboard Area */}
         <SidebarInset>
-          {/* 🧩 Sticky Header (includes NavUser, notifications, etc.) */}
           <SiteHeader />
 
-          {/* 🧱 Main Content */}
-          <div className="flex flex-1 flex-col overflow-y-auto">
+          <div className="flex flex-1 flex-col overflow-y-auto scroll-smooth">
             <div className="@container/main flex flex-1 flex-col gap-2">
               <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-                {/* Quick summary cards */}
+                {/* 🔹 Summary cards */}
                 <SectionCards />
 
-                {/* Analytics section */}
+                {/* 📈 Analytics */}
                 <div className="px-4 lg:px-6">
                   <ChartAreaInteractive />
                 </div>
 
-                {/* Data table section */}
+                {/* 🗂️ Data Table */}
                 <DataTable data={data} />
               </div>
             </div>

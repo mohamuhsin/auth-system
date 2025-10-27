@@ -89,8 +89,12 @@ export async function apiRequest<T = any>(
       error.data = data;
       error.requestUrl = url;
 
-      /* 🔄 401 → try to refresh backend cookie via Firebase ID token */
-      if (res.status === 401 && !options.skipAuthCheck) {
+      /* 🔄 401 → try to refresh backend cookie via Firebase ID token (once) */
+      if (
+        res.status === 401 &&
+        !options.skipAuthCheck &&
+        (options.retryCount ?? 0) < 1 // 🧩 guard: retry only once
+      ) {
         try {
           const firebaseUser = auth.currentUser;
           if (firebaseUser) {
@@ -114,6 +118,10 @@ export async function apiRequest<T = any>(
       throw error;
     }
 
+    // ✅ Handle 204 (No Content)
+    if (res.status === 204) return {} as T;
+
+    // ✅ Return parsed JSON response
     return (await parseJsonSafe(res)) as T;
   } catch (err: any) {
     clearTimeout(timeout);
@@ -137,7 +145,7 @@ export async function apiRequest<T = any>(
       networkError.status = 0;
       networkError.requestUrl = url;
 
-      /* simple exponential retry (max 2) */
+      /* Simple exponential retry (max 2) */
       const retry = options.retryCount ?? 0;
       if (retry < 2) {
         const delay = Math.pow(2, retry) * 500;

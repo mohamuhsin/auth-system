@@ -12,6 +12,10 @@ const router = Router();
  * ------------------------------------------------------------
  * Exchanges a Firebase ID Token → Secure session cookie.
  * Used by frontend on page reload or new browser start.
+ * - Verifies Firebase ID token
+ * - Enforces email verification for password users
+ * - Creates/updates User record
+ * - Issues secure HttpOnly cookie + saves Session
  */
 router.post("/", async (req: Request, res: Response) => {
   try {
@@ -31,7 +35,7 @@ router.post("/", async (req: Request, res: Response) => {
     const name = decoded.name ?? null;
     const avatarUrl = decoded.picture ?? null;
 
-    // 🚫 Enforce verified email for password sign-ins
+    // 🚫 Enforce verified email for password logins
     if (provider === "password" && !decoded.email_verified) {
       console.warn(`⛔ Unverified email attempt: ${email}`);
       await logAudit("USER_LOGIN", null, req.ip, req.headers["user-agent"], {
@@ -43,13 +47,14 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
-    // 🧩 Find or create user
+    // 🧩 Find existing user (by uid or email)
     let user = await prisma.user.findFirst({
       where: { OR: [{ uid: decoded.uid }, { email }] },
     });
 
     const isFirstUser = (await prisma.user.count()) === 0;
 
+    // 🆕 Create user if not found
     if (!user) {
       console.log("🆕 Creating new user record...");
       user = await prisma.user.create({
@@ -63,12 +68,14 @@ router.post("/", async (req: Request, res: Response) => {
           primaryProvider: provider === "google.com" ? "GOOGLE" : "PASSWORD",
           role: isFirstUser ? "ADMIN" : "USER",
           isApproved: isFirstUser,
+          status: "ACTIVE",
           lastLoginAt: new Date(),
         },
       });
 
       await logAudit("USER_SIGNUP", user.id, req.ip, req.headers["user-agent"]);
     } else {
+      // ✅ Update metadata for returning user
       user = await prisma.user.update({
         where: { id: user.id },
         data: {
@@ -77,6 +84,7 @@ router.post("/", async (req: Request, res: Response) => {
           emailVerifiedAt: decoded.email_verified ? new Date() : null,
           lastLoginAt: new Date(),
           primaryProvider: provider === "google.com" ? "GOOGLE" : "PASSWORD",
+          status: "ACTIVE",
         },
       });
     }
@@ -97,7 +105,7 @@ router.post("/", async (req: Request, res: Response) => {
       },
     });
 
-    // ✅ Return cookie
+    // ✅ Return cookie + response
     res.setHeader("Set-Cookie", cookieHeader);
     console.log(`✅ Session cookie set for ${user.email}`);
 
@@ -120,7 +128,7 @@ router.post("/", async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("🚨 AUTH SESSION ERROR:", err);
 
-    // 🔁 Unique constraint (duplicate email)
+    // 🔁 Prisma duplicate email constraint
     if (err.code === "P2002") {
       await logAudit("USER_SIGNUP", null, req.ip, req.headers["user-agent"], {
         reason: "DUPLICATE_EMAIL",
@@ -132,7 +140,7 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     await logAudit("USER_LOGIN", null, req.ip, req.headers["user-agent"], {
-      reason: err.message || "LOGIN_FAILED",
+      reason: err.message || "SESSION_CREATION_FAILED",
     });
 
     return res.status(500).json({

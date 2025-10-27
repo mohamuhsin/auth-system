@@ -5,12 +5,12 @@ import type { IncomingMessage, ServerResponse } from "http";
 import { safeError } from "./errors";
 
 /**
- * 🪵 Pino Logger — Level 2.0 Hardened
+ * 🪵 Pino Logger — Level 2.5 Hardened (Auth by Iventics)
  * ------------------------------------------------------------
- * • Structured JSON logs in production.
- * • Pretty-printed developer logs in dev.
- * • Adds requestId + service context for correlation.
- * • Safe error serialization via safeError().
+ * ✅ Structured JSON logs in production
+ * ✅ Pretty-printed developer logs in dev
+ * ✅ requestId + service context for correlation
+ * ✅ Safe error serialization via safeError()
  */
 
 const isProd = process.env.NODE_ENV === "production";
@@ -28,6 +28,11 @@ export const logger = pino({
     "req.headers.cookie",
     "req.headers['set-cookie']",
   ],
+  formatters: {
+    level(label) {
+      return { level: label.toUpperCase() };
+    },
+  },
   ...(isProd
     ? {}
     : {
@@ -52,14 +57,14 @@ export const logger = pino({
 export const httpLogger = pinoHttp<IncomingMessage, ServerResponse>({
   logger,
 
-  // ✅ Per-request UUID (correlates across microservices)
+  // ✅ Per-request UUID for trace correlation
   genReqId: (req) => {
     const id = crypto.randomUUID();
     (req as any).requestId = id;
     return id;
   },
 
-  // ✅ Add custom fields to each request log
+  // ✅ Enrich every log entry with context
   customProps: (req, res) => ({
     requestId: (req as any).requestId,
     service: serviceName,
@@ -81,7 +86,7 @@ export const httpLogger = pinoHttp<IncomingMessage, ServerResponse>({
     err: "error",
   },
 
-  quietReqLogger: !isProd, // Less noise in dev
+  quietReqLogger: !isProd, // less noise in dev
 });
 
 /* ============================================================
@@ -96,5 +101,5 @@ export const logWarn = (msg: string, ctx: Record<string, any> = {}) =>
 export const logError = (err: unknown, ctx: Record<string, any> = {}) =>
   logger.error(
     { service: serviceName, ...ctx, error: safeError(err) },
-    "Error logged"
+    "❌ Error logged"
   );

@@ -1,13 +1,23 @@
 /**
- * 🧩 Session Model — Shared between Frontend & Backend (Level 2.0)
- * ---------------------------------------------------------------
+ * 🧩 Session Model — Shared between Frontend & Backend (Level 2.5)
+ * ----------------------------------------------------------------
  * Mirrors Prisma `Session` model and `/api/auth/session` responses.
- * Used for session tracking, audits, and client analytics.
+ * Used for:
+ *   • session tracking & security analytics
+ *   • admin dashboards / audits
+ *   • Firebase session-cookie lifecycle
  *
  * ✅ Matches Prisma schema
- * ✅ Type-safe for frontend state / admin dashboards
- * ✅ Ready for cross-domain secure cookies (Firebase Session Cookies)
+ * ✅ Type-safe for frontend state & dashboards
+ * ✅ Works with cross-domain secure cookies (__Secure-iventics_session)
  */
+
+import type { UserRole } from "@/types/user";
+
+/* ============================================================
+   🧱 Session Interface
+============================================================ */
+
 export interface Session {
   /** 🔹 Internal database UUID (Prisma `Session.id`) */
   id: string;
@@ -24,20 +34,27 @@ export interface Session {
   /** 💻 Browser or client User-Agent string */
   userAgent?: string | null;
 
-  /** 🕒 ISO timestamp — Session creation time */
+  /** 🕒 ISO timestamp — session creation time */
   createdAt: string;
 
-  /** 🕓 ISO timestamp — If revoked manually or expired early */
+  /** 🕓 ISO timestamp — if revoked manually or expired early */
   revokedAt?: string | null;
 
-  /** ⏳ ISO timestamp — Scheduled expiration time */
+  /** ⏳ ISO timestamp — scheduled expiration time */
   expiresAt: string;
 
-  /** 🧠 Optional populated user object for dashboards */
+  /** 🧠 Optional populated user object (for admin dashboards) */
   user?: {
     id: string;
     email: string;
     name?: string | null;
-    role?: "ADMIN" | "USER" | "CREATOR" | "MERCHANT";
+    role?: UserRole;
   };
 }
+
+/* ============================================================
+   🧩 SessionStatus (optional helper)
+   ------------------------------------------------------------
+   Derived helper type for UI dashboards or analytics logic.
+============================================================ */
+export type SessionStatus = "ACTIVE" | "REVOKED" | "EXPIRED";

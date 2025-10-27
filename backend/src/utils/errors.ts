@@ -1,27 +1,40 @@
 /**
- * 🧩 safeError — Level 2.0 Hardened
+ * 🧩 safeError — Level 2.5 Hardened (Auth by Iventics)
  * ------------------------------------------------------------
  * Converts any thrown value into a safe, structured, and log-ready string.
- * Handles:
- *   - Firebase / Prisma / generic Errors
- *   - Circular references
- *   - Sensitive data redaction
- *   - Non-Error primitives (string, number, object)
+ *
+ * ✅ Handles:
+ *    • Firebase / Prisma / generic Errors
+ *    • Circular references
+ *    • Sensitive-field redaction
+ *    • Non-Error primitives
+ *
+ * ✅ Never throws — guaranteed safe even inside catch blocks.
  */
-
 export function safeError(err: unknown): string {
   try {
+    // ------------------------------------------------------------
     // 🎯 Standard JS Error instance
+    // ------------------------------------------------------------
     if (err instanceof Error) {
-      const code = (err as any).code ? ` (code: ${(err as any).code})` : "";
+      const code =
+        (err as any).code && typeof (err as any).code === "string"
+          ? ` (code: ${(err as any).code})`
+          : "";
       const stack =
-        process.env.NODE_ENV === "production" ? "" : `\n${err.stack ?? ""}`;
+        process.env.NODE_ENV === "production"
+          ? ""
+          : err.stack
+          ? `\n${err.stack}`
+          : "";
       return `[${err.name}] ${err.message}${code}${stack}`.trim();
     }
 
+    // ------------------------------------------------------------
     // 🧱 Handle non-Error objects safely (avoid circular refs)
+    // ------------------------------------------------------------
     if (typeof err === "object" && err !== null) {
-      const cache = new Set<any>();
+      const cache = new WeakSet<object>();
       const json = JSON.stringify(
         err,
         (key, value) => {
@@ -31,7 +44,12 @@ export function safeError(err: unknown): string {
           }
 
           // 🚫 Redact sensitive fields
-          if (["password", "token", "secret", "privateKey"].includes(key)) {
+          const lowered = key.toLowerCase();
+          if (
+            ["password", "token", "secret", "privatekey", "apikey"].includes(
+              lowered
+            )
+          ) {
             return "[REDACTED]";
           }
 
@@ -42,9 +60,13 @@ export function safeError(err: unknown): string {
       return json;
     }
 
-    // 🔡 Handle primitives
+    // ------------------------------------------------------------
+    // 🔡 Handle primitives (string, number, boolean, etc.)
+    // ------------------------------------------------------------
     return String(err);
-  } catch (fatal) {
-    return `[safeError failed] ${(fatal as Error).message || String(fatal)}`;
+  } catch (fatal: any) {
+    return `[safeError failed] ${
+      fatal?.message || String(fatal) || "Unknown error"
+    }`;
   }
 }

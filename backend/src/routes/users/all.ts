@@ -5,35 +5,59 @@ import prisma from "../../prisma/client";
 import { makeSessionCookie } from "../../utils/cookies";
 import { logAudit } from "../../utils/audit";
 import { AuditAction, Role } from "@prisma/client";
+import { logger } from "../../utils/logger";
 
 const router = Router();
 
 /**
  * 🔐 POST /api/auth/session
  * ------------------------------------------------------------
- * Exchanges Firebase ID token → Secure session cookie.
- * Creates a user if missing.
+ * Exchanges Firebase ID token → Secure HttpOnly session cookie.
+ * Creates new user if not found.
  * First registered user becomes ADMIN automatically.
+ *
+ * Used by frontend on login or session refresh.
  */
 router.post("/", async (req: Request, res: Response) => {
   try {
     const { idToken, userAgent } = req.body;
-    if (!idToken) {
+
+    // 🧩 Validate input
+    if (!idToken || typeof idToken !== "string") {
+      logger.warn("🚫 Missing idToken in /auth/session");
       return res.status(400).json({
         status: "error",
         code: 400,
-        message: "Missing idToken",
+        message: "Missing or invalid idToken",
       });
     }
 
-    // 🔎 Verify Firebase ID token
+    // 🔍 Verify Firebase ID token
     const decoded = await admin.auth().verifyIdToken(idToken, true);
-    const email = decoded.email!;
-    const name = decoded.name || null;
-    const avatarUrl = decoded.picture || null;
+    const email = decoded.email ?? null;
+    const name = decoded.name ?? null;
+    const avatarUrl = decoded.picture ?? null;
 
-    // 🚫 Reject unverified email users (non-OAuth signups)
-    if (!decoded.email_verified) {
+    if (!email) {
+      await logAudit(
+        AuditAction.USER_LOGIN,
+        null,
+        req.ip,
+        req.headers["user-agent"],
+        { reason: "NO_EMAIL_IN_TOKEN" }
+      );
+      return res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Firebase token missing email field.",
+      });
+    }
+
+    // 🚫 Block unverified password-based sign-ins
+    if (
+      !decoded.email_verified &&
+      decoded.firebase?.sign_in_provider === "password"
+    ) {
       await logAudit(
         AuditAction.USER_LOGIN,
         null,
@@ -48,13 +72,15 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
-    // 🔧 Find or create user
+    /* ============================================================
+       👤 Find or create user record
+    ============================================================ */
     let user = await prisma.user.findUnique({ where: { uid: decoded.uid } });
 
-    if (!user) {
-      const userCount = await prisma.user.count();
-      const isFirstUser = userCount === 0;
+    const userCount = await prisma.user.count();
+    const isFirstUser = userCount === 0;
 
+    if (!user) {
       user = await prisma.user.create({
         data: {
           uid: decoded.uid,
@@ -63,7 +89,7 @@ router.post("/", async (req: Request, res: Response) => {
           avatarUrl,
           role: isFirstUser ? Role.ADMIN : Role.USER,
           isApproved: isFirstUser,
-          emailVerified: true,
+          emailVerified: decoded.email_verified ?? false,
         },
       });
 
@@ -72,48 +98,59 @@ router.post("/", async (req: Request, res: Response) => {
         user.id,
         req.ip,
         req.headers["user-agent"],
-        { reason: "NEW_USER" }
+        { reason: "NEW_USER_AUTO_CREATED" }
       );
+
+      logger.info(`🆕 New user created: ${user.email}`);
     } else {
       await logAudit(
         AuditAction.USER_LOGIN,
         user.id,
         req.ip,
         req.headers["user-agent"],
-        { reason: "EXISTING_USER" }
+        { reason: "EXISTING_USER_SESSION" }
       );
     }
 
-    // 🍪 Create Firebase session cookie
+    /* ============================================================
+       🍪 Create secure Firebase session cookie
+    ============================================================ */
     const { cookieHeader, rawToken, expiresAt } = await makeSessionCookie(
       idToken
     );
 
-    // 🧾 Store hashed token in DB
+    // Normalize user agent + IP
     const ua =
       (Array.isArray(userAgent) ? userAgent.join("; ") : userAgent) ??
       req.headers["user-agent"] ??
       null;
 
+    const ip =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.socket?.remoteAddress ||
+      null;
+
+    // 💾 Save session (hashed token)
     await prisma.session.create({
       data: {
         tokenHash: crypto.createHash("sha256").update(rawToken).digest("hex"),
         userId: user.id,
-        ipAddress:
-          (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-          req.socket?.remoteAddress ||
-          null,
+        ipAddress: ip,
         userAgent: ua,
         expiresAt,
       },
     });
 
-    // ✅ Send secure cookie
+    // ✅ Attach cookie to response
     res.setHeader("Set-Cookie", cookieHeader);
 
-    // ✅ Success response
+    /* ============================================================
+       ✅ Success
+    ============================================================ */
+    logger.info(`✅ Session created for ${email}`);
     return res.status(200).json({
       status: "success",
+      code: 200,
       message: "Session created successfully",
       user: {
         id: user.id,
@@ -126,19 +163,25 @@ router.post("/", async (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
+    logger.error({
+      msg: "🚨 /auth/session error",
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    });
+
     await logAudit(
       AuditAction.USER_LOGIN,
       null,
       req.ip,
       req.headers["user-agent"],
-      { reason: "ERROR", detail: err.message }
+      { reason: "SESSION_CREATION_ERROR", detail: err.message }
     );
 
     return res.status(500).json({
       status: "error",
       code: 500,
-      message: "Failed to create session",
-      detail: process.env.NODE_ENV === "production" ? undefined : err.message,
+      message: "Failed to create session.",
+      ...(process.env.NODE_ENV !== "production" && { detail: err.message }),
     });
   }
 });

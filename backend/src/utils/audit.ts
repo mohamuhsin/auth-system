@@ -3,12 +3,15 @@ import { AuditAction } from "@prisma/client";
 import { logger } from "./logger";
 
 /**
- * 🧾 logAudit (Level 2.0 Hardened)
+ * 🧾 logAudit (Level 2.5 Hardened)
  * ------------------------------------------------------------
- * Records auth or activity events into the AuditLog table.
- * - Uses enum-safe `AuditAction`
- * - Never throws (silent fallback)
- * - Structured metadata with context, timestamp, severity
+ * Writes structured audit events into the `AuditLog` table.
+ *
+ * ✅ Uses enum-safe `AuditAction`
+ * ✅ Never throws (safe fallback on DB errors)
+ * ✅ Adds metadata timestamp + severity
+ * ✅ Joins multi-string user-agents cleanly
+ * ✅ Logs dev-mode stack traces for easier debugging
  */
 export async function logAudit(
   action: AuditAction,
@@ -18,12 +21,20 @@ export async function logAudit(
   metadata: Record<string, any> = {}
 ): Promise<void> {
   try {
-    // ✅ Validate action at runtime (extra guard for dev)
+    // ------------------------------------------------------------
+    // 🧩 Runtime guard: ensure valid enum value
+    // ------------------------------------------------------------
     if (!Object.values(AuditAction).includes(action)) {
-      logger.warn({ action }, "Invalid AuditAction enum provided");
+      logger.warn(
+        { action },
+        "⚠️ Invalid AuditAction provided — skipping log."
+      );
       return;
     }
 
+    // ------------------------------------------------------------
+    // 🧩 Build audit payload
+    // ------------------------------------------------------------
     const data = {
       action,
       userId: userId ?? null,
@@ -31,18 +42,23 @@ export async function logAudit(
       userAgent: Array.isArray(userAgent)
         ? userAgent.join("; ")
         : userAgent ?? null,
-      message: metadata.reason || null,
+      message: metadata.reason ?? null,
       metadata: {
         ...metadata,
         timestamp: new Date().toISOString(),
-        severity: metadata.severity || "INFO",
+        severity: metadata.severity ?? "INFO",
       },
-      requestId: metadata.requestId || null,
+      requestId: metadata.requestId ?? null,
     };
 
+    // ------------------------------------------------------------
+    // 🧾 Persist to DB
+    // ------------------------------------------------------------
     await prisma.auditLog.create({ data });
   } catch (err: any) {
-    // 🧱 Never interrupt critical auth flow
+    // ------------------------------------------------------------
+    // 🚫 Never interrupt critical auth flow
+    // ------------------------------------------------------------
     logger.error({
       msg: "⚠️ Failed to log audit",
       error: err.message,

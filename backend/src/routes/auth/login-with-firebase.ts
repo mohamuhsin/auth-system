@@ -13,15 +13,14 @@ const router = Router();
  * 🔐 POST /api/auth/login-with-firebase
  * ------------------------------------------------------------
  * Verifies Firebase ID token → issues secure session cookie.
- * Updates user's verification status, records session + audit log.
- *
- * Handles both Google and Email/Password logins.
+ * Updates verification status, records session & audit log.
+ * Supports both Google and Email/Password sign-ins.
  */
 router.post("/", async (req: Request, res: Response) => {
   try {
     const { idToken, userAgent } = req.body;
 
-    if (!idToken) {
+    if (!idToken || typeof idToken !== "string") {
       logger.warn("🚫 Missing ID token in login request");
       return res.status(400).json({
         status: "error",
@@ -47,7 +46,6 @@ router.post("/", async (req: Request, res: Response) => {
           detail: verifyErr.message,
         }
       );
-
       return res.status(401).json({
         status: "error",
         message: "Invalid or expired Firebase token.",
@@ -71,13 +69,16 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
+    const provider = decoded.firebase?.sign_in_provider ?? "password";
+
     /* ============================================================
        👤 Find user in DB
     ============================================================ */
-    const user = await prisma.user.findUnique({ where: { email } });
+    let user = await prisma.user.findUnique({ where: { email } });
 
+    // 🔸 No existing user → instruct frontend to sign up
     if (!user) {
-      logger.warn(`❌ Login failed — No user found for email: ${email}`);
+      logger.warn(`❌ Login failed — no user found for ${email}`);
       await logAudit(
         AuditAction.USER_LOGIN,
         null,
@@ -88,8 +89,6 @@ router.post("/", async (req: Request, res: Response) => {
           email,
         }
       );
-
-      // 👇 Key for frontend to detect “no account”
       return res.status(404).json({
         status: "error",
         message: "Account not found.",
@@ -97,10 +96,13 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     /* ============================================================
-       📧 Check email verification
-       (If unverified both in Firebase and DB → block)
+       📧 Enforce email verification for password logins
     ============================================================ */
-    if (!decoded.email_verified && !user.emailVerified) {
+    if (
+      provider === "password" &&
+      !decoded.email_verified &&
+      !user.emailVerified
+    ) {
       await logAudit(
         AuditAction.USER_LOGIN,
         user.id,
@@ -110,7 +112,6 @@ router.post("/", async (req: Request, res: Response) => {
           reason: "UNVERIFIED_EMAIL",
         }
       );
-
       logger.warn(`🚫 Unverified email login attempt: ${user.email}`);
       return res.status(403).json({
         status: "error",
@@ -118,13 +119,19 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
-    // ✅ Sync Firebase verification to DB if changed
-    if (decoded.email_verified !== user.emailVerified) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { emailVerified: decoded.email_verified ?? false },
-      });
-    }
+    /* ============================================================
+       🔄 Sync verification + metadata
+    ============================================================ */
+    const updates: any = {
+      lastLoginAt: new Date(),
+      emailVerified: decoded.email_verified,
+      emailVerifiedAt: decoded.email_verified
+        ? new Date()
+        : user.emailVerifiedAt,
+      primaryProvider: provider === "google.com" ? "GOOGLE" : "PASSWORD",
+      status: "ACTIVE",
+    };
+    user = await prisma.user.update({ where: { id: user.id }, data: updates });
 
     /* ============================================================
        🍪 Create secure session cookie
@@ -144,12 +151,12 @@ router.post("/", async (req: Request, res: Response) => {
       null;
 
     /* ============================================================
-       🧾 Create session record
+       🧾 Save new session record (hashed token)
     ============================================================ */
     const session = await prisma.session.create({
       data: {
-        tokenHash: crypto.createHash("sha256").update(rawToken).digest("hex"),
         userId: user.id,
+        tokenHash: crypto.createHash("sha256").update(rawToken).digest("hex"),
         ipAddress: ip,
         userAgent: ua,
         expiresAt,
@@ -157,7 +164,7 @@ router.post("/", async (req: Request, res: Response) => {
     });
 
     /* ============================================================
-       📤 Respond with cookie + user info
+       📤 Send cookie + response
     ============================================================ */
     res.setHeader("Set-Cookie", cookieHeader);
     res.status(200).json({
@@ -165,9 +172,13 @@ router.post("/", async (req: Request, res: Response) => {
       message: "Login successful",
       user: {
         id: user.id,
+        uid: user.uid,
         email: user.email,
         name: user.name,
         role: user.role,
+        isApproved: user.isApproved,
+        emailVerified: user.emailVerified,
+        avatarUrl: user.avatarUrl,
       },
       sessionId: session.id,
       expiresAt,
@@ -182,7 +193,7 @@ router.post("/", async (req: Request, res: Response) => {
       req.ip,
       req.headers["user-agent"],
       {
-        method: decoded.firebase?.sign_in_provider || "FIREBASE",
+        method: provider,
         sessionId: session.id,
       }
     );
@@ -200,7 +211,6 @@ router.post("/", async (req: Request, res: Response) => {
         detail: err.message,
       }
     );
-
     return res.status(500).json({
       status: "error",
       message: "Internal server error during login.",

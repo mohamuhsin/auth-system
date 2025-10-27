@@ -1,253 +1,263 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import {
+import React, {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
   useCallback,
 } from "react";
-import {
-  getIdToken,
-  onAuthStateChanged,
-  signOut,
-  sendEmailVerification,
-  type User as FirebaseUser,
-} from "firebase/auth";
-import { useRouter } from "next/navigation";
+import { getIdToken, signOut, User as FirebaseUser } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { apiRequest } from "@/lib/api";
 import { toastAsync, toastMessage } from "@/lib/toast";
-import type { User } from "@/types/user";
 
-/* ============================================================
-   📦 API Response Type
-============================================================ */
+export type Role = "USER" | "ADMIN" | "CREATOR" | "MERCHANT";
+
+export interface User {
+  id: string;
+  firebaseUid: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+  role: Role;
+  isApproved: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 interface ApiResponse {
   status?: string;
+  code?: number;
   message?: string;
+  // user/me fields
+  id?: string;
+  uid?: string;
   email?: string;
   name?: string | null;
   avatarUrl?: string | null;
-  role?: string;
+  role?: Role;
   isApproved?: boolean;
-  statusCode?: number;
-  uid?: string;
-  id?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  error?: string;
+  // login/signup response may include nested user
+  user?: {
+    id: string;
+    uid: string;
+    email: string;
+    name: string | null;
+    avatarUrl: string | null;
+    role: Role;
+    isApproved: boolean;
+  };
 }
 
-/* ============================================================
-   🧠 Auth Context Types
-============================================================ */
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
+  refreshSession: () => Promise<void>;
+  logout: () => Promise<void>;
   loginWithFirebase: (firebaseUser: FirebaseUser) => Promise<ApiResponse>;
   signupWithFirebase: (
     firebaseUser: FirebaseUser,
     extra?: { name?: string; avatarUrl?: string }
   ) => Promise<ApiResponse>;
-  logout: () => Promise<void>;
-  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-/* ============================================================
-   🌍 AuthProvider — Global Auth State Manager
-============================================================ */
+/** Probe /users/me so we only redirect once the HttpOnly cookie is actually usable */
+async function waitForSession(
+  retries = 5,
+  baseDelayMs = 200
+): Promise<ApiResponse | null> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await apiRequest<ApiResponse>("/users/me");
+      if (res && (res.status === "success" || res.code === 200) && res.email)
+        return res;
+    } catch {}
+    await new Promise((r) => setTimeout(r, baseDelayMs * (i + 1)));
+  }
+  return null;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
 
-  /* ============================================================
-     🧩 Fetch Session — Verify Cookie from Backend
-  ============================================================ */
-  const fetchSession = useCallback(async (retries = 2) => {
-    try {
-      const res = await apiRequest<ApiResponse>("/users/me");
-
-      if ((res?.status === "success" || res?.email) && !res?.error) {
-        const validRoles = ["USER", "ADMIN", "CREATOR", "MERCHANT"] as const;
-        const role = validRoles.includes(res.role as any)
-          ? (res.role as User["role"])
-          : "USER";
-
-        const newUser: User = {
-          id: res.id || "unknown",
-          firebaseUid: res.uid || "unknown",
-          email: res.email ?? "",
-          name: res.name || null,
-          avatarUrl: res.avatarUrl || null,
-          role,
-          isApproved: res.isApproved ?? false,
-          createdAt: res.createdAt || new Date().toISOString(),
-          updatedAt: res.updatedAt || new Date().toISOString(),
+  /** build User from /users/me or nested login response */
+  const toUser = (src: ApiResponse): User | null => {
+    const u = src.user
+      ? src.user
+      : {
+          id: src.id,
+          uid: src.uid,
+          email: src.email,
+          name: src.name,
+          avatarUrl: src.avatarUrl,
+          role: src.role,
+          isApproved: src.isApproved,
         };
 
-        setUser(newUser);
+    if (!u || !u.id || !u.email) return null;
+    return {
+      id: u.id,
+      firebaseUid: (u as any).uid ?? (src as any).uid ?? "unknown",
+      email: u.email,
+      name: u.name ?? null,
+      avatarUrl: u.avatarUrl ?? null,
+      role: (u.role as Role) ?? "USER",
+      isApproved: !!u.isApproved,
+      createdAt: (src as any).createdAt,
+      updatedAt: (src as any).updatedAt,
+    };
+  };
+
+  const fetchSession = useCallback(async () => {
+    try {
+      const res = await apiRequest<ApiResponse>("/users/me");
+      if (res && (res.status === "success" || res.code === 200)) {
+        const u = toUser(res);
+        setUser(u);
       } else {
         setUser(null);
       }
-    } catch (err: any) {
-      if (retries > 0) {
-        console.warn("Retrying session fetch...");
-        return fetchSession(retries - 1);
-      }
-      console.warn("❌ Session fetch failed:", err.message || err);
+    } catch {
       setUser(null);
     } finally {
       setLoading(false);
-      console.log("✅ Auth state initialized — session checked");
     }
   }, []);
 
-  /* ============================================================
-     🚀 Initialize Session (Firebase + Backend Sync)
-     ------------------------------------------------------------
-     1️⃣ Listens to Firebase login state (cached users too)
-     2️⃣ If Firebase user exists but cookie expired → recreate session
-     3️⃣ Always ensures consistent backend + frontend state
-  ============================================================ */
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        if (firebaseUser) {
-          // 1️⃣ Refresh Firebase token (force refresh if expired)
-          const idToken = await getIdToken(firebaseUser, true);
-
-          // 2️⃣ Sync with backend (creates or refreshes cookie session)
-          await apiRequest("/auth/session", {
-            method: "POST",
-            body: { idToken },
-          });
-
-          // 3️⃣ Fetch user details from backend
-          await fetchSession();
-        } else {
-          // No Firebase user → clear session
-          setUser(null);
-          setLoading(false);
-        }
-      } catch (err: any) {
-        console.warn("❌ Session restore failed:", err.message);
-        setUser(null);
-        setLoading(false);
-      }
-    });
-
-    return () => unsubscribe();
+    // initialize on mount
+    fetchSession();
   }, [fetchSession]);
 
-  /* ============================================================
-     🔑 Login — Firebase → Backend Cookie Session
-  ============================================================ */
-  const loginWithFirebase = async (firebaseUser: FirebaseUser) => {
-    try {
-      const idToken = await getIdToken(firebaseUser, true);
-      const res = await apiRequest<ApiResponse>("/auth/login-with-firebase", {
-        method: "POST",
-        body: { idToken, userAgent: navigator.userAgent },
-      });
+  const loginWithFirebase = useCallback(
+    async (firebaseUser: FirebaseUser): Promise<ApiResponse> => {
+      try {
+        const idToken = await getIdToken(firebaseUser, true);
 
-      if (res?.statusCode === 403) {
-        toastMessage("Please verify your email before logging in.", {
-          type: "warning",
+        const res = await apiRequest<ApiResponse>("/auth/login-with-firebase", {
+          method: "POST",
+          body: {
+            idToken,
+            userAgent:
+              typeof navigator !== "undefined"
+                ? navigator.userAgent
+                : "unknown",
+          },
         });
-        router.replace("/verify-email");
-        return res;
-      }
 
-      if (res?.statusCode === 404) {
-        toastMessage("No account found. Redirecting to signup...", {
-          type: "warning",
-        });
-        router.replace("/signup");
-        return res;
-      }
-
-      // Wait briefly for cookie propagation
-      await new Promise((r) => setTimeout(r, 600));
-      await fetchSession();
-
-      router.replace("/dashboard");
-      return { ...res, status: res.status ?? "success" };
-    } catch (err: any) {
-      console.error("❌ Login error:", err.message);
-      toastMessage(err.message || "Login failed. Please try again.", {
-        type: "error",
-      });
-      return {
-        status: "error",
-        message: err.message || "Login failed.",
-      };
-    }
-  };
-
-  /* ============================================================
-     🆕 Signup — Firebase → Backend Cookie Session
-  ============================================================ */
-  const signupWithFirebase = async (
-    firebaseUser: FirebaseUser,
-    extra?: { name?: string; avatarUrl?: string }
-  ) => {
-    try {
-      const idToken = await getIdToken(firebaseUser, true);
-      const res = await apiRequest<ApiResponse>("/auth/signup-with-firebase", {
-        method: "POST",
-        body: { idToken, userAgent: navigator.userAgent, ...extra },
-      });
-
-      if (res?.statusCode === 202) {
-        // email/password unverified
-        try {
-          await sendEmailVerification(firebaseUser);
-          toastMessage("Verification email sent! Please check your inbox.", {
-            type: "success",
+        // handle backend signals
+        if ((res as any).code === 403) {
+          toastMessage("Please verify your email before logging in.", {
+            type: "warning",
           });
-        } catch (err: any) {
-          console.warn("⚠️ Could not send verification email:", err.message);
+          setUser(null);
+          return res;
         }
-        await signOut(auth);
-        router.replace("/verify-email");
-        return { ...res, status: "pending_verification" };
+        if ((res as any).code === 404) {
+          toastMessage("No account found. Redirecting to signup...", {
+            type: "warning",
+          });
+          setUser(null);
+          return res;
+        }
+
+        // probe cookie
+        const probe = await waitForSession();
+        if (probe) {
+          const u = toUser(probe);
+          setUser(u);
+        }
+
+        return { ...res, status: res.status ?? "success" };
+      } catch (err: any) {
+        toastMessage(err?.message || "Login failed.", { type: "error" });
+        return {
+          status: "error",
+          code: 500,
+          message: err?.message || "Login failed",
+        };
       }
+    },
+    []
+  );
 
-      if (res?.status === "error" || res?.error) {
-        throw new Error(res.message || "Signup failed on server");
+  const signupWithFirebase = useCallback(
+    async (
+      firebaseUser: FirebaseUser,
+      extra?: { name?: string; avatarUrl?: string }
+    ): Promise<ApiResponse> => {
+      try {
+        const idToken = await getIdToken(firebaseUser, true);
+
+        const res = await apiRequest<ApiResponse>(
+          "/auth/signup-with-firebase",
+          {
+            method: "POST",
+            body: {
+              idToken,
+              userAgent:
+                typeof navigator !== "undefined"
+                  ? navigator.userAgent
+                  : "unknown",
+              ...extra,
+            },
+          }
+        );
+
+        // password flow pending verification
+        if (
+          (res as any).status === "pending_verification" ||
+          (res as any).code === 202
+        ) {
+          try {
+            // if caller wants to send verify email, do it at the page level;
+            // here we just ensure user signs out so cookie won’t be created.
+            await signOut(auth);
+          } catch {}
+          setUser(null);
+          return { ...res, status: "pending_verification" };
+        }
+
+        if ((res as any).status === "error") {
+          throw new Error(res.message || "Signup failed on server");
+        }
+
+        // probe cookie (google/verified scenario)
+        const probe = await waitForSession();
+        if (probe) {
+          const u = toUser(probe);
+          setUser(u);
+        }
+
+        return { ...res, status: "success" };
+      } catch (err: any) {
+        toastMessage(err?.message || "Signup failed.", { type: "error" });
+        return {
+          status: "error",
+          code: 500,
+          message: err?.message || "Signup failed",
+        };
       }
+    },
+    []
+  );
 
-      await new Promise((r) => setTimeout(r, 800));
-      await fetchSession();
-      router.replace("/dashboard");
-      return { ...res, status: "success" };
-    } catch (err: any) {
-      console.error("❌ signupWithFirebase error:", err.message);
-      toastMessage(err.message || "Signup failed. Please try again.", {
-        type: "error",
-      });
-      return {
-        status: "error",
-        message: err.message || "Signup failed.",
-      };
-    }
-  };
-
-  /* ============================================================
-     🚪 Logout — Backend + Firebase + Router
-  ============================================================ */
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await toastAsync(
       async () => {
-        await apiRequest("/auth/logout", { method: "POST" });
-        await signOut(auth);
-        setUser(null);
-        router.replace("/login");
+        try {
+          await apiRequest("/auth/logout", { method: "POST" });
+        } finally {
+          // even if backend fails, make sure firebase state is cleared client-side
+          await signOut(auth).catch(() => {});
+          setUser(null);
+        }
       },
       {
         loading: "Logging out...",
@@ -255,37 +265,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: "Logout failed. Please try again.",
       }
     );
-  };
+  }, []);
 
-  /* ============================================================
-     🔁 Manual Session Refresh
-  ============================================================ */
   const refreshSession = useCallback(async () => {
     await fetchSession();
   }, [fetchSession]);
 
-  /* ============================================================
-     🌍 Provide Context Globally
-  ============================================================ */
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        loginWithFirebase,
-        signupWithFirebase,
-        logout,
-        refreshSession,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      loading,
+      loginWithFirebase,
+      signupWithFirebase,
+      logout,
+      refreshSession,
+    }),
+    [
+      user,
+      loading,
+      loginWithFirebase,
+      signupWithFirebase,
+      logout,
+      refreshSession,
+    ]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-/* ============================================================
-   🪶 useAuth Hook
-============================================================ */
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
