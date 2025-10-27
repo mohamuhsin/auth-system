@@ -2,11 +2,11 @@
 "use client";
 
 /* ============================================================
-   🔑 ResetPasswordForm — Secure Firebase Password Reset
+   🔑 ResetPasswordForm — Level 2.7 (Final Polished)
    ------------------------------------------------------------
-   • Handles URL-based reset (oobCode)
-   • Verifies and updates password securely
-   • Unified toasts + safe redirects
+   • Auto-redirects if token missing
+   • Verifies + updates password via Firebase
+   • Unified toast handling + success query redirect
 ============================================================ */
 
 import { useState, useEffect } from "react";
@@ -60,24 +60,25 @@ export function ResetPasswordForm({
   });
 
   /* ============================================================
-     🔍 Extract oobCode (Firebase reset token) from URL
+     🔍 Auto-detect and validate oobCode
   ============================================================ */
   useEffect(() => {
     const code = searchParams.get("oobCode");
-    if (code) setOobCode(code);
-  }, [searchParams]);
+    if (!code) {
+      toastMessage("Invalid or expired password reset link.", {
+        type: "error",
+      });
+      router.replace("/forgot-password");
+    } else {
+      setOobCode(code);
+    }
+  }, [searchParams, router]);
 
   /* ============================================================
      🔐 Handle Password Reset
   ============================================================ */
   async function onSubmit(values: ResetPasswordValues) {
-    if (!oobCode) {
-      toastMessage("Invalid or expired password reset link.", {
-        type: "error",
-      });
-      setTimeout(() => router.replace("/forgot-password"), 1500);
-      return;
-    }
+    if (!oobCode) return;
 
     if (values.password !== values.confirmPassword) {
       toastMessage("Passwords do not match. Please try again.", {
@@ -94,8 +95,8 @@ export function ResetPasswordForm({
           type: "success",
         });
 
-        // Redirect smoothly after success
-        setTimeout(() => router.replace("/login"), 1500);
+        // Redirect to login with success flag
+        setTimeout(() => router.replace("/login?reset=success"), 1500);
       },
       {
         loading: "Updating password...",

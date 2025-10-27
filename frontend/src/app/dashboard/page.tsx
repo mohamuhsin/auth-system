@@ -1,8 +1,12 @@
 "use client";
 
-export const dynamic = "force-dynamic"; // ✅ Prevents static pre-render
+export const dynamic = "force-dynamic"; // ✅ ensures no static caching
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 import { ProtectedRoute } from "@/components/auth/protected-route";
+import { useAuth } from "@/context/authContext";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { ChartAreaInteractive } from "@/components/dashboard/chart-area-interactive";
 import { DataTable } from "@/components/dashboard/data-table";
@@ -11,14 +15,24 @@ import { SiteHeader } from "@/components/dashboard/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import data from "./data.json";
 
-/**
- * 🧭 Dashboard Page (Protected)
- * ------------------------------------------------------------
- * • Requires user authentication
- * • Uses shared Sidebar + Header layout
- * • Displays analytics, cards, and data table
- */
+/* ============================================================
+   🧭 Dashboard Page (Protected)
+   ------------------------------------------------------------
+   • Requires active authenticated session
+   • Uses unified sidebar + header layout
+   • Displays analytics + data table
+============================================================ */
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const router = useRouter();
+
+  // 🧭 Optional: redirect if user role isn’t allowed (RBAC ready)
+  useEffect(() => {
+    if (user && user.role === "MERCHANT") {
+      router.replace("/merchant");
+    }
+  }, [user, router]);
+
   return (
     <ProtectedRoute>
       <SidebarProvider
@@ -29,7 +43,7 @@ export default function DashboardPage() {
           } as React.CSSProperties
         }
       >
-        {/* 🧭 Left Sidebar */}
+        {/* 🧭 Sidebar */}
         <AppSidebar variant="inset" />
 
         {/* 📊 Main Dashboard Area */}

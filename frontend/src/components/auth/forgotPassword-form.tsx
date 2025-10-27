@@ -3,8 +3,9 @@
 /* ============================================================
    🔑 ForgotPasswordForm — Secure Password Reset via Firebase
    ------------------------------------------------------------
-   Unified with toastAsync + shared requestPasswordReset helper.
-   Redirects user to /login after successful email dispatch.
+   • Integrated with shared toast + helper utilities
+   • Clean redirect after success
+   • Unified with all other Iventics Auth screens
 ============================================================ */
 
 import { Controller, useForm } from "react-hook-form";
@@ -37,7 +38,7 @@ import { toastAsync, toastMessage } from "@/lib/toast";
 import { requestPasswordReset } from "@/lib/auth-email";
 
 /* ============================================================
-   🔐 ForgotPasswordForm — Level 2.0
+   🔐 ForgotPasswordForm — Level 2.7
 ============================================================ */
 export function ForgotPasswordForm({
   className,
@@ -55,7 +56,9 @@ export function ForgotPasswordForm({
      ✉️ Handle Password Reset
   ============================================================ */
   async function onSubmit(values: ForgotPasswordValues) {
-    if (!values.email.trim()) {
+    const email = values.email.trim().toLowerCase();
+
+    if (!email) {
       toastMessage("Please enter your email address first.", {
         type: "warning",
       });
@@ -64,18 +67,16 @@ export function ForgotPasswordForm({
 
     await toastAsync(
       async () => {
-        const result = await requestPasswordReset(values.email);
+        const result = await requestPasswordReset(email);
 
-        if (!result?.ok) {
-          throw new Error("Failed to send password reset link.");
-        }
+        if (!result?.ok) throw new Error("Failed to send password reset link.");
 
-        toastMessage("Password reset email sent! Check your inbox.", {
+        toastMessage("📨 Password reset email sent! Check your inbox.", {
           type: "success",
         });
 
-        // Optional UX delay before redirect
-        setTimeout(() => router.replace("/login"), 2500);
+        // Short, smooth UX delay before redirecting to login
+        setTimeout(() => router.replace("/login"), 2000);
       },
       {
         loading: "Sending password reset link...",
@@ -96,7 +97,7 @@ export function ForgotPasswordForm({
             Forgot Password?
           </CardTitle>
           <CardDescription>
-            Enter your email, and we’ll send you a secure reset link.
+            Enter your email and we’ll send you a secure reset link.
           </CardDescription>
         </CardHeader>
 

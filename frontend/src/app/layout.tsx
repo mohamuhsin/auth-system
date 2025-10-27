@@ -27,18 +27,16 @@ const interTight = Inter_Tight({
 export const metadata: Metadata = {
   title: "Auth by Iventics",
   description: "Secure authentication system for all Iventics apps",
-  icons: {
-    icon: "/favicon.ico",
-  },
+  icons: { icon: "/favicon.ico" },
   manifest: "/manifest.json",
 };
 
 /* ============================================================
-   🌍 Root Layout — Unified Global Providers (Level 2.0)
+   🌍 RootLayout — Unified Global Providers (Level 2.8)
    ------------------------------------------------------------
-   • Provides global font + theme + toast
-   • Wraps all routes in AuthProvider
-   • Prevents hydration mismatch warnings
+   ✅ Wraps app with Auth + Theme + Toast
+   ✅ Prevents hydration mismatch warnings
+   ✅ Ready for nested layouts (protected routes)
 ============================================================ */
 export default function RootLayout({
   children,
@@ -46,22 +44,21 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${interSans.variable} ${interTight.variable}
+        className={`${interSans.variable} ${interTight.variable} 
           font-sans antialiased min-h-screen bg-background text-foreground`}
       >
-        {/* 🔐 Auth Context wraps the entire app */}
+        {/* 🔐 Global Contexts (Auth + Theme) */}
         <AuthProvider>
-          {/* 🌓 ThemeProvider handles dark/light mode */}
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
           >
-            {/* 🌐 Main Application */}
-            {children}
+            {/* 🧩 Main App Content */}
+            <main className="min-h-screen">{children}</main>
 
-            {/* 🔔 Global toast notifications */}
+            {/* 🔔 Toast Notifications */}
             <Toaster
               richColors
               position="top-right"

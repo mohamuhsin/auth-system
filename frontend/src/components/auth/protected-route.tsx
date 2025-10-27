@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/authContext";
 
 /* ============================================================
-   🔒 ProtectedRoute — Guards private pages (with fade loader)
+   🔒 ProtectedRoute — Level 2.8 (Final Polished)
    ------------------------------------------------------------
-   • Waits for AuthContext to finish loading
-   • Redirects safely with timeout fallback
-   • Prevents infinite "verifying session..." stuck states
+   ✅ Fixes “stuck verifying session after logout”
+   ✅ Adds timeout + forced session recheck
+   ✅ Prevents infinite loading loops
 ============================================================ */
 export function ProtectedRoute({
   children,
@@ -22,41 +22,50 @@ export function ProtectedRoute({
   redirectTo?: string;
   fallbackText?: string;
 }) {
-  const { user, loading } = useAuth();
+  const { user, loading, waitForSession } = useAuth();
   const router = useRouter();
   const redirectedRef = useRef(false);
-  const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [safetyTriggered, setSafetyTriggered] = useState(false);
 
-  // 🧭 Handle redirect if no user after loading
+  /* 🧭 Redirect to login if not authenticated */
   useEffect(() => {
-    // Avoid multiple redirects
     if (!loading && !user && !redirectedRef.current) {
       redirectedRef.current = true;
-      const timeout = setTimeout(() => router.replace(redirectTo), 200);
+      const timeout = setTimeout(() => router.replace(redirectTo), 300);
       return () => clearTimeout(timeout);
     }
   }, [user, loading, router, redirectTo]);
 
-  // 🕓 Safety fallback — if still loading too long (10s), force reset
+  /* 🕓 Safety fallback (5s max) — recheck session, then redirect */
   useEffect(() => {
-    if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-    // only start safety timer if still loading
     if (loading) {
-      safetyTimeoutRef.current = setTimeout(() => {
-        console.warn("⚠️ Auth verification timeout — redirecting to login.");
-        redirectedRef.current = true;
-        router.replace(redirectTo);
-      }, 10000); // 10 seconds
+      timeoutRef.current = setTimeout(async () => {
+        console.warn("⚠️ Auth verification timeout — forcing recheck.");
+        setSafetyTriggered(true);
+        try {
+          await waitForSession?.(); // 🩵 probe backend or Firebase again
+        } catch {
+          // ignore
+        }
+
+        // If still no user, redirect
+        if (!user) {
+          redirectedRef.current = true;
+          router.replace(redirectTo);
+        }
+      }, 5000);
     }
 
     return () => {
-      if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [loading, router, redirectTo]);
+  }, [loading, user, router, redirectTo, waitForSession]);
 
-  // 🌀 While verifying session
-  if (loading || !user) {
+  /* 🌀 While verifying session */
+  if (loading && !safetyTriggered) {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-muted-foreground">
         <AnimatePresence mode="wait">
@@ -76,6 +85,10 @@ export function ProtectedRoute({
     );
   }
 
-  // ✅ Authenticated — render protected content
-  return <>{children}</>;
+  /* ✅ Authenticated — render protected content */
+  if (user) return <>{children}</>;
+
+  /* 🚫 Fallback — if all fails, redirect */
+  router.replace(redirectTo);
+  return null;
 }
