@@ -1,8 +1,11 @@
+"use client";
+
+import { Suspense } from "react";
+import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { ForgotPasswordForm } from "@/components/auth/forgotPassword-form";
-import Link from "next/link";
 
-export default function ForgotPasswordPage() {
+export default function ForgotPasswordPageClient() {
   return (
     <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
@@ -19,8 +22,16 @@ export default function ForgotPasswordPage() {
           </span>
         </Link>
 
-        {/* ✉️ Forgot Password Form */}
-        <ForgotPasswordForm />
+        {/* ✉️ Forgot Password Form — wrapped in Suspense for safety */}
+        <Suspense
+          fallback={
+            <div className="text-center text-muted-foreground">
+              Loading forgot password form...
+            </div>
+          }
+        >
+          <ForgotPasswordForm />
+        </Suspense>
       </div>
     </div>
   );
