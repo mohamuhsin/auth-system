@@ -1,6 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+/* ============================================================
+   🔒 AuthContext — Level 2.9 (Final Verified)
+   ------------------------------------------------------------
+   • Unified cookie + Firebase session bridge
+   • Handles verification, 401s, and retry loops
+   • Safe polling after signup/login
+   • Toast-integrated UX
+============================================================ */
+
 import React, {
   createContext,
   useContext,
@@ -58,7 +67,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 /* ============================================================
-   🧩 AuthProvider — Level 2.8
+   🧩 AuthProvider
 ============================================================ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -81,22 +90,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /* ------------------------------------------------------------
-     🧭 Probe /users/me until session cookie is valid
+     🧭 Probe /users/me until cookie session becomes valid
   ------------------------------------------------------------ */
   const waitForSession = useCallback(async (): Promise<ApiResponse | null> => {
-    for (let i = 0; i < 5; i++) {
+    const isAborted = false;
+    const maxRetries = 5;
+    let attempt = 0;
+
+    while (!isAborted && attempt < maxRetries) {
       try {
         const res = await apiRequest<ApiResponse>("/users/me");
         if (res && (res.status === "success" || res.code === 200) && res.email)
           return res;
-      } catch {}
-      await new Promise((r) => setTimeout(r, 200 * (i + 1)));
+      } catch {
+        /* ignore temporary errors */
+      }
+      await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
+      attempt++;
     }
     return null;
   }, []);
 
   /* ------------------------------------------------------------
-     🚀 Fetch session on mount or refresh
+     🚀 Fetch active session (used on mount or manual refresh)
   ------------------------------------------------------------ */
   const fetchSession = useCallback(async () => {
     try {
@@ -106,7 +122,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setUser(null);
       }
-    } catch {
+    } catch (err: any) {
+      if (err.status === 401) {
+        console.info("🔒 No active session — clearing state.");
+      }
       setUser(null);
     } finally {
       setLoading(false);
@@ -118,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchSession]);
 
   /* ------------------------------------------------------------
-     🔐 Login with Firebase
+     🔐 Login with Firebase → Backend Session Cookie
   ------------------------------------------------------------ */
   const loginWithFirebase = useCallback(
     async (firebaseUser: FirebaseUser): Promise<ApiResponse> => {
@@ -135,10 +154,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         });
 
+        // 🧾 Handle backend codes
         if (res.code === 403) {
           toastMessage("Please verify your email before logging in.", {
             type: "warning",
           });
+          await signOut(auth).catch(() => {});
           setUser(null);
           return res;
         }
@@ -150,6 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return res;
         }
 
+        // 🔄 Wait for cookie-based session to propagate
         const probe = await waitForSession();
         setUser(probe ? toUser(probe) : null);
         setLoading(false);
@@ -164,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   /* ------------------------------------------------------------
-     🆕 Signup with Firebase
+     🆕 Signup with Firebase → Backend registration
   ------------------------------------------------------------ */
   const signupWithFirebase = useCallback(
     async (
@@ -195,6 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { ...res, status: "pending_verification" };
         }
 
+        // Wait for backend cookie to exist
         const probe = await waitForSession();
         setUser(probe ? toUser(probe) : null);
         setLoading(false);
@@ -209,7 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   /* ------------------------------------------------------------
-     🚪 Logout (clears backend + Firebase)
+     🚪 Logout (clear backend + Firebase)
   ------------------------------------------------------------ */
   const logout = useCallback(async () => {
     await toastAsync(
@@ -257,7 +280,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 /* ------------------------------------------------------------
-   🪶 Hook
+   🪶 useAuth Hook
 ------------------------------------------------------------ */
 export function useAuth() {
   const ctx = useContext(AuthContext);

@@ -24,18 +24,23 @@ function normalizeApi(res: any): {
   status?: number;
   message?: string;
 } {
-  // Case 1: native fetch Response
+  // Case 1: native fetch Response (or a Response-like)
   if (res && typeof res === "object" && "ok" in res && "status" in res) {
-    return { ok: !!res.ok, status: Number(res.status), message: undefined };
+    return {
+      ok: !!(res as Response).ok,
+      status: Number((res as Response).status),
+    };
   }
 
-  // Case 2: JSON envelope with code/statusCode/statusText/message
+  // Case 2: JSON envelope with code/statusCode/status/message
   if (res && typeof res === "object") {
     const statusNum =
       typeof res.code === "number"
         ? res.code
-        : typeof res.statusCode === "number"
-        ? res.statusCode
+        : typeof (res as any).statusCode === "number"
+        ? (res as any).statusCode
+        : typeof (res as any).status === "number"
+        ? (res as any).status
         : undefined;
 
     const statusStr = (res.status ?? res.statusText) as string | undefined;
@@ -45,22 +50,36 @@ function normalizeApi(res: any): {
       (typeof statusNum === "number" && statusNum >= 200 && statusNum < 300);
 
     return {
-      ok,
+      ok: !!ok,
       status: statusNum,
-      message: res.message,
+      message: (res as any).message,
     };
   }
 
   // Fallback
-  return { ok: false, status: undefined, message: undefined };
+  return { ok: false };
 }
 
-/** Safe redirect with delay */
+/** Safe redirect (history-replacing) */
 function go(path: string, delay = 800) {
+  if (typeof window === "undefined") return;
   setTimeout(() => {
-    if (typeof window !== "undefined") window.location.href = path;
+    try {
+      window.location.replace(path); // replace avoids going "Back" into bad states
+    } catch {
+      window.location.href = path;
+    }
   }, delay);
 }
+
+/* Optional: configure where the verification link should bounce back to */
+const actionCodeSettings =
+  typeof window !== "undefined"
+    ? {
+        url: `${window.location.origin}/verify-email`, // tweak if you prefer a different continue page
+        handleCodeInApp: false,
+      }
+    : undefined;
 
 /* ============================================================
    🆕 Signup — Email + Password (Manual toasts, no toastAsync)
@@ -71,16 +90,19 @@ export async function signupWithEmailPassword(
   name?: string
 ): Promise<AuthResult> {
   try {
-    // Loading toast (manual control avoids double-toasts)
     toastMessage("Creating your account...", { type: "loading" });
 
     // 1) Create Firebase user
     const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-    // 2) Send verification email
-    await sendEmailVerification(cred.user);
+    // 2) Send verification email (with optional continueUrl)
+    if (actionCodeSettings) {
+      await sendEmailVerification(cred.user, actionCodeSettings);
+    } else {
+      await sendEmailVerification(cred.user);
+    }
 
-    // 3) Register on backend (sets cookie only for already-verified providers)
+    // 3) Register on backend (it may return 202 for pending-verification)
     const idToken = await cred.user.getIdToken(true);
     const raw = await apiRequest("/auth/signup-with-firebase", {
       method: "POST",
@@ -89,11 +111,21 @@ export async function signupWithEmailPassword(
     });
     const res = normalizeApi(raw);
 
-    // 4) Handle backend response
-    if (res.status === 202) {
-      // Email/password signups: backend expects verification → sign out locally
-      await signOut(auth);
-      toast.dismiss();
+    // 4) Always sign out after signup (email/password) so state is clean
+    await signOut(auth);
+
+    toast.dismiss();
+
+    if (res.status === 409) {
+      toastMessage("Account already exists. Redirecting to login...", {
+        type: "warning",
+      });
+      go("/login", 1200);
+      return { ok: false, message: "Account already exists." };
+    }
+
+    if (res.status === 202 || !res.ok) {
+      // Pending verification or non-OK: route to verify page
       toastMessage(
         "Account created! Please verify your email before logging in.",
         { type: "success" }
@@ -102,23 +134,10 @@ export async function signupWithEmailPassword(
       return { ok: true, message: "Verification pending." };
     }
 
-    if (res.ok) {
-      toast.dismiss();
-      toastMessage("Account created successfully!", { type: "success" });
-      go("/dashboard", 900);
-      return { ok: true };
-    }
-
-    if (res.status === 409) {
-      toast.dismiss();
-      toastMessage("Account already exists. Redirecting to login...", {
-        type: "warning",
-      });
-      go("/login", 1200);
-      return { ok: false, message: "Account already exists." };
-    }
-
-    throw new Error(res.message || "Signup failed. Please try again.");
+    // If backend decided to auto-create a session for some providers (rare for email/pwd)
+    toastMessage("Account created successfully!", { type: "success" });
+    go("/dashboard", 900);
+    return { ok: true };
   } catch (err: any) {
     toast.dismiss();
 
@@ -158,9 +177,9 @@ export async function loginWithEmailPassword(
     // 1) Firebase login
     const cred = await signInWithEmailAndPassword(auth, email, password);
 
-    // 2) Local guard: must be verified
+    // 2) Local guard: must be verified BEFORE we touch the backend
     if (!cred.user.emailVerified) {
-      await signOut(auth);
+      await signOut(auth); // ensure no stale Firebase session
       toast.dismiss();
       toastMessage("Please verify your email before signing in.", {
         type: "warning",
@@ -180,7 +199,7 @@ export async function loginWithEmailPassword(
 
     // 4) Backend responses
     if (res.status === 403) {
-      // Not verified in backend signals
+      // Backend signals not verified → route to verify page
       toast.dismiss();
       toastMessage("Please verify your email before logging in.", {
         type: "warning",
@@ -260,7 +279,11 @@ export async function resendVerificationEmail(): Promise<AuthResult> {
 
   try {
     toastMessage("Sending verification email...", { type: "loading" });
-    await sendEmailVerification(user);
+    if (actionCodeSettings) {
+      await sendEmailVerification(user, actionCodeSettings);
+    } else {
+      await sendEmailVerification(user);
+    }
     toast.dismiss();
     toastMessage("Verification link sent successfully!", {
       type: "success",
@@ -269,6 +292,7 @@ export async function resendVerificationEmail(): Promise<AuthResult> {
   } catch (err: any) {
     toast.dismiss();
     const code = err?.code as string | undefined;
+
     if (code === "auth/too-many-requests") {
       toastMessage(
         "You’ve requested too many verification emails. Try again later.",
@@ -276,6 +300,15 @@ export async function resendVerificationEmail(): Promise<AuthResult> {
       );
       return { ok: false, message: "Too many requests." };
     }
+
+    if (code === "auth/requires-recent-login") {
+      toastMessage("For security, please log in again to resend the email.", {
+        type: "warning",
+      });
+      go("/login", 1200);
+      return { ok: false, message: "Requires recent login." };
+    }
+
     const msg = err?.message || "Something went wrong.";
     toastMessage(msg, { type: "error" });
     return { ok: false, message: msg };
