@@ -4,12 +4,12 @@ import { logAudit } from "./audit";
 import { AuditAction } from "@prisma/client";
 
 /**
- * 🌍 CORS Middleware — Level 2.7 (Hardened + Smart Wildcards)
+ * 🌍 CORS Middleware — Level 2.8 (Final Production)
  * ------------------------------------------------------------
  * ✅ Supports `.iventics.com` cross-domain cookies
  * ✅ Auto-allows Vercel preview subdomains (`*.vercel.app`)
  * ✅ Allows localhost in dev
- * ✅ Allows x-request-id header for trace logging
+ * ✅ Allows x-request-id, cache-control, pragma headers
  * ✅ Logs and audits blocked origins
  * ✅ Handles preflight OPTIONS safely
  */
@@ -54,7 +54,6 @@ const corsConfig: CorsOptions = {
       return (
         origin === allowed ||
         origin.endsWith(`.${base}`) ||
-        // ✅ also allow vercel.app project URLs
         (base === "vercel.app" && origin.includes(".vercel.app"))
       );
     });
@@ -63,13 +62,11 @@ const corsConfig: CorsOptions = {
 
     // 🚫 Block unauthorized origin
     logger.warn({ origin }, "🚫 Blocked by CORS policy");
-
     void logAudit(AuditAction.RATE_LIMIT_HIT, null, null, null, {
       reason: "CORS_ORIGIN_BLOCKED",
       origin,
       severity: "WARN",
     });
-
     return callback(new Error(`CORS: Origin not allowed → ${origin}`));
   },
 
@@ -81,7 +78,9 @@ const corsConfig: CorsOptions = {
     "X-Requested-With",
     "Accept",
     "Origin",
-    "x-request-id", // ✅ Added for your frontend tracing header
+    "x-request-id",
+    "cache-control", // ✅ Fix for browser preflights
+    "pragma", // ✅ Legacy header some browsers still send
   ],
   exposedHeaders: ["Set-Cookie"],
   optionsSuccessStatus: 204,
