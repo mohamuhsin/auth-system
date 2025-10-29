@@ -14,6 +14,7 @@ export function generateToken(length = 32): string {
   if (!Number.isInteger(length) || length <= 0) {
     throw new Error("Invalid token length — must be a positive integer.");
   }
+
   return randomBytes(length).toString("hex");
 }
 
@@ -28,7 +29,7 @@ export function generateToken(length = 32): string {
  */
 export function hashToken(token: string): string {
   if (typeof token !== "string" || !token.trim()) {
-    throw new Error("Token required for hashing");
+    throw new Error("Token required for hashing.");
   }
 
   return createHash("sha256").update(token).digest("hex");
@@ -45,7 +46,7 @@ export function hashToken(token: string): string {
  */
 export function verifyToken(token: string, hashed: string): boolean {
   if (typeof token !== "string" || typeof hashed !== "string") {
-    throw new Error("Invalid inputs for token verification");
+    throw new Error("Invalid inputs for token verification.");
   }
 
   const computed = hashToken(token);

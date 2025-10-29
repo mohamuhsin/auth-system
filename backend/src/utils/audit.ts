@@ -3,15 +3,15 @@ import { AuditAction } from "@prisma/client";
 import { logger } from "./logger";
 
 /**
- * 🧾 logAudit (Level 2.5 Hardened)
+ * 🧾 logAudit — Level 2.5 Hardened (Auth by Iventics)
  * ------------------------------------------------------------
  * Writes structured audit events into the `AuditLog` table.
  *
- * ✅ Uses enum-safe `AuditAction`
- * ✅ Never throws (safe fallback on DB errors)
+ * ✅ Enum-safe `AuditAction`
+ * ✅ Never throws (graceful fallback on DB errors)
  * ✅ Adds metadata timestamp + severity
  * ✅ Joins multi-string user-agents cleanly
- * ✅ Logs dev-mode stack traces for easier debugging
+ * ✅ Logs stack trace in dev mode for debug visibility
  */
 export async function logAudit(
   action: AuditAction,
@@ -22,7 +22,7 @@ export async function logAudit(
 ): Promise<void> {
   try {
     // ------------------------------------------------------------
-    // 🧩 Runtime guard: ensure valid enum value
+    // 🧩 Runtime validation: ensure valid enum value
     // ------------------------------------------------------------
     if (!Object.values(AuditAction).includes(action)) {
       logger.warn(
@@ -33,7 +33,7 @@ export async function logAudit(
     }
 
     // ------------------------------------------------------------
-    // 🧩 Build audit payload
+    // 🧩 Build structured audit payload
     // ------------------------------------------------------------
     const data = {
       action,
@@ -52,17 +52,18 @@ export async function logAudit(
     };
 
     // ------------------------------------------------------------
-    // 🧾 Persist to DB
+    // 🧾 Persist event to database
     // ------------------------------------------------------------
     await prisma.auditLog.create({ data });
-  } catch (err: any) {
+  } catch (err: unknown) {
     // ------------------------------------------------------------
-    // 🚫 Never interrupt critical auth flow
+    // 🚫 Never interrupt authentication or critical flow
     // ------------------------------------------------------------
+    const error = err as Error;
     logger.error({
       msg: "⚠️ Failed to log audit",
-      error: err.message,
-      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+      error: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 }

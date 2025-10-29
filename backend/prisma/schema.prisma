@@ -1,3 +1,6 @@
+// ============================================================
+// 🧩 PRISMA CONFIGURATION
+// ============================================================
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,14 +10,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/**
- * ============================================================
- * 👤 USER MODEL — Core user identity
- * ============================================================
- */
+// ============================================================
+// 👤 USER MODEL — Core User Identity
+// ============================================================
 model User {
   id              String       @id @default(cuid())
-  uid             String       @unique // Firebase UID
+  uid             String       @unique                     
   email           String       @unique
   name            String?
   avatarUrl       String?
@@ -26,24 +27,24 @@ model User {
   lastLoginAt     DateTime?
   isApproved      Boolean      @default(false)
   termsAcceptedAt DateTime?
-  deletedAt       DateTime? // soft delete
+  deletedAt       DateTime?                                
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
+  // 🔗 Relations
   sessions  Session[]
-  auditLogs AuditLog[] @relation("UserAuditLogs")
+  auditLogs AuditLog[]        @relation("UserAuditLogs")
 
+  // 📈 Indexes
   @@index([uid])
   @@index([email])
   @@index([role])
   @@index([status])
 }
 
-/**
- * ============================================================
- * 🔐 SESSION MODEL — Backend session cookies
- * ============================================================
- */
+// ============================================================
+// 🔐 SESSION MODEL — Secure Backend Sessions
+// ============================================================
 model Session {
   id          String    @id @default(cuid())
   tokenHash   String    @unique
@@ -51,22 +52,21 @@ model Session {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   ipAddress   String?
   userAgent   String?
-  device      String? // optional: "Chrome on Windows"
+  device      String?                            
   createdAt   DateTime  @default(now())
-  refreshedAt DateTime? // optional: when cookie renewed
+  refreshedAt DateTime?                          
   revokedAt   DateTime?
   expiresAt   DateTime
 
+  // 📈 Indexes
   @@index([userId, expiresAt])
   @@index([expiresAt])
   @@index([tokenHash])
 }
 
-/**
- * ============================================================
- * 🧾 AUDIT LOG MODEL — System event logs
- * ============================================================
- */
+// ============================================================
+// 🧾 AUDIT LOG MODEL — System Event Tracking
+// ============================================================
 model AuditLog {
   id        String      @id @default(cuid())
   userId    String?
@@ -74,22 +74,21 @@ model AuditLog {
   action    AuditAction
   message   String?
   metadata  Json?
-  source    String? // e.g. "auth", "api", "admin"
-  severity  String? // e.g. "INFO", "WARN", "ERROR"
+  source    String?                              
+  severity  String?                             
   requestId String?
   ipAddress String?
   userAgent String?
   createdAt DateTime    @default(now())
 
+  // 📈 Indexes
   @@index([userId, createdAt])
   @@index([action, createdAt])
 }
 
-/**
- * ============================================================
- * 🧩 ENUMS — Type-safe states & roles
- * ============================================================
- */
+// ============================================================
+// 🧩 ENUMS — Type-Safe States & Roles
+// ============================================================
 enum Role {
   USER
   ADMIN

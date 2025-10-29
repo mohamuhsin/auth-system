@@ -4,8 +4,14 @@
 import { toast } from "sonner";
 
 /* ============================================================
-   🔔 Toast Types
+   Toast Configuration
+   ------------------------------------------------------------
+   • Centralized toast utility for consistent feedback
+   • Supports: success, error, warning, info, loading
+   • Use toastMessage for instant feedback
+   • Use toastAsync for async operations
 ============================================================ */
+
 export interface ToastOptions {
   type?: "success" | "error" | "info" | "warning" | "loading";
   duration?: number;
@@ -13,13 +19,10 @@ export interface ToastOptions {
   onAction?: () => void;
 }
 
-/* ============================================================
-   🪶 toastMessage — Immediate Toast Notification
-   ------------------------------------------------------------
-   • Use for instant feedback messages
-   • Supports all toast types
-   • Gracefully handles Sonner runtime errors
-============================================================ */
+/* ------------------------------------------------------------
+   toastMessage — Immediate Toast Notification
+   Used for direct feedback after an event or validation
+------------------------------------------------------------ */
 export function toastMessage(
   message: string,
   {
@@ -30,9 +33,7 @@ export function toastMessage(
   }: ToastOptions = {}
 ): void {
   try {
-    const opts: Record<string, any> = {
-      duration,
-    };
+    const opts: Record<string, any> = { duration };
 
     if (actionLabel && onAction) {
       opts.action = { label: actionLabel, onClick: onAction };
@@ -59,17 +60,14 @@ export function toastMessage(
         break;
     }
   } catch (err) {
-    console.error("Toast render error:", err);
+    console.error("toastMessage runtime error:", err);
   }
 }
 
-/* ============================================================
-   ⚙️ toastAsync — Async Promise Wrapper
-   ------------------------------------------------------------
-   • Wraps async operations for UX feedback
-   • Shows loading, success, and error toasts
-   • Returns resolved value or undefined on failure
-============================================================ */
+/* ------------------------------------------------------------
+   toastAsync — Async Promise Wrapper
+   Used to wrap async operations with loading/success/error states
+------------------------------------------------------------ */
 export async function toastAsync<T>(
   fn: () => Promise<T>,
   messages?: {
@@ -81,13 +79,12 @@ export async function toastAsync<T>(
 ): Promise<T | undefined> {
   const { loading, success, error } = {
     loading: "Processing...",
-    success: "Completed successfully!",
-    error: "Something went wrong.",
+    success: "Completed successfully.",
+    error: "An error occurred.",
     ...messages,
   };
 
   try {
-    // ✅ Sonner's toast.promise automatically handles states
     const result = (await toast.promise(fn(), {
       loading,
       success,
@@ -107,7 +104,7 @@ export async function toastAsync<T>(
   }
 }
 
-/* ============================================================
-   🧱 Export Base
-============================================================ */
+/* ------------------------------------------------------------
+   Export Base
+------------------------------------------------------------ */
 export { toast };
