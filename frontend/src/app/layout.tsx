@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   title: "Auth by Iventics",
   description: "Secure authentication system for all Iventics apps",
   icons: { icon: "/favicon.ico" },
-  manifest: "/manifest.json",
+  manifest: undefined,
 };
 
 /* ============================================================
