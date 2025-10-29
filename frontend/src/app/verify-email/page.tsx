@@ -1,10 +1,11 @@
-export const dynamic = "force-dynamic"; // ✅ prevents prerender build crash on Vercel
+"use client";
 
+import { Suspense } from "react";
 import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { VerifyEmailNotice } from "@/components/auth/verify-email";
 
-export default function VerifyEmailPage() {
+export default function VerifyEmailPageClient() {
   return (
     <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
@@ -21,8 +22,16 @@ export default function VerifyEmailPage() {
           </span>
         </Link>
 
-        {/* ✉️ Verify Email Notice */}
-        <VerifyEmailNotice />
+        {/* ✉️ Verify Email Notice — wrapped in Suspense for useSearchParams safety */}
+        <Suspense
+          fallback={
+            <div className="text-center text-muted-foreground">
+              Loading verify email message...
+            </div>
+          }
+        >
+          <VerifyEmailNotice />
+        </Suspense>
       </div>
     </div>
   );

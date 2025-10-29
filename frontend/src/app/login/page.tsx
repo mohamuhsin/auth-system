@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { LoginForm } from "@/components/auth/login-form";
@@ -20,7 +21,10 @@ export default function LoginPageClient() {
           </span>
         </Link>
 
-        <LoginForm />
+        {/* 🌀 Required Suspense wrapper for useSearchParams */}
+        <Suspense fallback={<div>Loading login form...</div>}>
+          <LoginForm />
+        </Suspense>
       </div>
     </div>
   );
