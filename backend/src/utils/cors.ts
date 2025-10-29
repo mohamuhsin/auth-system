@@ -4,11 +4,12 @@ import { logAudit } from "./audit";
 import { AuditAction } from "@prisma/client";
 
 /**
- * 🌍 CORS Middleware — Level 2.5 Hardened (Auth by Iventics)
+ * 🌍 CORS Middleware — Level 2.6 (Hardened + Smart Wildcards)
  * ------------------------------------------------------------
- * ✅ Supports cross-domain cookies (`.iventics.com`)
- * ✅ Allows wildcard subdomains + local dev
- * ✅ Logs & audits blocked origins
+ * ✅ Supports `.iventics.com` cross-domain cookies
+ * ✅ Auto-allows Vercel preview subdomains (`*.vercel.app`)
+ * ✅ Allows localhost in dev
+ * ✅ Logs and audits blocked origins
  * ✅ Handles preflight OPTIONS safely
  */
 
@@ -24,6 +25,11 @@ if (process.env.NODE_ENV !== "production") {
   }
 }
 
+// 🧩 Auto-add .vercel.app wildcard for preview deployments
+if (!allowedOrigins.some((o) => o.includes("vercel.app"))) {
+  allowedOrigins.push("vercel.app");
+}
+
 if (!allowedOrigins.length) {
   logger.warn(
     "⚠️  No AUTH_ALLOWED_ORIGINS defined — all origins will be blocked in production."
@@ -35,16 +41,21 @@ if (!allowedOrigins.length) {
 ============================================================ */
 const corsConfig: CorsOptions = {
   origin(origin, callback) {
-    // ✅ Allow server-to-server / Postman / SSR
+    // ✅ Allow Postman, server-to-server, SSR
     if (!origin) return callback(null, true);
 
     // ✅ Exact match
     if (allowedOrigins.includes(origin)) return callback(null, true);
 
-    // ✅ Wildcard subdomain match
+    // ✅ Wildcard subdomain or suffix match
     const allowed = allowedOrigins.find((allowed) => {
       const base = allowed.replace(/^https?:\/\//, "");
-      return origin === allowed || origin.endsWith(`.${base}`);
+      return (
+        origin === allowed ||
+        origin.endsWith(`.${base}`) ||
+        // ✅ also allow vercel.app project URLs
+        (base === "vercel.app" && origin.includes(".vercel.app"))
+      );
     });
     if (allowed) return callback(null, true);
 
@@ -57,7 +68,6 @@ const corsConfig: CorsOptions = {
       severity: "WARN",
     });
 
-    // Let Express handle gracefully
     return callback(new Error(`CORS: Origin not allowed → ${origin}`));
   },
 
@@ -70,8 +80,8 @@ const corsConfig: CorsOptions = {
     "Accept",
     "Origin",
   ],
-  exposedHeaders: ["Set-Cookie"], // so frontend can read cookie headers
-  optionsSuccessStatus: 204, // avoids legacy browser issues
+  exposedHeaders: ["Set-Cookie"],
+  optionsSuccessStatus: 204,
 };
 
 /* ============================================================
