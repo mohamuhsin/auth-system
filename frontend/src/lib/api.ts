@@ -1,16 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* ============================================================
-   🌐 API Client — Level 2.7 (Final + Audit-Ready)
+   🌐 API Client — Level 2.8 (Final + Audit-Ready)
    ------------------------------------------------------------
    • Secure cross-domain (cookies + CORS)
-   • Silent token refresh on 401
+   • Silent Firebase token refresh on 401
    • Auto-retry with exponential backoff
-   • Unified error normalization
+   • Unified error normalization + production toasts
    • 15 s abort timeout protection
    • x-request-id for backend audit correlation
 ============================================================ */
 
 import { auth } from "@/services/firebase";
+import { toast, toastMessage } from "@/lib/toast";
 
 /* ============================================================
    🔗 Base URL
@@ -52,9 +53,8 @@ async function parseJsonSafe(res: Response) {
    🔗 Generate request ID (for audit/log correlation)
 ============================================================ */
 function uuidv4() {
-  // Simple RFC4122 v4 UUID generator
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (crypto.getRandomValues(new Uint8Array(1))[0] & 0xf) >> 0;
+    const r = crypto.getRandomValues(new Uint8Array(1))[0] & 0x0f;
     const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
@@ -71,13 +71,13 @@ export async function apiRequest<T = any>(
     ? `${API_BASE}${path}`
     : `${API_BASE}/${path}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000); // ⏱️ 15 s
+  const timeout = setTimeout(() => controller.abort(), 15_000); // 15 s
   const requestId = uuidv4();
 
   try {
     const res = await fetch(url, {
       method: options.method || "GET",
-      credentials: "include", // ✅ send cookies cross-domain
+      credentials: "include",
       mode: "cors",
       keepalive: true,
       signal: controller.signal,
@@ -97,7 +97,7 @@ export async function apiRequest<T = any>(
     });
 
     /* ------------------------------------------------------------
-       🧩 Non-OK Responses
+       Non-OK Responses
     ------------------------------------------------------------ */
     if (!res.ok) {
       const data = await parseJsonSafe(res);
@@ -115,7 +115,7 @@ export async function apiRequest<T = any>(
         requestUrl: url,
       }) as ApiError;
 
-      /* 🔄 401 → refresh Firebase ID token & retry once */
+      // 🔄 401 → refresh Firebase ID token & retry once
       if (
         res.status === 401 &&
         !options.skipAuthCheck &&
@@ -124,7 +124,7 @@ export async function apiRequest<T = any>(
         try {
           const firebaseUser = auth.currentUser;
           if (firebaseUser) {
-            console.warn(`🔄 401 from ${url} → refreshing Firebase ID token`);
+            console.warn(`401 from ${url} → refreshing Firebase ID token`);
             const idToken = await firebaseUser.getIdToken(true);
             await apiRequest("/auth/session", {
               method: "POST",
@@ -137,8 +137,24 @@ export async function apiRequest<T = any>(
             });
           }
         } catch (refreshErr) {
-          console.warn("⚠️ Token refresh failed:", refreshErr);
+          console.warn("Token refresh failed:", refreshErr);
         }
+      }
+
+      // 🚫 Notify user only for visible errors
+      if (res.status === 401) {
+        toast.dismiss();
+        toastMessage("Your session has expired. Please sign in again.", {
+          type: "warning",
+        });
+      } else if (res.status >= 500) {
+        toast.dismiss();
+        toastMessage("Server error occurred. Please try again later.", {
+          type: "error",
+        });
+      } else if (res.status >= 400) {
+        toast.dismiss();
+        toastMessage(message, { type: "error" });
       }
 
       throw error;
@@ -152,14 +168,12 @@ export async function apiRequest<T = any>(
   } catch (err: any) {
     /* ⏰ Timeout */
     if (err.name === "AbortError") {
-      const timeoutError = Object.assign(
-        new Error("Request timed out after 15 seconds."),
-        {
-          status: 408,
-          requestUrl: url,
-        }
-      ) as ApiError;
-      throw timeoutError;
+      toast.dismiss();
+      toastMessage("Request timed out after 15 seconds.", { type: "warning" });
+      throw Object.assign(new Error("Request timed out after 15 seconds."), {
+        status: 408,
+        requestUrl: url,
+      }) as ApiError;
     }
 
     /* 🌐 Network/CORS failure */
@@ -167,19 +181,26 @@ export async function apiRequest<T = any>(
       const retry = options.retryCount ?? 0;
       if (retry < 2) {
         const delay = Math.pow(2, retry) * 500;
-        console.warn(`🌐 Retry #${retry + 1} after ${delay} ms → ${url}`);
+        console.warn(`Retry #${retry + 1} after ${delay} ms → ${url}`);
         await new Promise((r) => setTimeout(r, delay));
         return apiRequest<T>(path, { ...options, retryCount: retry + 1 });
       }
 
-      const networkError = Object.assign(
+      toast.dismiss();
+      toastMessage("Network error. Please check your connection.", {
+        type: "error",
+      });
+
+      throw Object.assign(
         new Error("Network error or CORS policy blocked the request."),
         { isNetworkError: true, status: 0, requestUrl: url }
       ) as ApiError;
-      throw networkError;
     }
 
-    console.error("🌐 API request failed:", err);
+    // 🚫 Catch-all fallback
+    console.error("API request failed:", err);
+    toast.dismiss();
+    toastMessage("An unexpected error occurred.", { type: "error" });
     throw err;
   } finally {
     clearTimeout(timeout);

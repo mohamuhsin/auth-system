@@ -31,6 +31,7 @@ if (!allowedOrigins.some((o) => o.includes("vercel.app"))) {
   allowedOrigins.push("vercel.app");
 }
 
+// 🧩 Safety warning when nothing configured
 if (!allowedOrigins.length) {
   logger.warn(
     "⚠️  No AUTH_ALLOWED_ORIGINS defined — all origins will be blocked in production."
@@ -42,7 +43,7 @@ if (!allowedOrigins.length) {
 ============================================================ */
 const corsConfig: CorsOptions = {
   origin(origin, callback) {
-    // ✅ Allow Postman, server-to-server, SSR
+    // ✅ Allow Postman, SSR, or server-to-server requests
     if (!origin) return callback(null, true);
 
     // ✅ Exact match
@@ -67,6 +68,7 @@ const corsConfig: CorsOptions = {
       origin,
       severity: "WARN",
     });
+
     return callback(new Error(`CORS: Origin not allowed → ${origin}`));
   },
 
@@ -79,8 +81,8 @@ const corsConfig: CorsOptions = {
     "Accept",
     "Origin",
     "x-request-id",
-    "cache-control", // ✅ Fix for browser preflights
-    "pragma", // ✅ Legacy header some browsers still send
+    "cache-control", // ✅ Fix for some preflights
+    "pragma", // ✅ Legacy fallback header
   ],
   exposedHeaders: ["Set-Cookie"],
   optionsSuccessStatus: 204,

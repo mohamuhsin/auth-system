@@ -2,11 +2,11 @@
 "use client";
 
 /* ============================================================
-   🔐 LoginForm — Level 2.7 (Final Polished)
+   🔐 LoginForm — Level 3.0 (Final Production)
    ------------------------------------------------------------
    • Unified with reset-password success query
-   • No double toasts or redirects
-   • Stable across Firebase + Backend cookie sessions
+   • Dismiss-safe toasts (no duplicates)
+   • Stable across Firebase + cookie sessions
 ============================================================ */
 
 import { useState, useEffect } from "react";
@@ -39,7 +39,7 @@ import { loginSchema, type LoginFormValues } from "@/lib/validators/auth";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { useAuth } from "@/context/authContext";
-import { toastAsync, toastMessage } from "@/lib/toast";
+import { toastAsync, toastMessage, toast } from "@/lib/toast";
 import { loginWithEmailPassword } from "@/lib/auth-email";
 
 /* ============================================================
@@ -59,22 +59,22 @@ export function LoginForm({
     mode: "onChange",
   });
 
-  /* ============================================================
-     💬 Detect reset-password success
-  ============================================================ */
+  /* ------------------------------------------------------------
+     Detect reset-password success
+  ------------------------------------------------------------ */
   useEffect(() => {
     if (searchParams.get("reset") === "success") {
-      toastMessage("✅ Password updated — please sign in.", {
-        type: "success",
-      });
+      toast.dismiss();
+      toastMessage("Password updated. Please sign in.", { type: "success" });
     }
   }, [searchParams]);
 
-  /* ============================================================
-     ✉️ Email + Password Login
-  ============================================================ */
+  /* ------------------------------------------------------------
+     Email + Password Login
+  ------------------------------------------------------------ */
   async function onSubmit(values: LoginFormValues) {
     if (!values.email || !values.password) {
+      toast.dismiss();
       toastMessage("Please fill in both fields before logging in.", {
         type: "warning",
       });
@@ -82,23 +82,22 @@ export function LoginForm({
     }
 
     try {
+      toast.dismiss();
       const email = values.email.trim().toLowerCase();
       const result = await loginWithEmailPassword(email, values.password);
-
-      if (result?.ok) {
-        form.reset();
-      }
-      // Helpers handle their own toasts and redirects
+      if (result?.ok) form.reset();
+      // Backend handles redirect after session cookie set
     } catch (err: any) {
+      toast.dismiss();
       toastMessage(err?.message || "Login failed. Please try again.", {
         type: "error",
       });
     }
   }
 
-  /* ============================================================
-     🔵 Google Login — Secure Firebase → Backend Session
-  ============================================================ */
+  /* ------------------------------------------------------------
+     Google Login → Firebase → Backend Session
+  ------------------------------------------------------------ */
   async function handleGoogleLogin() {
     await toastAsync(
       async () => {
@@ -107,11 +106,11 @@ export function LoginForm({
 
         const userCred = await signInWithPopup(auth, provider);
         const googleUser = userCred.user;
-
         const result = await loginWithFirebase(googleUser);
 
         if (!result || result.status !== "success") {
           if ((result as any)?.statusCode === 404) {
+            toast.dismiss();
             toastMessage("No account found. Please sign up first.", {
               type: "warning",
             });
@@ -120,36 +119,37 @@ export function LoginForm({
           throw new Error(result?.message || "Session creation failed.");
         }
 
-        toastMessage("✅ Signed in successfully! Redirecting...", {
+        toast.dismiss();
+        toastMessage("Signed in successfully. Redirecting...", {
           type: "success",
         });
         window.location.replace("/dashboard");
       },
       {
         loading: "Connecting to Google...",
-        success: "Connected!",
+        success: "Connected.",
         error: "Google sign-in failed. Please try again.",
       }
     );
   }
 
-  /* ============================================================
+  /* ------------------------------------------------------------
      💅 UI
-  ============================================================ */
+  ------------------------------------------------------------ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader className="text-center">
           <CardTitle className="text-xl font-display">Welcome back</CardTitle>
           <CardDescription>
-            Login with your Email or Google account
+            Login with your email or Google account
           </CardDescription>
         </CardHeader>
 
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* 🔵 Google Sign-In */}
+              {/* Google Sign-In */}
               <Field>
                 <Button
                   variant="outline"
@@ -195,7 +195,7 @@ export function LoginForm({
                 Or continue with
               </FieldSeparator>
 
-              {/* ✉️ Email */}
+              {/* Email */}
               <Controller
                 name="email"
                 control={form.control}
@@ -214,7 +214,7 @@ export function LoginForm({
                 )}
               />
 
-              {/* 🔒 Password */}
+              {/* Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -257,7 +257,7 @@ export function LoginForm({
                 )}
               />
 
-              {/* 🔘 Submit */}
+              {/* Submit */}
               <Field>
                 <Button
                   type="submit"

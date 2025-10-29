@@ -2,12 +2,12 @@
 "use client";
 
 /* ============================================================
-   🔒 AuthContext — Level 2.9 (Final Verified)
+   🔒 AuthContext — Level 3.0 (Final Production)
    ------------------------------------------------------------
-   • Unified cookie + Firebase session bridge
-   • Handles verification, 401s, and retry loops
+   • Unified Firebase ↔ Cookie session bridge
+   • Handles 401 auto-logout and re-auth
    • Safe polling after signup/login
-   • Toast-integrated UX
+   • Duplicate-free toasts + timeout safety
 ============================================================ */
 
 import React, {
@@ -21,7 +21,7 @@ import React, {
 import { getIdToken, signOut, User as FirebaseUser } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { apiRequest } from "@/lib/api";
-import { toastAsync, toastMessage } from "@/lib/toast";
+import { toastAsync, toastMessage, toast } from "@/lib/toast";
 
 export type Role = "USER" | "ADMIN" | "CREATOR" | "MERCHANT";
 
@@ -90,14 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /* ------------------------------------------------------------
-     🧭 Probe /users/me until cookie session becomes valid
+     🧭 Poll /users/me until cookie session becomes valid
   ------------------------------------------------------------ */
   const waitForSession = useCallback(async (): Promise<ApiResponse | null> => {
-    const isAborted = false;
     const maxRetries = 5;
-    let attempt = 0;
-
-    while (!isAborted && attempt < maxRetries) {
+    for (let i = 0; i < maxRetries; i++) {
       try {
         const res = await apiRequest<ApiResponse>("/users/me");
         if (res && (res.status === "success" || res.code === 200) && res.email)
@@ -105,14 +102,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         /* ignore temporary errors */
       }
-      await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
-      attempt++;
+      await new Promise((r) => setTimeout(r, 200 * (i + 1)));
     }
     return null;
   }, []);
 
   /* ------------------------------------------------------------
-     🚀 Fetch active session (used on mount or manual refresh)
+     🚀 Fetch current session (used on mount or manual refresh)
   ------------------------------------------------------------ */
   const fetchSession = useCallback(async () => {
     try {
@@ -124,7 +120,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err: any) {
       if (err.status === 401) {
-        console.info("🔒 No active session — clearing state.");
+        // 🔒 Auto-logout on expired session
+        await signOut(auth).catch(() => {});
+        toast.dismiss();
+        toastMessage("Your session has expired. Please sign in again.", {
+          type: "warning",
+        });
       }
       setUser(null);
     } finally {
@@ -142,6 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithFirebase = useCallback(
     async (firebaseUser: FirebaseUser): Promise<ApiResponse> => {
       try {
+        toast.dismiss();
         const idToken = await getIdToken(firebaseUser, true);
         const res = await apiRequest<ApiResponse>("/auth/login-with-firebase", {
           method: "POST",
@@ -154,8 +156,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         });
 
-        // 🧾 Handle backend codes
         if (res.code === 403) {
+          toast.dismiss();
           toastMessage("Please verify your email before logging in.", {
             type: "warning",
           });
@@ -164,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return res;
         }
         if (res.code === 404) {
+          toast.dismiss();
           toastMessage("No account found. Redirecting to signup...", {
             type: "warning",
           });
@@ -171,12 +174,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return res;
         }
 
-        // 🔄 Wait for cookie-based session to propagate
         const probe = await waitForSession();
         setUser(probe ? toUser(probe) : null);
         setLoading(false);
         return { ...res, status: res.status ?? "success" };
       } catch (err: any) {
+        toast.dismiss();
         toastMessage(err?.message || "Login failed.", { type: "error" });
         setLoading(false);
         return { status: "error", code: 500, message: err?.message };
@@ -186,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   /* ------------------------------------------------------------
-     🆕 Signup with Firebase → Backend registration
+     🆕 Signup with Firebase → Backend Registration
   ------------------------------------------------------------ */
   const signupWithFirebase = useCallback(
     async (
@@ -194,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       extra?: { name?: string; avatarUrl?: string }
     ): Promise<ApiResponse> => {
       try {
+        toast.dismiss();
         const idToken = await getIdToken(firebaseUser, true);
         const res = await apiRequest<ApiResponse>(
           "/auth/signup-with-firebase",
@@ -217,12 +221,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { ...res, status: "pending_verification" };
         }
 
-        // Wait for backend cookie to exist
         const probe = await waitForSession();
         setUser(probe ? toUser(probe) : null);
         setLoading(false);
         return { ...res, status: "success" };
       } catch (err: any) {
+        toast.dismiss();
         toastMessage(err?.message || "Signup failed.", { type: "error" });
         setLoading(false);
         return { status: "error", code: 500, message: err?.message };
@@ -232,7 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   /* ------------------------------------------------------------
-     🚪 Logout (clear backend + Firebase)
+     🚪 Logout (backend + Firebase)
   ------------------------------------------------------------ */
   const logout = useCallback(async () => {
     await toastAsync(
@@ -247,7 +251,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       {
         loading: "Logging out...",
-        success: "Logged out successfully",
+        success: "Logged out successfully.",
         error: "Logout failed. Please try again.",
       }
     );

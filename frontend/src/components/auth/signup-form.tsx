@@ -1,6 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+/* ============================================================
+   🟢 SignupForm — Level 3.0 (Final Production)
+   ------------------------------------------------------------
+   • Clean, dismiss-safe toasts (no duplicates)
+   • Unified with backend + Firebase flow
+   • Consistent language across Auth suite
+============================================================ */
+
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -30,11 +38,11 @@ import { signupSchema, type SignupFormValues } from "@/lib/validators/auth";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { useAuth } from "@/context/authContext";
-import { toastAsync, toastMessage } from "@/lib/toast";
+import { toastAsync, toastMessage, toast } from "@/lib/toast";
 import { signupWithEmailPassword } from "@/lib/auth-email";
 
 /* ============================================================
-   🟢 SignupForm — Level 2.6 (final, clean UX)
+   🧩 Component
 ============================================================ */
 export function SignupForm({
   className,
@@ -55,12 +63,12 @@ export function SignupForm({
     mode: "onChange",
   });
 
-  /* ============================================================
-     ✉️ Email + Password Signup
-     - Delegate to helper; it handles toast + redirect
-  ============================================================ */
+  /* ------------------------------------------------------------
+     Email + Password Signup
+  ------------------------------------------------------------ */
   async function onSubmit(values: SignupFormValues) {
     if (values.password !== values.confirmPassword) {
+      toast.dismiss();
       toastMessage("Passwords do not match. Please try again.", {
         type: "error",
       });
@@ -68,30 +76,26 @@ export function SignupForm({
     }
 
     try {
+      toast.dismiss();
       const result = await signupWithEmailPassword(
         values.email,
         values.password,
         values.name
       );
 
-      // Helper already:
-      // • sends verification mail
-      // • signs out
-      // • shows success toast
-      // • redirects to /verify-email or /dashboard
-      // So we don’t toast or redirect again here.
       if (result?.ok) form.reset();
+      // Helper handles its own toasts + redirects
     } catch (err: any) {
+      toast.dismiss();
       toastMessage(err?.message || "Signup failed. Please try again.", {
         type: "error",
       });
     }
   }
 
-  /* ============================================================
-     🔵 Google Signup — Secure Firebase → Backend Flow
-     - Context helper handles backend session
-  ============================================================ */
+  /* ------------------------------------------------------------
+     Google Signup → Firebase → Backend
+  ------------------------------------------------------------ */
   async function handleGoogleSignup() {
     await toastAsync(
       async () => {
@@ -108,6 +112,7 @@ export function SignupForm({
 
         if (!result || result.status !== "success") {
           if ((result as any)?.statusCode === 409) {
+            toast.dismiss();
             toastMessage("Account already exists. Redirecting to login...", {
               type: "warning",
             });
@@ -117,22 +122,23 @@ export function SignupForm({
           throw new Error(result?.message || "Signup verification failed.");
         }
 
-        toastMessage("🎉 Signed up successfully with Google!", {
+        toast.dismiss();
+        toastMessage("Signed up successfully. Redirecting...", {
           type: "success",
         });
         window.location.replace("/dashboard");
       },
       {
         loading: "Connecting to Google...",
-        success: "Connected!",
+        success: "Connected.",
         error: "Google sign-up failed. Please try again.",
       }
     );
   }
 
-  /* ============================================================
-     🧩 UI Layout
-  ============================================================ */
+  /* ------------------------------------------------------------
+     Render
+  ------------------------------------------------------------ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -148,7 +154,7 @@ export function SignupForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* 🟢 Google Signup */}
+              {/* Google Signup */}
               <Field>
                 <Button
                   variant="outline"
@@ -195,7 +201,7 @@ export function SignupForm({
                 Or continue with
               </FieldSeparator>
 
-              {/* 👤 Full Name */}
+              {/* Name */}
               <Controller
                 name="name"
                 control={form.control}
@@ -213,7 +219,7 @@ export function SignupForm({
                 )}
               />
 
-              {/* 📧 Email */}
+              {/* Email */}
               <Controller
                 name="email"
                 control={form.control}
@@ -232,7 +238,7 @@ export function SignupForm({
                 )}
               />
 
-              {/* 🔑 Password */}
+              {/* Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -267,7 +273,7 @@ export function SignupForm({
                 )}
               />
 
-              {/* 🔁 Confirm Password */}
+              {/* Confirm Password */}
               <Controller
                 name="confirmPassword"
                 control={form.control}
@@ -309,7 +315,7 @@ export function SignupForm({
                 uppercase letter.
               </FieldDescription>
 
-              {/* 🔘 Submit */}
+              {/* Submit */}
               <Field>
                 <Button
                   type="submit"

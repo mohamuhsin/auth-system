@@ -17,6 +17,13 @@ const TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 7);
 
 /* ============================================================
    🔑 makeSessionCookie — Exchange Firebase ID token → session
+   ------------------------------------------------------------
+   Returns:
+     - cookieHeader → serialized Set-Cookie header
+     - cookieName   → "__Secure-iventics_session"
+     - rawToken     → Firebase session token
+     - expiresAt    → Date object
+     - maxAge       → in seconds
 ============================================================ */
 export async function makeSessionCookie(idToken: string) {
   const expiresIn = TTL_DAYS * 24 * 60 * 60 * 1000; // days → ms
@@ -27,7 +34,7 @@ export async function makeSessionCookie(idToken: string) {
       .auth()
       .createSessionCookie(idToken, { expiresIn });
 
-    // ✅ Serialize secure cookie
+    // ✅ Serialize secure cookie (shared across .iventics.com)
     const cookieHeader = cookie.serialize(NAME, sessionCookie, {
       httpOnly: true,
       secure: true,
@@ -51,21 +58,25 @@ export async function makeSessionCookie(idToken: string) {
       expiresAt: new Date(Date.now() + expiresIn),
       maxAge: expiresIn / 1000,
     };
-  } catch (err: any) {
-    // 🚫 Never swallow admin SDK errors silently
+  } catch (err: unknown) {
+    const error = err as Error & { code?: string };
+
     logger.error({
       msg: "❌ Failed to create Firebase session cookie",
-      code: err?.code,
-      error: err?.message,
-      stack: process.env.NODE_ENV === "development" ? err?.stack : undefined,
+      code: error.code,
+      error: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
 
-    throw new Error(`Session cookie creation failed: ${err?.message}`);
+    // ❗ Propagate up to route handler for HTTP 500
+    throw new Error(`Session cookie creation failed: ${error.message}`);
   }
 }
 
 /* ============================================================
    🚪 clearSessionCookie — Delete cookie across all subdomains
+   ------------------------------------------------------------
+   Returns: serialized Set-Cookie header for immediate invalidation
 ============================================================ */
 export function clearSessionCookie() {
   return cookie.serialize(NAME, "", {

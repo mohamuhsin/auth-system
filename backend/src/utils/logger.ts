@@ -17,12 +17,12 @@ const isProd = process.env.NODE_ENV === "production";
 const serviceName = process.env.SERVICE_NAME || "auth-api";
 
 /* ============================================================
-   🎯 Base Logger
+   🎯 Base Logger (Singleton)
 ============================================================ */
 export const logger = pino({
   name: serviceName,
   level: isProd ? "info" : "debug",
-  base: undefined, // cleaner logs (no pid/hostname)
+  base: undefined, // cleaner logs (omit pid/hostname)
   redact: [
     "req.headers.authorization",
     "req.headers.cookie",
@@ -92,14 +92,27 @@ export const httpLogger = pinoHttp<IncomingMessage, ServerResponse>({
 /* ============================================================
    🧱 Helper Shortcuts
 ============================================================ */
-export const logInfo = (msg: string, ctx: Record<string, any> = {}) =>
+
+/**
+ * Info-level log
+ */
+export const logInfo = (msg: string, ctx: Record<string, any> = {}): void => {
   logger.info({ service: serviceName, ...ctx }, msg);
+};
 
-export const logWarn = (msg: string, ctx: Record<string, any> = {}) =>
+/**
+ * Warn-level log
+ */
+export const logWarn = (msg: string, ctx: Record<string, any> = {}): void => {
   logger.warn({ service: serviceName, ...ctx }, msg);
+};
 
-export const logError = (err: unknown, ctx: Record<string, any> = {}) =>
+/**
+ * Error-level log (uses safeError)
+ */
+export const logError = (err: unknown, ctx: Record<string, any> = {}): void => {
   logger.error(
     { service: serviceName, ...ctx, error: safeError(err) },
     "❌ Error logged"
   );
+};

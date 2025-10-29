@@ -46,10 +46,8 @@ export function ProtectedRoute({
         console.warn("⚠️ Auth verification timeout — forcing recheck.");
         setSafetyTriggered(true);
         try {
-          await waitForSession?.(); // 🩵 probe backend or Firebase again
-        } catch {
-          // ignore
-        }
+          await waitForSession?.();
+        } catch {}
 
         // If still no user, redirect
         if (!user) {

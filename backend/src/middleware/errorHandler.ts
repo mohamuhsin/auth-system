@@ -14,14 +14,14 @@ export function errorHandler(
   err: unknown,
   req: Request,
   res: Response,
-  _next: NextFunction
+  next: NextFunction
 ) {
   const isProd = process.env.NODE_ENV === "production";
 
   // If headers are already sent → delegate to Express default
-  if (res.headersSent) return _next(err);
+  if (res.headersSent) return next(err);
 
-  // Normalize error shape
+  // 🧩 Normalize error shape
   const e =
     err && typeof err === "object"
       ? (err as {
@@ -40,18 +40,18 @@ export function errorHandler(
       ? "Internal server error"
       : e.message || "Something went wrong";
 
-  // 🧾 Structured logging
+  // 🧾 Structured logging (always safe)
   logger.error({
     name: e.name ?? "UnknownError",
     code: e.code ?? "UNKNOWN",
     status,
     path: req.path,
     method: req.method,
-    message: safeError(e),
+    error: safeError(e),
     stack: isProd ? undefined : e.stack,
   });
 
-  // ✅ Uniform response structure
+  // ✅ Uniform JSON response
   res.status(status).json({
     status: "error",
     success: false,
@@ -64,15 +64,15 @@ export function errorHandler(
 /**
  * 🔍 mapToHttpStatus
  * ------------------------------------------------------------
- * Maps common Prisma + Firebase codes → HTTP status codes.
+ * Maps known Prisma & Firebase codes → appropriate HTTP status.
  */
 function mapToHttpStatus(code?: string): number | undefined {
   switch (code) {
-    // Prisma constraint violations
+    // ⚙️ Prisma constraint violations
     case "P2002": // Unique constraint failed
       return 409;
 
-    // Firebase Auth errors
+    // 🔐 Firebase Auth errors
     case "auth/invalid-id-token":
     case "auth/id-token-expired":
       return 401;

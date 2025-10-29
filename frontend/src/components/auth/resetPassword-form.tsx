@@ -2,11 +2,11 @@
 "use client";
 
 /* ============================================================
-   🔑 ResetPasswordForm — Level 2.7 (Final Polished)
+   🔑 ResetPasswordForm — Level 3.0 (Final Production)
    ------------------------------------------------------------
-   • Auto-redirects if token missing
+   • Auto-redirects if token missing or invalid
    • Verifies + updates password via Firebase
-   • Unified toast handling + success query redirect
+   • Clean, dismiss-safe toasts with unified messaging
 ============================================================ */
 
 import { useState, useEffect } from "react";
@@ -40,8 +40,11 @@ import {
 
 import { confirmPasswordReset } from "firebase/auth";
 import { auth } from "@/services/firebase";
-import { toastAsync, toastMessage } from "@/lib/toast";
+import { toastAsync, toastMessage, toast } from "@/lib/toast";
 
+/* ============================================================
+   🧩 Component
+============================================================ */
 export function ResetPasswordForm({
   className,
   ...props
@@ -59,12 +62,13 @@ export function ResetPasswordForm({
     mode: "onChange",
   });
 
-  /* ============================================================
-     🔍 Auto-detect and validate oobCode
-  ============================================================ */
+  /* ------------------------------------------------------------
+     Detect and validate oobCode
+  ------------------------------------------------------------ */
   useEffect(() => {
     const code = searchParams.get("oobCode");
     if (!code) {
+      toast.dismiss();
       toastMessage("Invalid or expired password reset link.", {
         type: "error",
       });
@@ -74,13 +78,14 @@ export function ResetPasswordForm({
     }
   }, [searchParams, router]);
 
-  /* ============================================================
-     🔐 Handle Password Reset
-  ============================================================ */
+  /* ------------------------------------------------------------
+     Handle Password Reset
+  ------------------------------------------------------------ */
   async function onSubmit(values: ResetPasswordValues) {
     if (!oobCode) return;
 
     if (values.password !== values.confirmPassword) {
+      toast.dismiss();
       toastMessage("Passwords do not match. Please try again.", {
         type: "warning",
       });
@@ -91,19 +96,20 @@ export function ResetPasswordForm({
       async () => {
         await confirmPasswordReset(auth, oobCode, values.password);
 
-        toastMessage("✅ Your password has been updated successfully!", {
+        toast.dismiss();
+        toastMessage("Your password has been updated successfully.", {
           type: "success",
         });
 
-        // Redirect to login with success flag
         setTimeout(() => router.replace("/login?reset=success"), 1500);
       },
       {
         loading: "Updating password...",
-        success: "Password updated successfully!",
+        success: "Password updated successfully.",
         error: "Password reset failed. Please try again.",
       }
     ).catch((err: any) => {
+      toast.dismiss();
       const code = err.code || "";
       switch (code) {
         case "auth/expired-action-code":
@@ -138,9 +144,9 @@ export function ResetPasswordForm({
     });
   }
 
-  /* ============================================================
-     💅 UI Render
-  ============================================================ */
+  /* ------------------------------------------------------------
+     Render
+  ------------------------------------------------------------ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -154,7 +160,7 @@ export function ResetPasswordForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* 🔑 New Password */}
+              {/* New Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -189,7 +195,7 @@ export function ResetPasswordForm({
                 )}
               />
 
-              {/* 🔁 Confirm Password */}
+              {/* Confirm Password */}
               <Controller
                 name="confirmPassword"
                 control={form.control}
@@ -258,7 +264,6 @@ export function ResetPasswordForm({
         </CardContent>
       </Card>
 
-      {/* Footer Help */}
       <FieldDescription className="px-6 text-center">
         Need help?{" "}
         <a

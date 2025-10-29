@@ -19,6 +19,9 @@ export interface AuthenticatedUser {
   photoURL?: string | null;
 }
 
+/**
+ * ✅ Extended Express Request to include authenticated user
+ */
 export interface AuthenticatedRequest extends Request {
   authUser?: AuthenticatedUser;
 }
@@ -28,7 +31,8 @@ export interface AuthenticatedRequest extends Request {
  * ------------------------------------------------------------
  * • Validates Firebase session cookie (.iventics.com shared)
  * • Syncs Firebase user data with Prisma user record
- * • Enforces role-based access if `requiredRole` is given
+ * • Enforces role-based access if `requiredRole` is provided
+ * • Logs audit events for transparency & monitoring
  */
 export function authGuard(requiredRole?: Role) {
   return async (
@@ -40,7 +44,7 @@ export function authGuard(requiredRole?: Role) {
       process.env.SESSION_COOKIE_NAME || "__Secure-iventics_session";
 
     try {
-      // 🍪 Extract cookie (supports signed & forwarded headers)
+      // 🍪 Extract session cookie (supports signed / raw / forwarded)
       const sessionCookie =
         req.cookies?.[cookieName] ||
         req.signedCookies?.[cookieName] ||
@@ -54,8 +58,9 @@ export function authGuard(requiredRole?: Role) {
           { path: req.path, ip: req.ip },
           "🚫 No session cookie found"
         );
+
         await logAudit(
-          AuditAction.USER_LOGIN,
+          AuditAction.USER_LOGOUT_NO_COOKIE,
           null,
           req.ip,
           req.headers["user-agent"],
@@ -69,7 +74,7 @@ export function authGuard(requiredRole?: Role) {
         });
       }
 
-      // ✅ Verify Firebase session cookie (revoke-aware)
+      // ✅ Verify Firebase session cookie (revocation-aware)
       const decoded = await admin
         .auth()
         .verifySessionCookie(sessionCookie, true);
@@ -164,6 +169,7 @@ export function authGuard(requiredRole?: Role) {
         });
       }
 
+      // ✅ Passed authentication & authorization
       next();
     } catch (err: any) {
       logger.error({

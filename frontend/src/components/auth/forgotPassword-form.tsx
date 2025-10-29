@@ -1,11 +1,11 @@
 "use client";
 
 /* ============================================================
-   🔑 ForgotPasswordForm — Secure Password Reset via Firebase
+   🔑 ForgotPasswordForm — Level 3.0 (Final Production)
    ------------------------------------------------------------
-   • Integrated with shared toast + helper utilities
-   • Clean redirect after success
-   • Unified with all other Iventics Auth screens
+   • Clean, dismiss-safe toasts (no duplicates)
+   • Integrated with shared toast + auth utilities
+   • Smooth redirect after success
 ============================================================ */
 
 import { Controller, useForm } from "react-hook-form";
@@ -34,11 +34,11 @@ import {
   forgotPasswordSchema,
   type ForgotPasswordValues,
 } from "@/lib/validators/auth";
-import { toastAsync, toastMessage } from "@/lib/toast";
+import { toastAsync, toastMessage, toast } from "@/lib/toast";
 import { requestPasswordReset } from "@/lib/auth-email";
 
 /* ============================================================
-   🔐 ForgotPasswordForm — Level 2.7
+   🧩 Component
 ============================================================ */
 export function ForgotPasswordForm({
   className,
@@ -52,13 +52,14 @@ export function ForgotPasswordForm({
     mode: "onChange",
   });
 
-  /* ============================================================
-     ✉️ Handle Password Reset
-  ============================================================ */
+  /* ------------------------------------------------------------
+     Handle Password Reset
+  ------------------------------------------------------------ */
   async function onSubmit(values: ForgotPasswordValues) {
     const email = values.email.trim().toLowerCase();
 
     if (!email) {
+      toast.dismiss();
       toastMessage("Please enter your email address first.", {
         type: "warning",
       });
@@ -71,24 +72,25 @@ export function ForgotPasswordForm({
 
         if (!result?.ok) throw new Error("Failed to send password reset link.");
 
-        toastMessage("📨 Password reset email sent! Check your inbox.", {
+        toast.dismiss();
+        toastMessage("Password reset link sent. Check your inbox.", {
           type: "success",
         });
 
-        // Short, smooth UX delay before redirecting to login
-        setTimeout(() => router.replace("/login"), 2000);
+        // Gentle delay before redirect
+        setTimeout(() => router.replace("/login?reset=success"), 2000);
       },
       {
         loading: "Sending password reset link...",
-        success: "Password reset email sent!",
+        success: "Password reset email sent.",
         error: "Failed to send reset link. Please try again.",
       }
     );
   }
 
-  /* ============================================================
-     💅 Render
-  ============================================================ */
+  /* ------------------------------------------------------------
+     Render
+  ------------------------------------------------------------ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -104,7 +106,7 @@ export function ForgotPasswordForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* 📧 Email */}
+              {/* Email */}
               <Controller
                 name="email"
                 control={form.control}
@@ -123,7 +125,7 @@ export function ForgotPasswordForm({
                 )}
               />
 
-              {/* 🔘 Submit */}
+              {/* Submit */}
               <Field>
                 <Button
                   type="submit"
@@ -150,7 +152,6 @@ export function ForgotPasswordForm({
         </CardContent>
       </Card>
 
-      {/* 🧭 Footer Help */}
       <FieldDescription className="px-6 text-center">
         Need help?{" "}
         <a

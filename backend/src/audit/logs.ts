@@ -13,14 +13,17 @@ const router = Router();
  * ------------------------------------------------------------
  * Fetches recent audit logs for admin dashboards.
  *
- * Supports filters:
- *   • ?limit=50
- *   • ?offset=0
- *   • ?userId=<uuid>
+ * Query Parameters:
+ *   • ?limit=50       → Max number of results (default: 50, max: 200)
+ *   • ?offset=0       → Offset for pagination
+ *   • ?userId=<uuid>  → Filter logs by user ID
  *   • ?action=USER_LOGIN
  *   • ?search=email_or_ip
  *   • ?start=2025-10-01
  *   • ?end=2025-10-31
+ *
+ * Access:
+ *   🔒 Admins only (authGuard(Role.ADMIN))
  */
 router.get(
   "/",
@@ -40,18 +43,18 @@ router.get(
       // ============================================================
       // 🧮 Pagination
       // ============================================================
-      const take = Math.min(Number(limit) || 50, 200); // max 200 for safety
+      const take = Math.min(Number(limit) || 50, 200); // Max 200 records
       const skip = Math.max(Number(offset) || 0, 0);
 
       // ============================================================
-      // 🧩 Base Filters
+      // 🧩 Build Filters
       // ============================================================
-      const where: any = {};
+      const where: Record<string, any> = {};
 
       if (userId) where.userId = String(userId);
       if (action) where.action = String(action);
 
-      // 📆 Date Range
+      // 📆 Date Range Filtering
       if (start || end) {
         where.createdAt = {};
         if (start && !isNaN(Date.parse(String(start)))) {
@@ -62,7 +65,7 @@ router.get(
         }
       }
 
-      // 🔍 Search Filter — across IP, email, name, and userAgent
+      // 🔍 Search Filter — across IP, email, name, userAgent
       if (typeof search === "string" && search.trim()) {
         const term = search.trim();
         where.OR = [
@@ -74,7 +77,7 @@ router.get(
       }
 
       // ============================================================
-      // 📊 Query Logs
+      // 📊 Query Logs + Total Count (Parallel)
       // ============================================================
       const [total, logs] = await Promise.all([
         prisma.auditLog.count({ where }),
@@ -92,7 +95,7 @@ router.get(
       ]);
 
       // ============================================================
-      // 🧠 Enrich with Audit Metadata
+      // 🧠 Enrich Logs with Metadata
       // ============================================================
       const data = logs.map((log) => ({
         ...log,

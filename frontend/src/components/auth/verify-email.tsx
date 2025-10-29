@@ -6,6 +6,7 @@
    • Confirms verification email was sent
    • Allows resending (via helper)
    • Auto-polls Firebase until verified
+   • Calls backend waitForSession() before redirect
    • Smooth & consistent with Auth UI design
 ============================================================ */
 
@@ -16,6 +17,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { resendVerificationEmail } from "@/lib/auth-email";
 import { toastMessage } from "@/lib/toast";
+import { useAuth } from "@/context/authContext";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +40,7 @@ export function VerifyEmailNotice() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { waitForSession } = useAuth(); // ✅ for backend cookie activation
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /** Safely clear polling interval */
@@ -74,6 +77,7 @@ export function VerifyEmailNotice() {
       // ✅ Already verified
       if (user.emailVerified) {
         toastMessage("✅ Your email has been verified!", { type: "success" });
+        await waitForSession?.(); // 🔐 activate backend cookie
         setTimeout(() => router.replace("/dashboard"), 800);
         return;
       }
@@ -98,6 +102,9 @@ export function VerifyEmailNotice() {
           toastMessage("🎉 Email verified! Redirecting...", {
             type: "success",
           });
+
+          // 🩵 Ensure backend cookie is ready before redirect
+          await waitForSession?.();
           router.replace("/dashboard");
         }
       }, 5000);
@@ -110,7 +117,7 @@ export function VerifyEmailNotice() {
       unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [router, waitForSession]);
 
   /* ============================================================
      🔁 Resend Verification Email

@@ -8,10 +8,10 @@ import {
 } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { apiRequest } from "@/lib/api";
-import { toastMessage, toast } from "@/lib/toast";
+import { toast, toastMessage } from "@/lib/toast";
 
 /* ============================================================
-   🧩 Shared types & helpers
+   Shared Types & Helpers
 ============================================================ */
 export interface AuthResult {
   ok: boolean;
@@ -24,65 +24,55 @@ function normalizeApi(res: any): {
   status?: number;
   message?: string;
 } {
-  // Case 1: native fetch Response (or a Response-like)
   if (res && typeof res === "object" && "ok" in res && "status" in res) {
-    return {
-      ok: !!(res as Response).ok,
-      status: Number((res as Response).status),
-    };
+    return { ok: !!res.ok, status: Number(res.status) };
   }
 
-  // Case 2: JSON envelope with code/statusCode/status/message
   if (res && typeof res === "object") {
     const statusNum =
       typeof res.code === "number"
         ? res.code
-        : typeof (res as any).statusCode === "number"
-        ? (res as any).statusCode
-        : typeof (res as any).status === "number"
-        ? (res as any).status
+        : typeof res.statusCode === "number"
+        ? res.statusCode
+        : typeof res.status === "number"
+        ? res.status
         : undefined;
 
-    const statusStr = (res.status ?? res.statusText) as string | undefined;
+    const statusStr = res.status ?? res.statusText;
 
     const ok =
       statusStr === "success" ||
       (typeof statusNum === "number" && statusNum >= 200 && statusNum < 300);
 
-    return {
-      ok: !!ok,
-      status: statusNum,
-      message: (res as any).message,
-    };
+    return { ok, status: statusNum, message: res.message };
   }
 
-  // Fallback
   return { ok: false };
 }
 
-/** Safe redirect (history-replacing) */
+/** Safe redirect helper */
 function go(path: string, delay = 800) {
   if (typeof window === "undefined") return;
   setTimeout(() => {
     try {
-      window.location.replace(path); // replace avoids going "Back" into bad states
+      window.location.replace(path);
     } catch {
       window.location.href = path;
     }
   }, delay);
 }
 
-/* Optional: configure where the verification link should bounce back to */
+/** Firebase email verification redirect settings */
 const actionCodeSettings =
   typeof window !== "undefined"
     ? {
-        url: `${window.location.origin}/verify-email`, // tweak if you prefer a different continue page
+        url: `${window.location.origin}/verify-email`,
         handleCodeInApp: false,
       }
     : undefined;
 
 /* ============================================================
-   🆕 Signup — Email + Password (Manual toasts, no toastAsync)
+   Signup — Email + Password
 ============================================================ */
 export async function signupWithEmailPassword(
   email: string,
@@ -90,19 +80,16 @@ export async function signupWithEmailPassword(
   name?: string
 ): Promise<AuthResult> {
   try {
+    toast.dismiss();
     toastMessage("Creating your account...", { type: "loading" });
 
-    // 1) Create Firebase user
+    // Create Firebase user
     const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-    // 2) Send verification email (with optional continueUrl)
-    if (actionCodeSettings) {
-      await sendEmailVerification(cred.user, actionCodeSettings);
-    } else {
-      await sendEmailVerification(cred.user);
-    }
+    // Send verification email
+    await sendEmailVerification(cred.user, actionCodeSettings);
 
-    // 3) Register on backend (it may return 202 for pending-verification)
+    // Register on backend
     const idToken = await cred.user.getIdToken(true);
     const raw = await apiRequest("/auth/signup-with-firebase", {
       method: "POST",
@@ -110,9 +97,6 @@ export async function signupWithEmailPassword(
       body: { idToken, name },
     });
     const res = normalizeApi(raw);
-
-    // 4) Always sign out after signup (email/password) so state is clean
-    await signOut(auth);
 
     toast.dismiss();
 
@@ -125,61 +109,59 @@ export async function signupWithEmailPassword(
     }
 
     if (res.status === 202 || !res.ok) {
-      // Pending verification or non-OK: route to verify page
-      toastMessage(
-        "Account created! Please verify your email before logging in.",
-        { type: "success" }
-      );
+      toastMessage("Verify your email before logging in.", { type: "success" });
       go(`/verify-email?email=${encodeURIComponent(email)}`, 1200);
       return { ok: true, message: "Verification pending." };
     }
 
-    // If backend decided to auto-create a session for some providers (rare for email/pwd)
-    toastMessage("Account created successfully!", { type: "success" });
+    toastMessage("Account created successfully.", { type: "success" });
     go("/dashboard", 900);
     return { ok: true };
   } catch (err: any) {
     toast.dismiss();
 
-    const code = err?.code as string | undefined;
-    if (code === "auth/email-already-in-use") {
-      toastMessage("Account already exists. Redirecting to login...", {
-        type: "warning",
-      });
-      go("/login", 1200);
-      return { ok: false, message: "Account already exists." };
-    }
-    if (code === "auth/invalid-email") {
-      toastMessage("Invalid email address.", { type: "error" });
-      return { ok: false, message: "Invalid email." };
-    }
-    if (code === "auth/weak-password") {
-      toastMessage("Weak password. Try a stronger one.", { type: "warning" });
-      return { ok: false, message: "Weak password." };
-    }
+    const code = err?.code as string;
+    switch (code) {
+      case "auth/email-already-in-use":
+        toastMessage("Account already exists. Redirecting to login...", {
+          type: "warning",
+        });
+        go("/login", 1200);
+        return { ok: false, message: "Account already exists." };
 
-    const msg = err?.message || "Signup failed.";
-    toastMessage(msg, { type: "error" });
-    return { ok: false, message: msg };
+      case "auth/invalid-email":
+        toastMessage("Invalid email address.", { type: "error" });
+        return { ok: false, message: "Invalid email." };
+
+      case "auth/weak-password":
+        toastMessage("Weak password. Try a stronger one.", { type: "warning" });
+        return { ok: false, message: "Weak password." };
+
+      default:
+        const msg = err?.message || "Signup failed.";
+        toastMessage(msg, { type: "error" });
+        return { ok: false, message: msg };
+    }
   }
 }
 
 /* ============================================================
-   🔑 Login — Email + Password (Manual toasts to avoid conflicts)
+   Login — Email + Password
 ============================================================ */
 export async function loginWithEmailPassword(
   email: string,
   password: string
 ): Promise<AuthResult> {
   try {
+    toast.dismiss();
     toastMessage("Signing you in...", { type: "loading" });
 
-    // 1) Firebase login
+    // Firebase login
     const cred = await signInWithEmailAndPassword(auth, email, password);
 
-    // 2) Local guard: must be verified BEFORE we touch the backend
+    // Require verified email
     if (!cred.user.emailVerified) {
-      await signOut(auth); // ensure no stale Firebase session
+      await signOut(auth);
       toast.dismiss();
       toastMessage("Please verify your email before signing in.", {
         type: "warning",
@@ -188,7 +170,7 @@ export async function loginWithEmailPassword(
       return { ok: false, message: "Email not verified." };
     }
 
-    // 3) Exchange ID token with backend → set session cookie
+    // Exchange ID token with backend
     const idToken = await cred.user.getIdToken(true);
     const raw = await apiRequest("/auth/login-with-firebase", {
       method: "POST",
@@ -197,10 +179,9 @@ export async function loginWithEmailPassword(
     });
     const res = normalizeApi(raw);
 
-    // 4) Backend responses
+    toast.dismiss();
+
     if (res.status === 403) {
-      // Backend signals not verified → route to verify page
-      toast.dismiss();
       toastMessage("Please verify your email before logging in.", {
         type: "warning",
       });
@@ -209,7 +190,6 @@ export async function loginWithEmailPassword(
     }
 
     if (res.status === 404) {
-      toast.dismiss();
       toastMessage("No account found. Redirecting to signup...", {
         type: "warning",
       });
@@ -218,15 +198,12 @@ export async function loginWithEmailPassword(
     }
 
     if (!res.ok) {
-      toast.dismiss();
       toastMessage(res.message || "Login failed.", { type: "error" });
       return { ok: false, message: res.message || "Login failed." };
     }
 
-    // ✅ Success
-    toast.dismiss();
-    toastMessage("Welcome back!", { type: "success" });
-    go("/dashboard", 500);
+    toastMessage("Welcome back.", { type: "success" });
+    go("/dashboard", 600);
     return { ok: true };
   } catch (err: any) {
     toast.dismiss();
@@ -237,72 +214,78 @@ export async function loginWithEmailPassword(
 }
 
 /* ============================================================
-   🔁 Password Reset
+   Password Reset
 ============================================================ */
 export async function requestPasswordReset(email: string): Promise<AuthResult> {
   try {
-    toastMessage("Sending password reset link...", { type: "loading" });
-    await sendPasswordResetEmail(auth, email);
     toast.dismiss();
-    toastMessage("Password reset link sent! Check your inbox.", {
+    toastMessage("Sending password reset link...", { type: "loading" });
+
+    await sendPasswordResetEmail(auth, email);
+
+    toast.dismiss();
+    toastMessage("Password reset link sent. Check your inbox.", {
       type: "success",
     });
+
     return { ok: true };
   } catch (err: any) {
     toast.dismiss();
-    const code = err?.code as string | undefined;
-    if (code === "auth/user-not-found") {
-      toastMessage("No account found with that email.", { type: "warning" });
-      return { ok: false, message: "User not found." };
+
+    const code = err?.code as string;
+    switch (code) {
+      case "auth/user-not-found":
+        toastMessage("No account found with that email.", { type: "warning" });
+        return { ok: false, message: "User not found." };
+
+      case "auth/invalid-email":
+        toastMessage("Please enter a valid email.", { type: "error" });
+        return { ok: false, message: "Invalid email." };
+
+      default:
+        const msg = err?.message || "Reset failed.";
+        toastMessage(msg, { type: "error" });
+        return { ok: false, message: msg };
     }
-    if (code === "auth/invalid-email") {
-      toastMessage("Please enter a valid email.", { type: "error" });
-      return { ok: false, message: "Invalid email." };
-    }
-    const msg = err?.message || "Reset failed.";
-    toastMessage(msg, { type: "error" });
-    return { ok: false, message: msg };
   }
 }
 
 /* ============================================================
-   ✉️ Resend Verification Email
+   Resend Verification Email
 ============================================================ */
 export async function resendVerificationEmail(): Promise<AuthResult> {
   const user = auth.currentUser;
 
   if (!user) {
+    toast.dismiss();
     toastMessage("Please log in again first.", { type: "error" });
     go("/login", 1000);
     return { ok: false, message: "No current user." };
   }
 
   try {
-    toastMessage("Sending verification email...", { type: "loading" });
-    if (actionCodeSettings) {
-      await sendEmailVerification(user, actionCodeSettings);
-    } else {
-      await sendEmailVerification(user);
-    }
     toast.dismiss();
-    toastMessage("Verification link sent successfully!", {
-      type: "success",
-    });
+    toastMessage("Sending verification email...", { type: "loading" });
+
+    await sendEmailVerification(user, actionCodeSettings);
+
+    toast.dismiss();
+    toastMessage("Verification link sent successfully.", { type: "success" });
     return { ok: true };
   } catch (err: any) {
     toast.dismiss();
-    const code = err?.code as string | undefined;
+
+    const code = err?.code as string;
 
     if (code === "auth/too-many-requests") {
-      toastMessage(
-        "You’ve requested too many verification emails. Try again later.",
-        { type: "warning" }
-      );
+      toastMessage("Too many verification attempts. Try again later.", {
+        type: "warning",
+      });
       return { ok: false, message: "Too many requests." };
     }
 
     if (code === "auth/requires-recent-login") {
-      toastMessage("For security, please log in again to resend the email.", {
+      toastMessage("Please log in again to resend the email.", {
         type: "warning",
       });
       go("/login", 1200);

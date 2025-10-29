@@ -21,17 +21,19 @@ export function safeError(err: unknown): string {
         (err as any).code && typeof (err as any).code === "string"
           ? ` (code: ${(err as any).code})`
           : "";
+
       const stack =
         process.env.NODE_ENV === "production"
           ? ""
           : err.stack
           ? `\n${err.stack}`
           : "";
+
       return `[${err.name}] ${err.message}${code}${stack}`.trim();
     }
 
     // ------------------------------------------------------------
-    // 🧱 Handle non-Error objects safely (avoid circular refs)
+    // 🧱 Non-Error objects (safe JSON, circular-ref protected)
     // ------------------------------------------------------------
     if (typeof err === "object" && err !== null) {
       const cache = new WeakSet<object>();
@@ -61,12 +63,13 @@ export function safeError(err: unknown): string {
     }
 
     // ------------------------------------------------------------
-    // 🔡 Handle primitives (string, number, boolean, etc.)
+    // 🔡 Primitive fallback (string, number, boolean, etc.)
     // ------------------------------------------------------------
     return String(err);
-  } catch (fatal: any) {
+  } catch (fatal: unknown) {
+    const f = fatal as Error;
     return `[safeError failed] ${
-      fatal?.message || String(fatal) || "Unknown error"
+      f?.message || String(fatal) || "Unknown error"
     }`;
   }
 }
