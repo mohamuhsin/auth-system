@@ -4,11 +4,12 @@ import { logAudit } from "./audit";
 import { AuditAction } from "@prisma/client";
 
 /**
- * 🌍 CORS Middleware — Level 2.6 (Hardened + Smart Wildcards)
+ * 🌍 CORS Middleware — Level 2.7 (Hardened + Smart Wildcards)
  * ------------------------------------------------------------
  * ✅ Supports `.iventics.com` cross-domain cookies
  * ✅ Auto-allows Vercel preview subdomains (`*.vercel.app`)
  * ✅ Allows localhost in dev
+ * ✅ Allows x-request-id header for trace logging
  * ✅ Logs and audits blocked origins
  * ✅ Handles preflight OPTIONS safely
  */
@@ -57,6 +58,7 @@ const corsConfig: CorsOptions = {
         (base === "vercel.app" && origin.includes(".vercel.app"))
       );
     });
+
     if (allowed) return callback(null, true);
 
     // 🚫 Block unauthorized origin
@@ -79,6 +81,7 @@ const corsConfig: CorsOptions = {
     "X-Requested-With",
     "Accept",
     "Origin",
+    "x-request-id", // ✅ Added for your frontend tracing header
   ],
   exposedHeaders: ["Set-Cookie"],
   optionsSuccessStatus: 204,
