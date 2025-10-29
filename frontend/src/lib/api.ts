@@ -1,20 +1,27 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* ============================================================
-   🌐 API Client — Level 2.6 Final (Auth by Iventics)
+   🌐 API Client — Level 2.7 (Final + Audit-Ready)
    ------------------------------------------------------------
    • Secure cross-domain (cookies + CORS)
    • Silent token refresh on 401
    • Auto-retry with exponential backoff
    • Unified error normalization
    • 15 s abort timeout protection
+   • x-request-id for backend audit correlation
 ============================================================ */
 
 import { auth } from "@/services/firebase";
 
+/* ============================================================
+   🔗 Base URL
+============================================================ */
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
   "https://auth-api.iventics.com/api";
 
+/* ============================================================
+   🧩 Types
+============================================================ */
 export interface ApiError extends Error {
   status?: number;
   data?: any;
@@ -24,7 +31,7 @@ export interface ApiError extends Error {
 
 export interface ApiRequestOptions extends RequestInit {
   body?: any;
-  skipAuthCheck?: boolean; // public endpoints skip token refresh
+  skipAuthCheck?: boolean; // skip token refresh on public endpoints
   retryCount?: number;
 }
 
@@ -42,7 +49,19 @@ async function parseJsonSafe(res: Response) {
 }
 
 /* ============================================================
-   🔁 Core API request wrapper
+   🔗 Generate request ID (for audit/log correlation)
+============================================================ */
+function uuidv4() {
+  // Simple RFC4122 v4 UUID generator
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (crypto.getRandomValues(new Uint8Array(1))[0] & 0xf) >> 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/* ============================================================
+   🚀 Core API Request Wrapper
 ============================================================ */
 export async function apiRequest<T = any>(
   path: string,
@@ -53,6 +72,7 @@ export async function apiRequest<T = any>(
     : `${API_BASE}/${path}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000); // ⏱️ 15 s
+  const requestId = uuidv4();
 
   try {
     const res = await fetch(url, {
@@ -64,6 +84,8 @@ export async function apiRequest<T = any>(
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+        "x-request-id": requestId,
         ...(options.headers || {}),
       },
       body:
@@ -74,22 +96,24 @@ export async function apiRequest<T = any>(
           : (options.body as BodyInit),
     });
 
-    clearTimeout(timeout);
-
     /* ------------------------------------------------------------
-       🧩 Non-OK responses
+       🧩 Non-OK Responses
     ------------------------------------------------------------ */
     if (!res.ok) {
       const data = await parseJsonSafe(res);
       const message =
         data?.message ||
         data?.error ||
-        `API request failed with status ${res.status}`;
+        (res.status === 401
+          ? "Unauthorized. Please sign in again."
+          : `API request failed with status ${res.status}`);
 
-      const error = new Error(message) as ApiError;
-      error.status = res.status;
-      error.data = data;
-      error.requestUrl = url;
+      const error = Object.assign(new Error(message), {
+        name: "ApiError",
+        status: res.status,
+        data,
+        requestUrl: url,
+      }) as ApiError;
 
       /* 🔄 401 → refresh Firebase ID token & retry once */
       if (
@@ -100,6 +124,7 @@ export async function apiRequest<T = any>(
         try {
           const firebaseUser = auth.currentUser;
           if (firebaseUser) {
+            console.warn(`🔄 401 from ${url} → refreshing Firebase ID token`);
             const idToken = await firebaseUser.getIdToken(true);
             await apiRequest("/auth/session", {
               method: "POST",
@@ -125,28 +150,20 @@ export async function apiRequest<T = any>(
     // ✅ Return parsed JSON
     return (await parseJsonSafe(res)) as T;
   } catch (err: any) {
-    clearTimeout(timeout);
-
     /* ⏰ Timeout */
     if (err.name === "AbortError") {
-      const timeoutError = new Error(
-        "Request timed out after 15 seconds."
+      const timeoutError = Object.assign(
+        new Error("Request timed out after 15 seconds."),
+        {
+          status: 408,
+          requestUrl: url,
+        }
       ) as ApiError;
-      timeoutError.status = 408;
-      timeoutError.requestUrl = url;
       throw timeoutError;
     }
 
     /* 🌐 Network/CORS failure */
     if (err instanceof TypeError && err.message === "Failed to fetch") {
-      const networkError = new Error(
-        "Network error or CORS policy blocked the request."
-      ) as ApiError;
-      networkError.isNetworkError = true;
-      networkError.status = 0;
-      networkError.requestUrl = url;
-
-      // simple exponential backoff (max 2)
       const retry = options.retryCount ?? 0;
       if (retry < 2) {
         const delay = Math.pow(2, retry) * 500;
@@ -155,10 +172,16 @@ export async function apiRequest<T = any>(
         return apiRequest<T>(path, { ...options, retryCount: retry + 1 });
       }
 
+      const networkError = Object.assign(
+        new Error("Network error or CORS policy blocked the request."),
+        { isNetworkError: true, status: 0, requestUrl: url }
+      ) as ApiError;
       throw networkError;
     }
 
     console.error("🌐 API request failed:", err);
     throw err;
+  } finally {
+    clearTimeout(timeout);
   }
 }
