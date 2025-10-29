@@ -1,12 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState } from "react";
+/* ============================================================
+   🔐 LoginForm — Level 2.7 (Final Polished)
+   ------------------------------------------------------------
+   • Unified with reset-password success query
+   • No double toasts or redirects
+   • Stable across Firebase + Backend cookie sessions
+============================================================ */
+
+import { useState, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -35,7 +43,7 @@ import { toastAsync, toastMessage } from "@/lib/toast";
 import { loginWithEmailPassword } from "@/lib/auth-email";
 
 /* ============================================================
-   🔐 LoginForm — Level 2.0 Hardened & Type-Safe
+   🧩 Component
 ============================================================ */
 export function LoginForm({
   className,
@@ -43,13 +51,24 @@ export function LoginForm({
 }: React.ComponentProps<"div">) {
   const [showPassword, setShowPassword] = useState(false);
   const { loginWithFirebase } = useAuth();
-  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
     mode: "onChange",
   });
+
+  /* ============================================================
+     💬 Detect reset-password success
+  ============================================================ */
+  useEffect(() => {
+    if (searchParams.get("reset") === "success") {
+      toastMessage("✅ Password updated — please sign in.", {
+        type: "success",
+      });
+    }
+  }, [searchParams]);
 
   /* ============================================================
      ✉️ Email + Password Login
@@ -63,20 +82,13 @@ export function LoginForm({
     }
 
     try {
-      const result = await loginWithEmailPassword(
-        values.email,
-        values.password
-      );
+      const email = values.email.trim().toLowerCase();
+      const result = await loginWithEmailPassword(email, values.password);
 
       if (result?.ok) {
-        toastMessage("🎉 Welcome back!", { type: "success" });
         form.reset();
-        router.replace("/dashboard");
-      } else {
-        toastMessage(result?.message || "Login failed. Please try again.", {
-          type: "error",
-        });
       }
+      // Helpers handle their own toasts and redirects
     } catch (err: any) {
       toastMessage(err?.message || "Login failed. Please try again.", {
         type: "error",
@@ -93,11 +105,9 @@ export function LoginForm({
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: "select_account" });
 
-        // 🔑 Firebase Google OAuth
         const userCred = await signInWithPopup(auth, provider);
         const googleUser = userCred.user;
 
-        // 🔒 Backend-verified session cookie
         const result = await loginWithFirebase(googleUser);
 
         if (!result || result.status !== "success") {
@@ -105,7 +115,6 @@ export function LoginForm({
             toastMessage("No account found. Please sign up first.", {
               type: "warning",
             });
-            router.push("/signup");
             return;
           }
           throw new Error(result?.message || "Session creation failed.");
@@ -114,7 +123,7 @@ export function LoginForm({
         toastMessage("✅ Signed in successfully! Redirecting...", {
           type: "success",
         });
-        router.replace("/dashboard");
+        window.location.replace("/dashboard");
       },
       {
         loading: "Connecting to Google...",
@@ -125,7 +134,7 @@ export function LoginForm({
   }
 
   /* ============================================================
-     🧩 UI
+     💅 UI
   ============================================================ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -148,11 +157,10 @@ export function LoginForm({
                   onClick={handleGoogleLogin}
                   disabled={form.formState.isSubmitting}
                 >
-                  {/* Inline Google SVG preserved */}
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 48 48"
-                    className="size-5"
+                    className="size-5 mr-2"
                     aria-hidden="true"
                   >
                     <path

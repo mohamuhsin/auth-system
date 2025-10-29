@@ -6,7 +6,6 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -35,7 +34,7 @@ import { toastAsync, toastMessage } from "@/lib/toast";
 import { signupWithEmailPassword } from "@/lib/auth-email";
 
 /* ============================================================
-   🟢 SignupForm — Level 2.1 (Hardened + Type-Safe)
+   🟢 SignupForm — Level 2.6 (final, clean UX)
 ============================================================ */
 export function SignupForm({
   className,
@@ -43,7 +42,6 @@ export function SignupForm({
 }: React.ComponentProps<"div">) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const router = useRouter();
   const { signupWithFirebase } = useAuth();
 
   const form = useForm<SignupFormValues>({
@@ -59,6 +57,7 @@ export function SignupForm({
 
   /* ============================================================
      ✉️ Email + Password Signup
+     - Delegate to helper; it handles toast + redirect
   ============================================================ */
   async function onSubmit(values: SignupFormValues) {
     if (values.password !== values.confirmPassword) {
@@ -75,17 +74,13 @@ export function SignupForm({
         values.name
       );
 
-      if (result?.ok) {
-        toastMessage("✅ Account created! Verify your email to continue.", {
-          type: "success",
-        });
-        form.reset();
-        router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
-      } else {
-        toastMessage(result?.message || "Signup failed. Please try again.", {
-          type: "error",
-        });
-      }
+      // Helper already:
+      // • sends verification mail
+      // • signs out
+      // • shows success toast
+      // • redirects to /verify-email or /dashboard
+      // So we don’t toast or redirect again here.
+      if (result?.ok) form.reset();
     } catch (err: any) {
       toastMessage(err?.message || "Signup failed. Please try again.", {
         type: "error",
@@ -95,6 +90,7 @@ export function SignupForm({
 
   /* ============================================================
      🔵 Google Signup — Secure Firebase → Backend Flow
+     - Context helper handles backend session
   ============================================================ */
   async function handleGoogleSignup() {
     await toastAsync(
@@ -111,12 +107,11 @@ export function SignupForm({
         });
 
         if (!result || result.status !== "success") {
-          // Existing or failed account
           if ((result as any)?.statusCode === 409) {
             toastMessage("Account already exists. Redirecting to login...", {
               type: "warning",
             });
-            setTimeout(() => router.push("/login"), 1200);
+            window.location.replace("/login");
             return;
           }
           throw new Error(result?.message || "Signup verification failed.");
@@ -125,7 +120,7 @@ export function SignupForm({
         toastMessage("🎉 Signed up successfully with Google!", {
           type: "success",
         });
-        router.replace("/dashboard");
+        window.location.replace("/dashboard");
       },
       {
         loading: "Connecting to Google...",
