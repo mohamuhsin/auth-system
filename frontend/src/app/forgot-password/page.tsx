@@ -7,7 +7,7 @@ import { ForgotPasswordForm } from "@/components/auth/forgotPassword-form";
 
 export default function ForgotPasswordPageClient() {
   return (
-    <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
+    <div className="bg-muted flex min-h-svh flex-col items-center justify-center p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
         <Link
           href="/"
@@ -20,9 +20,10 @@ export default function ForgotPasswordPageClient() {
             Auth by Iventics
           </span>
         </Link>
+
         <Suspense
           fallback={
-            <div className="text-center text-muted-foreground">
+            <div className="flex h-40 items-center justify-center text-center text-muted-foreground">
               Loading forgot password form...
             </div>
           }

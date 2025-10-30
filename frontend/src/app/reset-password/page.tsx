@@ -23,7 +23,7 @@ export default function ResetPasswordPageClient() {
 
         <Suspense
           fallback={
-            <div className="text-center text-muted-foreground">
+            <div className="flex h-40 items-center justify-center text-center text-muted-foreground">
               Loading reset form...
             </div>
           }
