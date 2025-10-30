@@ -3,17 +3,16 @@
 import { auth } from "@/services/firebase";
 import { toast, toastMessage } from "@/lib/toast";
 
-/* Base URL */
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
   "https://auth-api.iventics.com/api";
 
-/* Types */
 export interface ApiError extends Error {
   status?: number;
   data?: any;
   requestUrl?: string;
   isNetworkError?: boolean;
+  silent?: boolean;
 }
 
 export interface ApiRequestOptions extends RequestInit {
@@ -42,7 +41,7 @@ function uuidv4() {
   });
 }
 
-/*  Core API Request */
+/* Core API Request */
 export async function apiRequest<T = any>(
   path: string,
   options: ApiRequestOptions = {}
@@ -51,7 +50,7 @@ export async function apiRequest<T = any>(
     ? `${API_BASE}${path}`
     : `${API_BASE}/${path}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
+  const timeout = setTimeout(() => controller.abort(), 15000);
   const requestId = uuidv4();
 
   try {
@@ -76,24 +75,21 @@ export async function apiRequest<T = any>(
           : (options.body as BodyInit),
     });
 
-    /*  Handle Non-OK Responses */
     if (!res.ok) {
       const data = await parseJsonSafe(res);
       const message =
         data?.message ||
         data?.error ||
-        (res.status === 401
-          ? ""
-          : `API request failed with status ${res.status}`);
+        (res.status === 401 ? "" : `Request failed with status ${res.status}`);
 
-      const error = Object.assign(new Error(message), {
+      const error: ApiError = Object.assign(new Error(message), {
         name: "ApiError",
         status: res.status,
         data,
         requestUrl: url,
-      }) as ApiError;
+      });
 
-      /* Attempt Firebase token refresh once */
+      /* Auto refresh on first 401 */
       if (
         res.status === 401 &&
         !options.skipAuthCheck &&
@@ -119,7 +115,7 @@ export async function apiRequest<T = any>(
         }
       }
 
-      /* Silent 401s during cookie probing (/users/me, /auth/session) */
+      /* Silent probes (no toast) */
       if (
         res.status === 401 &&
         (path.includes("/users/me") || path.includes("/auth/session"))
@@ -128,29 +124,31 @@ export async function apiRequest<T = any>(
         throw Object.assign(error, { silent: true });
       }
 
-      /* Show production-safe toast only for real user errors */
       toast.dismiss();
-      if (res.status === 401) {
-        toastMessage("Your session has expired. Please sign in again.", {
-          type: "warning",
-        });
-      } else if (res.status >= 500) {
-        toastMessage("Server error occurred. Please try again later.", {
-          type: "error",
-        });
-      } else if (res.status >= 400) {
-        toastMessage(message || "Request failed. Please try again.", {
-          type: "error",
-        });
+
+      switch (true) {
+        case res.status === 401:
+          toastMessage("Your session has expired. Please sign in again.", {
+            type: "warning",
+          });
+          break;
+        case res.status >= 500:
+          toastMessage("Server error occurred. Please try again later.", {
+            type: "error",
+          });
+          break;
+        case res.status >= 400:
+          toastMessage(message || "Request failed. Please try again.", {
+            type: "error",
+          });
+          break;
       }
 
       throw error;
     }
 
-    /* 204 No Content */
     if (res.status === 204) return {} as T;
 
-    /* Return parsed JSON */
     return (await parseJsonSafe(res)) as T;
   } catch (err: any) {
     /* Timeout */
@@ -163,7 +161,7 @@ export async function apiRequest<T = any>(
       }) as ApiError;
     }
 
-    /* Network / CORS */
+    /* Network or CORS issue */
     if (err instanceof TypeError && err.message === "Failed to fetch") {
       const retry = options.retryCount ?? 0;
       if (retry < 2) {
@@ -174,7 +172,7 @@ export async function apiRequest<T = any>(
       }
 
       toast.dismiss();
-      toastMessage("Network error. Please check your connection.", {
+      toastMessage("Network error or CORS issue. Please try again.", {
         type: "error",
       });
 
@@ -184,7 +182,7 @@ export async function apiRequest<T = any>(
       ) as ApiError;
     }
 
-    /* Catch-all fallback (only visible if not silent) */
+    /* Unknown / fallback */
     if (!err?.silent) {
       console.error("API request failed:", err);
       toast.dismiss();
