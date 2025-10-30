@@ -1,8 +1,8 @@
 "use client";
 
 import { Suspense } from "react";
-import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 import { VerifyEmailNotice } from "@/components/auth/verify-email";
 
 export default function VerifyEmailPageClient() {
