@@ -6,7 +6,6 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,11 +25,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/form-error";
 import { signupSchema, type SignupFormValues } from "@/lib/validators/auth";
-
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { useAuth } from "@/context/authContext";
-import { toastAsync, toastMessage, toast } from "@/lib/toast";
+import { toast, toastMessage } from "@/lib/toast";
 import { signupWithEmailPassword } from "@/lib/auth-email";
 
 export function SignupForm({
@@ -52,7 +50,6 @@ export function SignupForm({
     mode: "onChange",
   });
 
-  /* Email + Password Signup */
   async function onSubmit(values: SignupFormValues) {
     if (values.password !== values.confirmPassword) {
       toast.dismiss();
@@ -69,7 +66,6 @@ export function SignupForm({
         values.password,
         values.name
       );
-
       if (result?.ok) form.reset();
     } catch (err: any) {
       toast.dismiss();
@@ -79,50 +75,47 @@ export function SignupForm({
     }
   }
 
-  /* Google Signup → Firebase → Backend */
   async function handleGoogleSignup() {
-    await toastAsync(
-      async () => {
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: "select_account" });
+    toast.dismiss();
+    toastMessage("Connecting to Google...", { type: "loading" });
 
-        const userCred = await signInWithPopup(auth, provider);
-        const googleUser = userCred.user;
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
 
-        const result = await signupWithFirebase(googleUser, {
-          name: googleUser.displayName ?? undefined,
-          avatarUrl: googleUser.photoURL ?? undefined,
-        });
+      const userCred = await signInWithPopup(auth, provider);
+      const googleUser = userCred.user;
 
-        if (!result || result.status !== "success") {
-          if ((result as any)?.statusCode === 409) {
-            toast.dismiss();
-            toastMessage("Account already exists. Redirecting to login...", {
-              type: "warning",
-            });
-            window.location.replace("/login");
-            return;
-          }
-          throw new Error(result?.message || "Signup verification failed.");
+      const result = await signupWithFirebase(googleUser, {
+        name: googleUser.displayName ?? undefined,
+        avatarUrl: googleUser.photoURL ?? undefined,
+      });
+
+      toast.dismiss();
+
+      if (!result || result.status !== "success") {
+        if ((result as any)?.statusCode === 409) {
+          toastMessage("Account already exists. Redirecting to login...", {
+            type: "warning",
+          });
+          window.location.replace("/login");
+          return;
         }
-
-        toast.dismiss();
-        toastMessage("Signed up successfully. Redirecting...", {
-          type: "success",
-        });
-        window.location.replace("/dashboard");
-      },
-      {
-        loading: "Connecting to Google...",
-        success: "Connected.",
-        error: "Google sign-up failed. Please try again.",
+        throw new Error(result?.message || "Signup verification failed.");
       }
-    );
+
+      toastMessage("Signed up successfully. Redirecting...", {
+        type: "success",
+      });
+      window.location.replace("/dashboard");
+    } catch (err: any) {
+      toast.dismiss();
+      toastMessage(err?.message || "Google sign-up failed. Please try again.", {
+        type: "error",
+      });
+    }
   }
 
-  /* ------------------------------------------------------------
-     Render
-  ------------------------------------------------------------ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -134,11 +127,9 @@ export function SignupForm({
             Sign up with Google or continue with email
           </CardDescription>
         </CardHeader>
-
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* Google Signup */}
               <Field>
                 <Button
                   variant="outline"
@@ -185,7 +176,6 @@ export function SignupForm({
                 Or continue with
               </FieldSeparator>
 
-              {/* Name */}
               <Controller
                 name="name"
                 control={form.control}
@@ -203,7 +193,6 @@ export function SignupForm({
                 )}
               />
 
-              {/* Email */}
               <Controller
                 name="email"
                 control={form.control}
@@ -222,7 +211,6 @@ export function SignupForm({
                 )}
               />
 
-              {/* Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -257,7 +245,6 @@ export function SignupForm({
                 )}
               />
 
-              {/* Confirm Password */}
               <Controller
                 name="confirmPassword"
                 control={form.control}
@@ -299,7 +286,6 @@ export function SignupForm({
                 uppercase letter.
               </FieldDescription>
 
-              {/* Submit */}
               <Field>
                 <Button
                   type="submit"

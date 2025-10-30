@@ -79,10 +79,7 @@ export function VerifyEmailNotice() {
 
         if (current.emailVerified) {
           clearPoll();
-          toastMessage("Email verified! Redirecting...", {
-            type: "success",
-          });
-
+          toastMessage("Email verified! Redirecting...", { type: "success" });
           await waitForSession?.();
           router.replace("/dashboard");
         }
@@ -99,7 +96,6 @@ export function VerifyEmailNotice() {
 
   const handleResend = async () => {
     const current = auth.currentUser;
-
     if (!current) {
       toastMessage("You need to be signed in to resend verification.", {
         type: "error",
@@ -109,16 +105,7 @@ export function VerifyEmailNotice() {
 
     try {
       setResending(true);
-      const res = await resendVerificationEmail();
-      if (res.ok) {
-        toastMessage("Verification email resent successfully.", {
-          type: "success",
-        });
-      } else {
-        toastMessage(res.message || "Failed to resend verification email.", {
-          type: "error",
-        });
-      }
+      await resendVerificationEmail(); // handles its own toast
     } catch {
       toastMessage("Failed to resend verification email.", { type: "error" });
     } finally {

@@ -1,15 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-/* ============================================================
-   🔒 AuthContext — Level 3.1 (Stable + Production)
-   ------------------------------------------------------------
-   • Unified Firebase ↔ Cookie session bridge
-   • Handles 401 auto-logout & safe silent retries
-   • Waits for cookie propagation after login/signup
-   • Duplicate-free toasts with timeout protection
-============================================================ */
-
 import React, {
   createContext,
   useContext,
@@ -66,6 +57,8 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+let isLoggingOut = false;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -111,9 +104,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (err.status === 401 && user) {
         await signOut(auth).catch(() => {});
         toast.dismiss();
-        toastMessage("Your session has expired. Please sign in again.", {
-          type: "warning",
-        });
+        if (!isLoggingOut) {
+          toastMessage("Your session has expired. Please sign in again.", {
+            type: "warning",
+          });
+        }
       }
       setUser(null);
     } finally {
@@ -219,6 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    isLoggingOut = true;
     await toastAsync(
       async () => {
         try {
@@ -235,6 +231,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: "Logout failed. Please try again.",
       }
     );
+    setTimeout(() => {
+      isLoggingOut = false;
+    }, 1200);
   }, []);
 
   const refreshSession = useCallback(fetchSession, [fetchSession]);
