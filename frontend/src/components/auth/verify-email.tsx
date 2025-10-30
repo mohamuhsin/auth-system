@@ -19,7 +19,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Loader2, MailCheck, MailWarning } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 
 export function VerifyEmailNotice() {
   const [resending, setResending] = useState(false);
@@ -115,77 +114,70 @@ export function VerifyEmailNotice() {
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/40">
+      <div className="flex h-40 items-center justify-center text-muted-foreground">
         <Loader2 className="size-6 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/40 px-6">
-      <AnimatePresence mode="wait">
-        <motion.div
-          key="verify-card"
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.96 }}
-          transition={{ duration: 0.25 }}
-          className="w-full max-w-sm"
-        >
-          <Card className="border border-border/60 bg-background/95 shadow-md backdrop-blur">
-            <CardHeader className="text-center">
-              <div className="mb-3 flex justify-center">
-                <MailCheck className="size-10 text-primary" />
-              </div>
-              <CardTitle className="font-display text-xl">
-                Verify your email
-              </CardTitle>
-              <CardDescription className="mt-2 text-sm leading-relaxed">
-                We’ve sent a verification link{" "}
-                {userEmail ? (
-                  <>
-                    to{" "}
-                    <span className="font-medium text-primary">
-                      {userEmail}
-                    </span>
-                  </>
-                ) : (
-                  "to your registered email address"
-                )}
-                . <br />
-                Please check your inbox and confirm to activate your account.
-              </CardDescription>
-            </CardHeader>
+    <div className="flex flex-col gap-6">
+      <Card>
+        <CardHeader className="text-center">
+          <div className="mb-3 flex justify-center">
+            <MailCheck className="size-10 text-primary" />
+          </div>
+          <CardTitle className="font-display text-xl">
+            Verify your email
+          </CardTitle>
+          <CardDescription className="mt-2 text-sm leading-relaxed">
+            We’ve sent a verification link{" "}
+            {userEmail ? (
+              <>
+                to <span className="font-medium text-primary">{userEmail}</span>
+              </>
+            ) : (
+              "to your registered email address"
+            )}
+            . <br />
+            Please check your inbox and confirm to activate your account.
+          </CardDescription>
+        </CardHeader>
 
-            <CardContent className="mt-2 flex flex-col items-center gap-4">
-              <Button
-                onClick={handleResend}
-                disabled={resending}
-                variant="outline"
-                className="w-full"
-              >
-                {resending ? (
-                  <>
-                    <Loader2 className="mr-2 size-4 animate-spin" /> Sending…
-                  </>
-                ) : (
-                  <>
-                    <MailWarning className="mr-2 size-4" /> Resend verification
-                    email
-                  </>
-                )}
-              </Button>
+        <CardContent className="mt-2 flex flex-col items-center gap-4">
+          <Button
+            onClick={handleResend}
+            disabled={resending}
+            variant="outline"
+            className="w-full"
+          >
+            {resending ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" /> Sending…
+              </>
+            ) : (
+              <>
+                <MailWarning className="mr-2 size-4" /> Resend verification
+                email
+              </>
+            )}
+          </Button>
 
-              <Link
-                href="/login"
-                className="text-sm text-primary underline-offset-4 hover:underline"
-              >
-                Back to Login
-              </Link>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </AnimatePresence>
-    </main>
+          <Link
+            href="/login"
+            className="text-sm text-primary underline-offset-4 hover:underline"
+          >
+            Back to Login
+          </Link>
+        </CardContent>
+      </Card>
+
+      <p className="px-6 text-center text-sm text-muted-foreground">
+        Didn’t receive the email?{" "}
+        <span className="font-medium text-primary">
+          Check your spam folder.
+        </span>
+      </p>
+    </div>
   );
 }
