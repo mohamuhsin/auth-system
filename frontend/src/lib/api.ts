@@ -21,7 +21,6 @@ export interface ApiRequestOptions extends RequestInit {
   retryCount?: number;
 }
 
-/* Safe JSON parser */
 async function parseJsonSafe(res: Response) {
   const text = await res.text();
   if (!text) return {};
@@ -32,7 +31,6 @@ async function parseJsonSafe(res: Response) {
   }
 }
 
-/* Generate request ID */
 function uuidv4() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = crypto.getRandomValues(new Uint8Array(1))[0] & 0x0f;
@@ -41,7 +39,6 @@ function uuidv4() {
   });
 }
 
-/* Core API Request */
 export async function apiRequest<T = any>(
   path: string,
   options: ApiRequestOptions = {}
@@ -89,7 +86,6 @@ export async function apiRequest<T = any>(
         requestUrl: url,
       });
 
-      /* Auto refresh on first 401 */
       if (
         res.status === 401 &&
         !options.skipAuthCheck &&
@@ -115,7 +111,6 @@ export async function apiRequest<T = any>(
         }
       }
 
-      /* Silent probes (no toast) */
       if (
         res.status === 401 &&
         (path.includes("/users/me") || path.includes("/auth/session"))
@@ -126,22 +121,18 @@ export async function apiRequest<T = any>(
 
       toast.dismiss();
 
-      switch (true) {
-        case res.status === 401:
-          toastMessage("Your session has expired. Please sign in again.", {
-            type: "warning",
-          });
-          break;
-        case res.status >= 500:
-          toastMessage("Server error occurred. Please try again later.", {
-            type: "error",
-          });
-          break;
-        case res.status >= 400:
-          toastMessage(message || "Request failed. Please try again.", {
-            type: "error",
-          });
-          break;
+      if (res.status === 401) {
+        toastMessage("Your session has expired. Please sign in again.", {
+          type: "warning",
+        });
+      } else if (res.status >= 500) {
+        toastMessage("Server error occurred. Please try again later.", {
+          type: "error",
+        });
+      } else if (res.status >= 400) {
+        toastMessage(message || "Request failed. Please try again.", {
+          type: "error",
+        });
       }
 
       throw error;
@@ -151,7 +142,6 @@ export async function apiRequest<T = any>(
 
     return (await parseJsonSafe(res)) as T;
   } catch (err: any) {
-    /* Timeout */
     if (err.name === "AbortError") {
       toast.dismiss();
       toastMessage("Request timed out after 15 seconds.", { type: "warning" });
@@ -161,9 +151,9 @@ export async function apiRequest<T = any>(
       }) as ApiError;
     }
 
-    /* Network or CORS issue */
     if (err instanceof TypeError && err.message === "Failed to fetch") {
       const retry = options.retryCount ?? 0;
+
       if (retry < 2) {
         const delay = Math.pow(2, retry) * 500;
         console.warn(`Retry #${retry + 1} after ${delay} ms → ${url}`);
@@ -182,7 +172,6 @@ export async function apiRequest<T = any>(
       ) as ApiError;
     }
 
-    /* Unknown / fallback */
     if (!err?.silent) {
       console.error("API request failed:", err);
       toast.dismiss();
