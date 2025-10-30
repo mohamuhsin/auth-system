@@ -1,14 +1,5 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
-
-/* ============================================================
-   ✉️ VerifyEmailNotice — Post-Signup Verification Screen
-   ------------------------------------------------------------
-   • Confirms verification email was sent
-   • Allows resending (via helper)
-   • Auto-polls Firebase until verified
-   • Calls backend waitForSession() before redirect
-   • Smooth & consistent with Auth UI design
-============================================================ */
 
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -30,9 +21,6 @@ import {
 import { Loader2, MailCheck, MailWarning } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-/* ============================================================
-   🧩 Component
-============================================================ */
 export function VerifyEmailNotice() {
   const [resending, setResending] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -40,10 +28,9 @@ export function VerifyEmailNotice() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { waitForSession } = useAuth(); // ✅ for backend cookie activation
+  const { waitForSession } = useAuth();
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  /** Safely clear polling interval */
   const clearPoll = () => {
     if (pollRef.current) {
       clearInterval(pollRef.current);
@@ -51,9 +38,6 @@ export function VerifyEmailNotice() {
     }
   };
 
-  /* ============================================================
-     🧭 Initialize user + Auto-poll verification
-  ============================================================ */
   useEffect(() => {
     const emailParam = searchParams.get("email");
     if (emailParam) setUserEmail(emailParam);
@@ -70,19 +54,15 @@ export function VerifyEmailNotice() {
 
       try {
         await user.reload();
-      } catch {
-        // Ignore reload errors (network, etc.)
-      }
+      } catch {}
 
-      // ✅ Already verified
       if (user.emailVerified) {
-        toastMessage("✅ Your email has been verified!", { type: "success" });
-        await waitForSession?.(); // 🔐 activate backend cookie
+        toastMessage("Your email has been verified!", { type: "success" });
+        await waitForSession?.();
         setTimeout(() => router.replace("/dashboard"), 800);
         return;
       }
 
-      // 🔁 Start polling every 5 seconds until verified
       pollRef.current = setInterval(async () => {
         const current = auth.currentUser;
         if (!current) {
@@ -94,16 +74,15 @@ export function VerifyEmailNotice() {
         try {
           await current.reload();
         } catch {
-          return; // ignore
+          return;
         }
 
         if (current.emailVerified) {
           clearPoll();
-          toastMessage("🎉 Email verified! Redirecting...", {
+          toastMessage("Email verified! Redirecting...", {
             type: "success",
           });
 
-          // 🩵 Ensure backend cookie is ready before redirect
           await waitForSession?.();
           router.replace("/dashboard");
         }
@@ -116,12 +95,8 @@ export function VerifyEmailNotice() {
       clearPoll();
       unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, waitForSession]);
 
-  /* ============================================================
-     🔁 Resend Verification Email
-  ============================================================ */
   const handleResend = async () => {
     const current = auth.currentUser;
 
@@ -136,7 +111,7 @@ export function VerifyEmailNotice() {
       setResending(true);
       const res = await resendVerificationEmail();
       if (res.ok) {
-        toastMessage("📧 Verification email resent successfully.", {
+        toastMessage("Verification email resent successfully.", {
           type: "success",
         });
       } else {
@@ -151,9 +126,6 @@ export function VerifyEmailNotice() {
     }
   };
 
-  /* ============================================================
-     🧩 UI — Consistent with Login / Signup design
-  ============================================================ */
   if (checking) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40">

@@ -6,9 +6,6 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider/theme-provider";
 import { AuthProvider } from "@/context/authContext";
 
-/* ============================================================
-   🎨 Fonts — Inter Sans + Tight (for headings)
-============================================================ */
 const interSans = Inter({
   variable: "--font-inter-sans",
   subsets: ["latin"],
@@ -21,9 +18,6 @@ const interTight = Inter_Tight({
   display: "swap",
 });
 
-/* ============================================================
-   🧭 Metadata — for SEO + Browser title
-============================================================ */
 export const metadata: Metadata = {
   title: "Auth by Iventics",
   description: "Secure authentication system for all Iventics apps",
@@ -31,13 +25,6 @@ export const metadata: Metadata = {
   manifest: undefined,
 };
 
-/* ============================================================
-   🌍 RootLayout — Unified Global Providers (Level 2.8)
-   ------------------------------------------------------------
-   ✅ Wraps app with Auth + Theme + Toast
-   ✅ Prevents hydration mismatch warnings
-   ✅ Ready for nested layouts (protected routes)
-============================================================ */
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -47,7 +34,6 @@ export default function RootLayout({
         className={`${interSans.variable} ${interTight.variable} 
           font-sans antialiased min-h-screen bg-background text-foreground`}
       >
-        {/* 🔐 Global Contexts (Auth + Theme) */}
         <AuthProvider>
           <ThemeProvider
             attribute="class"
@@ -55,10 +41,7 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            {/* 🧩 Main App Content */}
             <main className="min-h-screen">{children}</main>
-
-            {/* 🔔 Toast Notifications */}
             <Toaster
               richColors
               position="top-right"

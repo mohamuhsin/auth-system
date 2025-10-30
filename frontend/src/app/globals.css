@@ -1,14 +1,9 @@
 @plugin "tailwindcss-animate";
 
-/* ✅ Tailwind v4 import */
 @import "tailwindcss";
 
-/* 🌙 Enable dark variant */
 @custom-variant dark (&:is(.dark *));
 
-/* ============================================================
-   🎨 THEME TOKENS (Inter font + Royal Indigo)
-============================================================ */
 @theme inline {
   --font-sans: var(--font-inter-sans);
   --font-mono: var(--font-inter-tight);
@@ -50,9 +45,6 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* ============================================================
-   ☀️ LIGHT MODE — Royal Indigo Identity
-============================================================ */
 :root {
   --radius: 0.625rem;
 
@@ -64,28 +56,23 @@
   --popover: #ffffff;
   --popover-foreground: #0f172a;
 
-  /* 💎 Core Brand */
   --primary: #375dfb;
   --primary-foreground: #ffffff;
 
-  /* Supporting */
   --accent: #eef2ff;
   --accent-foreground: #1e293b;
   --secondary: #f3f4f6;
   --secondary-foreground: #0f172a;
 
-  /* Neutral */
   --muted: #f4f4f5;
   --muted-foreground: #6b7280;
   --border: #e5e7eb;
   --input: #e5e7eb;
   --ring: #375dfb;
 
-  /* Feedback */
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
 
-  /* Sidebar */
   --sidebar: #f9fafb;
   --sidebar-foreground: #0f172a;
   --sidebar-border: #e5e7eb;
@@ -96,9 +83,6 @@
   --sidebar-ring: #375dfb;
 }
 
-/* ============================================================
-   🌑 DARK MODE — Royal Indigo Night
-============================================================ */
 .dark {
   --background: #0d1017;
   --foreground: #f3f4f6;
@@ -108,28 +92,23 @@
   --popover: #161a22;
   --popover-foreground: #f9fafb;
 
-  /* 💎 Brand */
   --primary: #375dfb;
   --primary-foreground: #ffffff;
 
-  /* Accents tuned for depth */
   --accent: #2a3040;
   --accent-foreground: #f3f4f6;
   --secondary: #1c2029;
   --secondary-foreground: #f9fafb;
 
-  /* Neutral + muted text */
   --muted: #1a1e27;
   --muted-foreground: #9ca3af;
   --border: #2a2f3c;
   --input: #2a2f3c;
   --ring: #4f6cff;
 
-  /* Feedback */
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
 
-  /* Sidebar */
   --sidebar: #151922;
   --sidebar-foreground: #f3f4f6;
   --sidebar-border: #20242e;
@@ -140,9 +119,6 @@
   --sidebar-ring: #4f6cff;
 }
 
-/* ============================================================
-   🧱 BASE STYLES
-============================================================ */
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -153,12 +129,6 @@
   }
 }
 
-/* ============================================================
-   🧩 RADIX / SHADCN BASE COMPATIBILITY (Fix)
-   ------------------------------------------------------------
-   Restores visibility for <Separator />, <Tabs />, etc.
-   Works across Tailwind v4 + dark mode.
-============================================================ */
 @layer base {
   [data-orientation="horizontal"] {
     height: 1px;

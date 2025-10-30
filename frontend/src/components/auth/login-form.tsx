@@ -42,9 +42,6 @@ import { useAuth } from "@/context/authContext";
 import { toastAsync, toastMessage, toast } from "@/lib/toast";
 import { loginWithEmailPassword } from "@/lib/auth-email";
 
-/* ============================================================
-   🧩 Component
-============================================================ */
 export function LoginForm({
   className,
   ...props
@@ -59,9 +56,6 @@ export function LoginForm({
     mode: "onChange",
   });
 
-  /* ------------------------------------------------------------
-     Detect reset-password success
-  ------------------------------------------------------------ */
   useEffect(() => {
     if (searchParams.get("reset") === "success") {
       toast.dismiss();
@@ -69,9 +63,6 @@ export function LoginForm({
     }
   }, [searchParams]);
 
-  /* ------------------------------------------------------------
-     Email + Password Login
-  ------------------------------------------------------------ */
   async function onSubmit(values: LoginFormValues) {
     if (!values.email || !values.password) {
       toast.dismiss();
@@ -86,7 +77,6 @@ export function LoginForm({
       const email = values.email.trim().toLowerCase();
       const result = await loginWithEmailPassword(email, values.password);
       if (result?.ok) form.reset();
-      // Backend handles redirect after session cookie set
     } catch (err: any) {
       toast.dismiss();
       toastMessage(err?.message || "Login failed. Please try again.", {
@@ -95,9 +85,6 @@ export function LoginForm({
     }
   }
 
-  /* ------------------------------------------------------------
-     Google Login → Firebase → Backend Session
-  ------------------------------------------------------------ */
   async function handleGoogleLogin() {
     await toastAsync(
       async () => {
@@ -133,9 +120,6 @@ export function LoginForm({
     );
   }
 
-  /* ------------------------------------------------------------
-     💅 UI
-  ------------------------------------------------------------ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>

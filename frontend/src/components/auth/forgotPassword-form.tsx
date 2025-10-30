@@ -1,13 +1,5 @@
 "use client";
 
-/* ============================================================
-   🔑 ForgotPasswordForm — Level 3.0 (Final Production)
-   ------------------------------------------------------------
-   • Clean, dismiss-safe toasts (no duplicates)
-   • Integrated with shared toast + auth utilities
-   • Smooth redirect after success
-============================================================ */
-
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
@@ -37,9 +29,6 @@ import {
 import { toastAsync, toastMessage, toast } from "@/lib/toast";
 import { requestPasswordReset } from "@/lib/auth-email";
 
-/* ============================================================
-   🧩 Component
-============================================================ */
 export function ForgotPasswordForm({
   className,
   ...props
@@ -52,9 +41,6 @@ export function ForgotPasswordForm({
     mode: "onChange",
   });
 
-  /* ------------------------------------------------------------
-     Handle Password Reset
-  ------------------------------------------------------------ */
   async function onSubmit(values: ForgotPasswordValues) {
     const email = values.email.trim().toLowerCase();
 
@@ -77,7 +63,6 @@ export function ForgotPasswordForm({
           type: "success",
         });
 
-        // Gentle delay before redirect
         setTimeout(() => router.replace("/login?reset=success"), 2000);
       },
       {
@@ -88,9 +73,6 @@ export function ForgotPasswordForm({
     );
   }
 
-  /* ------------------------------------------------------------
-     Render
-  ------------------------------------------------------------ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>

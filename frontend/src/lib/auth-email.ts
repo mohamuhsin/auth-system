@@ -10,15 +10,13 @@ import { auth } from "@/services/firebase";
 import { apiRequest } from "@/lib/api";
 import { toast, toastMessage } from "@/lib/toast";
 
-/* ============================================================
-   Shared Types & Helpers
-============================================================ */
+/* SHARED TYPES & HELPERS */
 export interface AuthResult {
   ok: boolean;
   message?: string;
 }
 
-/** Normalize backend responses into a consistent shape */
+/* Normalize backend responses into a consistent shape */
 function normalizeApi(res: any): {
   ok: boolean;
   status?: number;
@@ -50,7 +48,7 @@ function normalizeApi(res: any): {
   return { ok: false };
 }
 
-/** Safe redirect helper */
+/* Safe redirect helper */
 function go(path: string, delay = 800) {
   if (typeof window === "undefined") return;
   setTimeout(() => {
@@ -62,7 +60,7 @@ function go(path: string, delay = 800) {
   }, delay);
 }
 
-/** Firebase email verification redirect settings */
+/* Firebase email verification redirect settings */
 const actionCodeSettings =
   typeof window !== "undefined"
     ? {
@@ -71,9 +69,7 @@ const actionCodeSettings =
       }
     : undefined;
 
-/* ============================================================
-   Signup — Email + Password
-============================================================ */
+/* SIGNUP — Email + Password */
 export async function signupWithEmailPassword(
   email: string,
   password: string,
@@ -145,9 +141,7 @@ export async function signupWithEmailPassword(
   }
 }
 
-/* ============================================================
-   Login — Email + Password
-============================================================ */
+/* Login — Email + Password */
 export async function loginWithEmailPassword(
   email: string,
   password: string
@@ -213,9 +207,7 @@ export async function loginWithEmailPassword(
   }
 }
 
-/* ============================================================
-   Password Reset
-============================================================ */
+/* Password Reset */
 export async function requestPasswordReset(email: string): Promise<AuthResult> {
   try {
     toast.dismiss();
@@ -250,9 +242,7 @@ export async function requestPasswordReset(email: string): Promise<AuthResult> {
   }
 }
 
-/* ============================================================
-   Resend Verification Email
-============================================================ */
+/* Resend Verification Email */
 export async function resendVerificationEmail(): Promise<AuthResult> {
   const user = auth.currentUser;
 

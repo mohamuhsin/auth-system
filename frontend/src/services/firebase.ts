@@ -9,10 +9,6 @@ import {
 } from "firebase/auth";
 import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
 
-/* ============================================================
-   🔥 Firebase Web SDK — Client-Safe Initialization (Fixed)
-============================================================ */
-
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "",
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "",
@@ -23,10 +19,6 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID ?? "",
 };
 
-// ============================================================
-// 🧠 Safe Initialization
-// ============================================================
-
 let app: FirebaseApp;
 let auth: Auth;
 let analytics: Analytics | null = null;
@@ -35,12 +27,10 @@ if (typeof window !== "undefined") {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
   auth = getAuth(app);
 
-  // ✅ Persist session across browser restarts
   setPersistence(auth, browserLocalPersistence).catch((err) => {
-    console.error("❌ Failed to set persistence:", err);
+    console.error("Failed to set persistence:", err);
   });
 
-  // ✅ Optional analytics
   isSupported()
     .then((supported) => {
       if (supported) analytics = getAnalytics(app);

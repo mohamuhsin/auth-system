@@ -1,14 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-/* ============================================================
-   🟢 SignupForm — Level 3.0 (Final Production)
-   ------------------------------------------------------------
-   • Clean, dismiss-safe toasts (no duplicates)
-   • Unified with backend + Firebase flow
-   • Consistent language across Auth suite
-============================================================ */
-
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,9 +33,6 @@ import { useAuth } from "@/context/authContext";
 import { toastAsync, toastMessage, toast } from "@/lib/toast";
 import { signupWithEmailPassword } from "@/lib/auth-email";
 
-/* ============================================================
-   🧩 Component
-============================================================ */
 export function SignupForm({
   className,
   ...props
@@ -63,9 +52,7 @@ export function SignupForm({
     mode: "onChange",
   });
 
-  /* ------------------------------------------------------------
-     Email + Password Signup
-  ------------------------------------------------------------ */
+  /* Email + Password Signup */
   async function onSubmit(values: SignupFormValues) {
     if (values.password !== values.confirmPassword) {
       toast.dismiss();
@@ -84,7 +71,6 @@ export function SignupForm({
       );
 
       if (result?.ok) form.reset();
-      // Helper handles its own toasts + redirects
     } catch (err: any) {
       toast.dismiss();
       toastMessage(err?.message || "Signup failed. Please try again.", {
@@ -93,9 +79,7 @@ export function SignupForm({
     }
   }
 
-  /* ------------------------------------------------------------
-     Google Signup → Firebase → Backend
-  ------------------------------------------------------------ */
+  /* Google Signup → Firebase → Backend */
   async function handleGoogleSignup() {
     await toastAsync(
       async () => {

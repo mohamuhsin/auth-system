@@ -9,8 +9,6 @@ import { cn } from "@/lib/utils";
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
-
-  // ✅ Ensure we only render after hydration
   React.useEffect(() => {
     setMounted(true);
   }, []);
@@ -21,7 +19,6 @@ export function ThemeToggle() {
     { value: "dark", icon: Moon, label: "Dark" },
   ];
 
-  // 🧩 If not mounted, render static placeholder to match SSR
   if (!mounted) {
     return (
       <div className="flex overflow-hidden rounded-md border border-border/70 shadow-sm backdrop-blur-sm bg-background/70 size-8">
@@ -63,7 +60,6 @@ export function ThemeToggle() {
             )}
           >
             <Icon className="size-[15px]" />
-            {/* ✅ Always render span for consistent SSR → CSR structure */}
             <span
               className={cn(
                 "absolute inset-0 rounded-md ring-1 ring-inset ring-accent/50 transition-opacity",

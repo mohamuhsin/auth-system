@@ -20,8 +20,6 @@ export default function LoginPageClient() {
             Auth by Iventics
           </span>
         </Link>
-
-        {/* 🌀 Required Suspense wrapper for useSearchParams */}
         <Suspense fallback={<div>Loading login form...</div>}>
           <LoginForm />
         </Suspense>
