@@ -1,14 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-/* ============================================================
-   🔐 LoginForm — Level 3.0 (Final Production)
-   ------------------------------------------------------------
-   • Unified with reset-password success query
-   • Dismiss-safe toasts (no duplicates)
-   • Stable across Firebase + cookie sessions
-============================================================ */
-
 import { useState, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -96,13 +88,30 @@ export function LoginForm({
         const result = await loginWithFirebase(googleUser);
 
         if (!result || result.status !== "success") {
+          toast.dismiss();
+
           if ((result as any)?.statusCode === 404) {
-            toast.dismiss();
-            toastMessage("No account found. Please sign up first.", {
+            toastMessage("No account found. Redirecting to signup...", {
               type: "warning",
             });
+            setTimeout(() => window.location.replace("/signup"), 1000);
             return;
           }
+
+          if ((result as any)?.code === 403) {
+            toastMessage("Please verify your email before logging in.", {
+              type: "warning",
+            });
+            setTimeout(
+              () =>
+                window.location.replace(
+                  `/verify-email?email=${googleUser.email}`
+                ),
+              1000
+            );
+            return;
+          }
+
           throw new Error(result?.message || "Session creation failed.");
         }
 
@@ -133,7 +142,6 @@ export function LoginForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* Google Sign-In */}
               <Field>
                 <Button
                   variant="outline"
@@ -179,7 +187,6 @@ export function LoginForm({
                 Or continue with
               </FieldSeparator>
 
-              {/* Email */}
               <Controller
                 name="email"
                 control={form.control}
@@ -198,7 +205,6 @@ export function LoginForm({
                 )}
               />
 
-              {/* Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -241,7 +247,6 @@ export function LoginForm({
                 )}
               />
 
-              {/* Submit */}
               <Field>
                 <Button
                   type="submit"

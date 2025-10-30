@@ -17,44 +17,35 @@ export function ProtectedRoute({
 }) {
   const { user, loading, waitForSession } = useAuth();
   const router = useRouter();
-  const redirectedRef = useRef(false);
-  const safetyTimer = useRef<NodeJS.Timeout | null>(null);
-  const [safetyTriggered, setSafetyTriggered] = useState(false);
+  const [verifying, setVerifying] = useState(true);
+  const redirected = useRef(false);
 
+  // ✅ Handle redirect after logout or session expiry
   useEffect(() => {
-    if (!loading && !user && !redirectedRef.current) {
-      redirectedRef.current = true;
-      const timeout = setTimeout(() => {
-        console.info("🔒 Redirecting to login after logout/session expiry.");
-        router.replace(redirectTo);
-      }, 250);
-      return () => clearTimeout(timeout);
+    if (!loading && !user && !redirected.current) {
+      redirected.current = true;
+      console.info("🔒 No user — redirecting to login.");
+      router.replace(redirectTo);
+    } else if (user) {
+      redirected.current = false; // reset flag once user logs in again
     }
   }, [user, loading, router, redirectTo]);
+
+  // ✅ Safety fallback if Firebase takes too long to verify
   useEffect(() => {
-    if (safetyTimer.current) clearTimeout(safetyTimer.current);
-
-    if (loading) {
-      safetyTimer.current = setTimeout(async () => {
-        console.warn("⚠️ Auth verification timeout — forcing manual recheck.");
-        setSafetyTriggered(true);
-
+    const timer = setTimeout(async () => {
+      if (loading && verifying) {
+        console.warn("⚠️ Verification delay — forcing session probe.");
         try {
           await waitForSession?.();
         } catch {}
+        setVerifying(false);
+      }
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [loading, verifying, waitForSession]);
 
-        if (!user && !redirectedRef.current) {
-          redirectedRef.current = true;
-          router.replace(redirectTo);
-        }
-      }, 5000);
-    }
-
-    return () => {
-      if (safetyTimer.current) clearTimeout(safetyTimer.current);
-    };
-  }, [loading, user, router, redirectTo, waitForSession]);
-  if (loading && !safetyTriggered) {
+  if (loading && verifying) {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-muted-foreground">
         <AnimatePresence mode="wait">
@@ -74,10 +65,6 @@ export function ProtectedRoute({
     );
   }
 
-  if (user) return <>{children}</>;
-  if (!redirectedRef.current) {
-    redirectedRef.current = true;
-    router.replace(redirectTo);
-  }
-  return null;
+  if (!user && !loading) return null;
+  return <>{children}</>;
 }
