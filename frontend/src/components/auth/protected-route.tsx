@@ -6,13 +6,6 @@ import { Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/authContext";
 
-/* ============================================================
-   🔒 ProtectedRoute — Level 2.8 (Final Polished)
-   ------------------------------------------------------------
-   ✅ Fixes “stuck verifying session after logout”
-   ✅ Adds timeout + forced session recheck
-   ✅ Prevents infinite loading loops
-============================================================ */
 export function ProtectedRoute({
   children,
   redirectTo = "/login",
@@ -25,32 +18,32 @@ export function ProtectedRoute({
   const { user, loading, waitForSession } = useAuth();
   const router = useRouter();
   const redirectedRef = useRef(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const safetyTimer = useRef<NodeJS.Timeout | null>(null);
   const [safetyTriggered, setSafetyTriggered] = useState(false);
 
-  /* 🧭 Redirect to login if not authenticated */
   useEffect(() => {
     if (!loading && !user && !redirectedRef.current) {
       redirectedRef.current = true;
-      const timeout = setTimeout(() => router.replace(redirectTo), 300);
+      const timeout = setTimeout(() => {
+        console.info("🔒 Redirecting to login after logout/session expiry.");
+        router.replace(redirectTo);
+      }, 250);
       return () => clearTimeout(timeout);
     }
   }, [user, loading, router, redirectTo]);
-
-  /* 🕓 Safety fallback (5s max) — recheck session, then redirect */
   useEffect(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (safetyTimer.current) clearTimeout(safetyTimer.current);
 
     if (loading) {
-      timeoutRef.current = setTimeout(async () => {
-        console.warn("⚠️ Auth verification timeout — forcing recheck.");
+      safetyTimer.current = setTimeout(async () => {
+        console.warn("⚠️ Auth verification timeout — forcing manual recheck.");
         setSafetyTriggered(true);
+
         try {
           await waitForSession?.();
         } catch {}
 
-        // If still no user, redirect
-        if (!user) {
+        if (!user && !redirectedRef.current) {
           redirectedRef.current = true;
           router.replace(redirectTo);
         }
@@ -58,11 +51,9 @@ export function ProtectedRoute({
     }
 
     return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (safetyTimer.current) clearTimeout(safetyTimer.current);
     };
   }, [loading, user, router, redirectTo, waitForSession]);
-
-  /* 🌀 While verifying session */
   if (loading && !safetyTriggered) {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-muted-foreground">
@@ -83,10 +74,10 @@ export function ProtectedRoute({
     );
   }
 
-  /* ✅ Authenticated — render protected content */
   if (user) return <>{children}</>;
-
-  /* 🚫 Fallback — if all fails, redirect */
-  router.replace(redirectTo);
+  if (!redirectedRef.current) {
+    redirectedRef.current = true;
+    router.replace(redirectTo);
+  }
   return null;
 }

@@ -3,15 +3,6 @@
 
 import { toast } from "sonner";
 
-/* ============================================================
-   Toast Configuration
-   ------------------------------------------------------------
-   • Centralized toast utility for consistent feedback
-   • Supports: success, error, warning, info, loading
-   • Use toastMessage for instant feedback
-   • Use toastAsync for async operations
-============================================================ */
-
 export interface ToastOptions {
   type?: "success" | "error" | "info" | "warning" | "loading";
   duration?: number;
@@ -19,10 +10,6 @@ export interface ToastOptions {
   onAction?: () => void;
 }
 
-/* ------------------------------------------------------------
-   toastMessage — Immediate Toast Notification
-   Used for direct feedback after an event or validation
------------------------------------------------------------- */
 export function toastMessage(
   message: string,
   {
@@ -64,10 +51,6 @@ export function toastMessage(
   }
 }
 
-/* ------------------------------------------------------------
-   toastAsync — Async Promise Wrapper
-   Used to wrap async operations with loading/success/error states
------------------------------------------------------------- */
 export async function toastAsync<T>(
   fn: () => Promise<T>,
   messages?: {
@@ -104,7 +87,4 @@ export async function toastAsync<T>(
   }
 }
 
-/* ------------------------------------------------------------
-   Export Base
------------------------------------------------------------- */
 export { toast };

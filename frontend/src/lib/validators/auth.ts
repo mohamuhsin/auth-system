@@ -1,8 +1,5 @@
 import * as z from "zod";
 
-/* ============================================================
-   🔐 Login Schema — Minimal but strict
-============================================================ */
 export const loginSchema = z.object({
   email: z
     .string()
@@ -14,9 +11,6 @@ export const loginSchema = z.object({
 
 export type LoginFormValues = z.infer<typeof loginSchema>;
 
-/* ============================================================
-   🆕 Signup Schema — Strong client-side password rules
-============================================================ */
 export const signupSchema = z
   .object({
     name: z
@@ -40,9 +34,6 @@ export const signupSchema = z
 
 export type SignupFormValues = z.infer<typeof signupSchema>;
 
-/* ============================================================
-   🔁 Forgot Password Schema
-============================================================ */
 export const forgotPasswordSchema = z.object({
   email: z
     .string()
@@ -53,9 +44,6 @@ export const forgotPasswordSchema = z.object({
 
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
-/* ============================================================
-   ♻️ Reset Password Schema — same complexity as signup
-============================================================ */
 export const resetPasswordSchema = z
   .object({
     password: z
