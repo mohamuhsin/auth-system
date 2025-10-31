@@ -28,14 +28,18 @@ import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/form-error";
 import { loginSchema, type LoginFormValues } from "@/lib/validators/auth";
 
-import { toast, toastMessage } from "@/lib/toast";
-import { loginWithEmailPassword, loginWithGoogle } from "@/lib/auth-email";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { auth } from "@/services/firebase";
+import { useAuth } from "@/context/authContext";
+import { toastAsync, toastMessage, toast } from "@/lib/toast";
+import { loginWithEmailPassword } from "@/lib/auth-email";
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const [showPassword, setShowPassword] = useState(false);
+  const { loginWithFirebase } = useAuth();
   const searchParams = useSearchParams();
 
   const form = useForm<LoginFormValues>({
@@ -44,9 +48,6 @@ export function LoginForm({
     mode: "onChange",
   });
 
-  /* ============================================================
-     Toast for password reset success
-  ============================================================ */
   useEffect(() => {
     if (searchParams.get("reset") === "success") {
       toast.dismiss();
@@ -54,9 +55,6 @@ export function LoginForm({
     }
   }, [searchParams]);
 
-  /* ============================================================
-     🔑 Email/Password Login
-  ============================================================ */
   async function onSubmit(values: LoginFormValues) {
     if (!values.email || !values.password) {
       toast.dismiss();
@@ -67,6 +65,7 @@ export function LoginForm({
     }
 
     try {
+      toast.dismiss();
       const email = values.email.trim().toLowerCase();
       const result = await loginWithEmailPassword(email, values.password);
       if (result?.ok) form.reset();
@@ -78,16 +77,58 @@ export function LoginForm({
     }
   }
 
-  /* ============================================================
-     🌐 Google Sign-In (new unified handler)
-  ============================================================ */
   async function handleGoogleLogin() {
-    await loginWithGoogle();
+    await toastAsync(
+      async () => {
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: "select_account" });
+
+        const userCred = await signInWithPopup(auth, provider);
+        const googleUser = userCred.user;
+        const result = await loginWithFirebase(googleUser);
+
+        if (!result || result.status !== "success") {
+          toast.dismiss();
+
+          if ((result as any)?.statusCode === 404) {
+            toastMessage("No account found. Redirecting to signup...", {
+              type: "warning",
+            });
+            setTimeout(() => window.location.replace("/signup"), 1000);
+            return;
+          }
+
+          if ((result as any)?.code === 403) {
+            toastMessage("Please verify your email before logging in.", {
+              type: "warning",
+            });
+            setTimeout(
+              () =>
+                window.location.replace(
+                  `/verify-email?email=${googleUser.email}`
+                ),
+              1000
+            );
+            return;
+          }
+
+          throw new Error(result?.message || "Session creation failed.");
+        }
+
+        toast.dismiss();
+        toastMessage("Signed in successfully. Redirecting...", {
+          type: "success",
+        });
+        window.location.replace("/dashboard");
+      },
+      {
+        loading: "Connecting to Google...",
+        success: "Connected.",
+        error: "Google sign-in failed. Please try again.",
+      }
+    );
   }
 
-  /* ============================================================
-     💅 UI
-  ============================================================ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -101,7 +142,6 @@ export function LoginForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* 🌐 Google Button */}
               <Field>
                 <Button
                   variant="outline"
@@ -147,7 +187,6 @@ export function LoginForm({
                 Or continue with
               </FieldSeparator>
 
-              {/* 📧 Email */}
               <Controller
                 name="email"
                 control={form.control}
@@ -166,7 +205,6 @@ export function LoginForm({
                 )}
               />
 
-              {/* 🔒 Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -209,7 +247,6 @@ export function LoginForm({
                 )}
               />
 
-              {/* 🚀 Submit */}
               <Field>
                 <Button
                   type="submit"
