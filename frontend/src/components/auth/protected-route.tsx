@@ -20,18 +20,17 @@ export function ProtectedRoute({
   const [verifying, setVerifying] = useState(true);
   const redirected = useRef(false);
 
-  // ✅ Handle redirect after logout or session expiry
   useEffect(() => {
     if (!loading && !user && !redirected.current) {
       redirected.current = true;
       console.info("🔒 No user — redirecting to login.");
-      router.replace(redirectTo);
-    } else if (user) {
-      redirected.current = false; // reset flag once user logs in again
+      const timeout = setTimeout(() => router.replace(redirectTo), 200);
+      return () => clearTimeout(timeout);
     }
+
+    if (user) redirected.current = false;
   }, [user, loading, router, redirectTo]);
 
-  // ✅ Safety fallback if Firebase takes too long to verify
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (loading && verifying) {
@@ -64,7 +63,7 @@ export function ProtectedRoute({
       </div>
     );
   }
-
   if (!user && !loading) return null;
+
   return <>{children}</>;
 }

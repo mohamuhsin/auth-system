@@ -87,17 +87,20 @@ export function LoginForm({
         const googleUser = userCred.user;
         const result = await loginWithFirebase(googleUser);
 
+        // 🚫 Handle cases where login failed or user doesn't exist
         if (!result || result.status !== "success") {
           toast.dismiss();
 
+          // 404: User not found
           if ((result as any)?.statusCode === 404) {
-            toastMessage("No account found. Redirecting to signup...", {
+            toastMessage("No account exists. Redirecting to signup...", {
               type: "warning",
             });
             setTimeout(() => window.location.replace("/signup"), 1000);
             return;
           }
 
+          // 403: Email not verified
           if ((result as any)?.code === 403) {
             toastMessage("Please verify your email before logging in.", {
               type: "warning",
@@ -112,9 +115,11 @@ export function LoginForm({
             return;
           }
 
+          // All other failures
           throw new Error(result?.message || "Session creation failed.");
         }
 
+        // ✅ Single clean success toast
         toast.dismiss();
         toastMessage("Signed in successfully. Redirecting...", {
           type: "success",
@@ -123,7 +128,7 @@ export function LoginForm({
       },
       {
         loading: "Connecting to Google...",
-        success: "Connected.",
+        // ✅ Removed extra success toast to avoid double notification
         error: "Google sign-in failed. Please try again.",
       }
     );

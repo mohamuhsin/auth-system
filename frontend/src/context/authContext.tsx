@@ -221,8 +221,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await apiRequest("/auth/logout", { method: "POST" });
         } finally {
           await signOut(auth).catch(() => {});
+
+          // 👇 Immediately clear session state so UI updates instantly
           setUser(null);
           setLoading(false);
+
+          if (typeof window !== "undefined") {
+            setTimeout(() => {
+              window.location.replace("/login");
+            }, 200);
+          }
         }
       },
       {
