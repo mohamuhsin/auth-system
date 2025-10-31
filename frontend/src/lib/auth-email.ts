@@ -26,7 +26,7 @@ function normalizeApi(res: any): {
   message?: string;
 } {
   if (res && typeof res === "object" && "ok" in res && "status" in res) {
-    return { ok: !!res.ok, status: Number(res.status) };
+    return { ok: !!res.ok, status: Number(res.status), message: res.message };
   }
   if (res && typeof res === "object") {
     const statusNum =
@@ -37,16 +37,14 @@ function normalizeApi(res: any): {
         : typeof res.status === "number"
         ? res.status
         : undefined;
-    const statusStr = res.status ?? res.statusText;
     const ok =
-      statusStr === "success" ||
-      (typeof statusNum === "number" && statusNum >= 200 && statusNum < 300);
+      typeof statusNum === "number" && statusNum >= 200 && statusNum < 300;
     return { ok, status: statusNum, message: res.message };
   }
   return { ok: false };
 }
 
-function go(path: string, delay = 800) {
+function go(path: string, delay = 1000) {
   if (typeof window === "undefined") return;
   setTimeout(() => {
     try {
@@ -78,8 +76,6 @@ export async function signupWithEmailPassword(
     toastMessage("Creating your account...", { type: "loading" });
 
     const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await sendEmailVerification(cred.user, actionCodeSettings);
-
     const idToken = await cred.user.getIdToken(true);
     const raw = await apiRequest("/auth/signup-with-firebase", {
       method: "POST",
@@ -95,25 +91,23 @@ export async function signupWithEmailPassword(
         type: "warning",
       });
       go("/login", 1200);
-      return { ok: false, message: "Account already exists." };
+      return { ok: false };
     }
 
-    if (res.status === 403 || res.status === 202) {
-      toastMessage("Verify your email before logging in.", { type: "info" });
-      go(`/verify-email?email=${encodeURIComponent(email)}`, 1200);
+    // Send verification after backend success
+    await sendEmailVerification(cred.user, actionCodeSettings);
+
+    // If verification required
+    if (res.status === 403 || res.status === 202 || !cred.user.emailVerified) {
+      toastMessage("Check your inbox to verify your email.", { type: "info" });
+      go(`/verify-email?email=${encodeURIComponent(email)}`, 1400);
       return { ok: true, message: "Verification pending." };
     }
 
-    if (res.ok) {
-      toastMessage("Account created successfully.", { type: "success" });
-      go("/dashboard", 900);
-      return { ok: true };
-    }
-
-    toastMessage(res.message || "Unexpected error occurred.", {
-      type: "error",
-    });
-    return { ok: false, message: res.message || "Signup failed." };
+    // Successful signup (should be rare if email verified)
+    toastMessage("Account created successfully.", { type: "success" });
+    go("/dashboard", 800);
+    return { ok: true };
   } catch (err: any) {
     toast.dismiss();
     const code = err?.code as string;
@@ -124,28 +118,18 @@ export async function signupWithEmailPassword(
           type: "warning",
         });
         go("/login", 1200);
-        return { ok: false, message: "Account already exists." };
-
+        return { ok: false };
       case "auth/invalid-email":
         toastMessage("Invalid email address.", { type: "error" });
-        return { ok: false, message: "Invalid email." };
-
+        return { ok: false };
       case "auth/weak-password":
         toastMessage("Weak password. Try a stronger one.", { type: "warning" });
-        return { ok: false, message: "Weak password." };
-
+        return { ok: false };
       default:
-        const msg =
-          err?.data?.message || err?.message || "Unexpected error occurred.";
-        if (msg.includes("already")) {
-          toastMessage("Account already exists. Redirecting to login...", {
-            type: "warning",
-          });
-          go("/login", 1200);
-          return { ok: false, message: "Account already exists." };
-        }
-        toastMessage(msg, { type: "error" });
-        return { ok: false, message: msg };
+        toastMessage(err?.message || "Unexpected signup error.", {
+          type: "error",
+        });
+        return { ok: false, message: err?.message };
     }
   }
 }
@@ -162,14 +146,15 @@ export async function loginWithEmailPassword(
     toastMessage("Signing you in...", { type: "loading" });
 
     const cred = await signInWithEmailAndPassword(auth, email, password);
+    await cred.user.reload();
 
+    // If unverified — resend and redirect
     if (!cred.user.emailVerified) {
+      await sendEmailVerification(cred.user, actionCodeSettings);
       await signOut(auth);
       toast.dismiss();
-      toastMessage("Please verify your email before signing in.", {
-        type: "warning",
-      });
-      go(`/verify-email?email=${encodeURIComponent(email)}`, 800);
+      toastMessage("Check your inbox to verify your email.", { type: "info" });
+      go(`/verify-email?email=${encodeURIComponent(email)}`, 1000);
       return { ok: false, message: "Email not verified." };
     }
 
@@ -184,11 +169,12 @@ export async function loginWithEmailPassword(
     toast.dismiss();
 
     if (res.status === 403 || res.status === 202) {
-      toastMessage("Account created! Please verify your email to continue.", {
-        type: "success",
+      await sendEmailVerification(cred.user, actionCodeSettings);
+      toastMessage("Please verify your email before continuing.", {
+        type: "info",
       });
       go(`/verify-email?email=${encodeURIComponent(email)}`, 1200);
-      return { ok: true, message: "Verification pending." };
+      return { ok: false, message: "Verification pending." };
     }
 
     if (res.status === 404) {
@@ -196,43 +182,39 @@ export async function loginWithEmailPassword(
         type: "warning",
       });
       go("/signup", 1000);
-      return { ok: false, message: "No account exists." };
+      return { ok: false };
     }
 
     if (!res.ok) {
       toastMessage(res.message || "Login failed.", { type: "error" });
-      return { ok: false, message: res.message || "Login failed." };
+      return { ok: false, message: res.message };
     }
 
-    toastMessage("Welcome back.", { type: "success" });
+    toastMessage("Welcome back!", { type: "success" });
     go("/dashboard", 600);
     return { ok: true };
   } catch (err: any) {
     toast.dismiss();
-
     const code = err?.code as string;
     let msg = "Login failed. Please try again.";
 
     switch (code) {
       case "auth/invalid-email":
-        msg = "Invalid email format. Please check and try again.";
+        msg = "Invalid email format.";
         break;
       case "auth/user-not-found":
       case "auth/wrong-password":
       case "auth/invalid-credential":
-        msg = "Invalid email or password. Please try again.";
+        msg = "Invalid email or password.";
         break;
       case "auth/too-many-requests":
-        msg = "Too many failed attempts. Please wait and try again later.";
+        msg = "Too many attempts. Please wait and try again.";
         break;
       case "auth/network-request-failed":
         msg = "Network error. Please check your connection.";
         break;
       default:
-        msg =
-          err?.data?.message ||
-          err?.message ||
-          "Unexpected error. Please try again.";
+        msg = err?.message || msg;
     }
 
     toastMessage(msg, { type: "error" });
@@ -249,32 +231,20 @@ export async function requestPasswordReset(email: string): Promise<AuthResult> {
     toastMessage("Sending password reset link...", { type: "loading" });
 
     await sendPasswordResetEmail(auth, email);
-
     toast.dismiss();
-    toastMessage(
-      "Password reset link sent successfully. Check your inbox and follow the link to set a new password.",
-      { type: "success" }
-    );
-
-    return { ok: true, message: "Reset email sent." };
+    toastMessage("Password reset link sent. Check your inbox.", {
+      type: "success",
+    });
+    return { ok: true };
   } catch (err: any) {
     toast.dismiss();
     const code = err?.code as string;
-
-    switch (code) {
-      case "auth/user-not-found":
-        toastMessage("No account found with that email.", { type: "warning" });
-        return { ok: false, message: "User not found." };
-
-      case "auth/invalid-email":
-        toastMessage("Please enter a valid email address.", { type: "error" });
-        return { ok: false, message: "Invalid email." };
-
-      default:
-        const msg = err?.message || "Failed to send reset link.";
-        toastMessage(msg, { type: "error" });
-        return { ok: false, message: msg };
-    }
+    let msg = err?.message || "Failed to send reset link.";
+    if (code === "auth/user-not-found")
+      msg = "No account found with that email.";
+    if (code === "auth/invalid-email") msg = "Invalid email format.";
+    toastMessage(msg, { type: "error" });
+    return { ok: false, message: msg };
   }
 }
 
@@ -283,46 +253,32 @@ export async function requestPasswordReset(email: string): Promise<AuthResult> {
 ============================================================ */
 export async function resendVerificationEmail(): Promise<AuthResult> {
   const user = auth.currentUser;
-
   if (!user) {
-    toast.dismiss();
-    toastMessage(
-      "We couldn’t resend the verification email because your signup session expired. Please sign in again to request a new link.",
-      { type: "warning" }
-    );
+    toastMessage("Session expired. Please sign in again.", { type: "warning" });
     go("/login", 1500);
-    return { ok: false, message: "Session expired. Please sign in again." };
+    return { ok: false };
   }
 
   try {
-    toast.dismiss();
     toastMessage("Sending verification email...", { type: "loading" });
     await sendEmailVerification(user, actionCodeSettings);
     toast.dismiss();
-    toastMessage("Verification link sent successfully.", { type: "success" });
+    toastMessage("Verification email sent successfully.", { type: "success" });
     return { ok: true };
   } catch (err: any) {
     toast.dismiss();
     const code = err?.code as string;
-
     if (code === "auth/too-many-requests") {
-      toastMessage("Too many verification attempts. Try again later.", {
-        type: "warning",
-      });
-      return { ok: false, message: "Too many requests." };
+      toastMessage("Too many attempts. Try again later.", { type: "warning" });
+      return { ok: false };
     }
-
     if (code === "auth/requires-recent-login") {
-      toastMessage("Please log in again to resend the email.", {
-        type: "warning",
-      });
+      toastMessage("Please log in again to resend email.", { type: "warning" });
       go("/login", 1200);
-      return { ok: false, message: "Requires recent login." };
+      return { ok: false };
     }
-
-    const msg = err?.message || "Something went wrong.";
-    toastMessage(msg, { type: "error" });
-    return { ok: false, message: msg };
+    toastMessage(err?.message || "Failed to send email.", { type: "error" });
+    return { ok: false };
   }
 }
 
@@ -337,11 +293,9 @@ export async function loginWithGoogle(): Promise<AuthResult> {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 
-    // 🔐 Firebase popup flow
     const result = await signInWithPopup(auth, provider);
     const idToken = await result.user.getIdToken();
 
-    // 🚀 Try backend login
     const raw = await apiRequest("/auth/login-with-firebase", {
       method: "POST",
       credentials: "include",
@@ -351,55 +305,37 @@ export async function loginWithGoogle(): Promise<AuthResult> {
     const res = normalizeApi(raw);
     toast.dismiss();
 
-    // ✅ Success
     if (res.ok) {
-      toastMessage("Welcome back.", { type: "success" });
+      toastMessage("Welcome back!", { type: "success" });
       go("/dashboard", 600);
       return { ok: true };
     }
 
-    // ❌ No account in backend → redirect to signup
     if (res.status === 404) {
       toastMessage("No account found. Redirecting to signup...", {
         type: "warning",
       });
       const email = encodeURIComponent(result.user.email || "");
       go(`/signup?email=${email}`, 800);
-      return { ok: false, message: "No account found. Redirecting to signup." };
+      return { ok: false };
     }
 
-    // ⚠️ Unverified (rare for Google, but just in case)
-    if (res.status === 403 || res.status === 401) {
-      toastMessage("Please verify your email before logging in.", {
-        type: "warning",
-      });
-      const email = encodeURIComponent(result.user.email || "");
-      go(`/verify-email?email=${email}`, 1000);
-      return { ok: false, message: "Verification required." };
-    }
-
-    // 🧠 Generic fallback
     toastMessage(res.message || "Google sign-in failed.", { type: "error" });
-    return { ok: false, message: res.message || "Google sign-in failed." };
+    return { ok: false };
   } catch (err: any) {
     toast.dismiss();
     const code = err?.code as string;
-
-    // Handle common Firebase popup issues
-    switch (code) {
-      case "auth/popup-closed-by-user":
-        toastMessage("Google sign-in cancelled.", { type: "info" });
-        return { ok: false, message: "Cancelled." };
-      case "auth/network-request-failed":
-        toastMessage("Network error. Please check your connection.", {
-          type: "error",
-        });
-        return { ok: false, message: "Network error." };
-      default:
-        const msg = err?.message || "Google sign-in failed.";
-        toastMessage(msg, { type: "error" });
-        console.error("Google sign-in error:", err);
-        return { ok: false, message: msg };
+    if (code === "auth/popup-closed-by-user") {
+      toastMessage("Google sign-in cancelled.", { type: "info" });
+      return { ok: false };
     }
+    if (code === "auth/network-request-failed") {
+      toastMessage("Network error. Please check your connection.", {
+        type: "error",
+      });
+      return { ok: false };
+    }
+    toastMessage(err?.message || "Google sign-in failed.", { type: "error" });
+    return { ok: false };
   }
 }
