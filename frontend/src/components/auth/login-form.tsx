@@ -45,7 +45,7 @@ export function LoginForm({
   });
 
   /* ============================================================
-     📨 Toast for password reset success
+     Toast for password reset success
   ============================================================ */
   useEffect(() => {
     if (searchParams.get("reset") === "success") {
@@ -82,7 +82,7 @@ export function LoginForm({
      🌐 Google Sign-In (new unified handler)
   ============================================================ */
   async function handleGoogleLogin() {
-    await loginWithGoogle(); // ✅ Calls centralized logic in auth.ts
+    await loginWithGoogle();
   }
 
   /* ============================================================
