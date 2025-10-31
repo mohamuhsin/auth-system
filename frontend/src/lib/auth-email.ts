@@ -178,20 +178,20 @@ export async function loginWithEmailPassword(
 
     toast.dismiss();
 
-    if (res.status === 403) {
-      toastMessage("Please verify your email before logging in.", {
-        type: "warning",
+    if (res.status === 403 || res.status === 202) {
+      toastMessage("Account created! Please verify your email to continue.", {
+        type: "success",
       });
-      go(`/verify-email?email=${encodeURIComponent(email)}`, 800);
-      return { ok: false, message: "Email not verified." };
+      go(`/verify-email?email=${encodeURIComponent(email)}`, 1200);
+      return { ok: true, message: "Verification pending." };
     }
 
     if (res.status === 404) {
-      toastMessage("No account found. Redirecting to signup...", {
+      toastMessage("No account exists. Redirecting to signup...", {
         type: "warning",
       });
-      go("/signup", 1200);
-      return { ok: false, message: "User not found." };
+      go("/signup", 1000);
+      return { ok: false, message: "No account exists." };
     }
 
     if (!res.ok) {
@@ -242,26 +242,31 @@ export async function requestPasswordReset(email: string): Promise<AuthResult> {
   try {
     toast.dismiss();
     toastMessage("Sending password reset link...", { type: "loading" });
+
     await sendPasswordResetEmail(auth, email);
+
     toast.dismiss();
-    toastMessage("Password reset link sent. Check your inbox.", {
-      type: "success",
-    });
-    return { ok: true };
+    toastMessage(
+      "Password reset link sent successfully. Check your inbox and follow the link to set a new password.",
+      { type: "success" }
+    );
+
+    return { ok: true, message: "Reset email sent." };
   } catch (err: any) {
     toast.dismiss();
     const code = err?.code as string;
+
     switch (code) {
       case "auth/user-not-found":
         toastMessage("No account found with that email.", { type: "warning" });
         return { ok: false, message: "User not found." };
 
       case "auth/invalid-email":
-        toastMessage("Please enter a valid email.", { type: "error" });
+        toastMessage("Please enter a valid email address.", { type: "error" });
         return { ok: false, message: "Invalid email." };
 
       default:
-        const msg = err?.message || "Reset failed.";
+        const msg = err?.message || "Failed to send reset link.";
         toastMessage(msg, { type: "error" });
         return { ok: false, message: msg };
     }
@@ -276,9 +281,12 @@ export async function resendVerificationEmail(): Promise<AuthResult> {
 
   if (!user) {
     toast.dismiss();
-    toastMessage("Please log in again first.", { type: "error" });
-    go("/login", 1000);
-    return { ok: false, message: "No current user." };
+    toastMessage(
+      "We couldn’t resend the verification email because your signup session expired. Please sign in again to request a new link.",
+      { type: "warning" }
+    );
+    go("/login", 1500);
+    return { ok: false, message: "Session expired. Please sign in again." };
   }
 
   try {
