@@ -5,11 +5,16 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
   signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { apiRequest } from "@/lib/api";
 import { toast, toastMessage } from "@/lib/toast";
 
+/* ============================================================
+   📦 Shared Types & Helpers
+============================================================ */
 export interface AuthResult {
   ok: boolean;
   message?: string;
@@ -61,7 +66,7 @@ const actionCodeSettings =
     : undefined;
 
 /* ============================================================
-   ✳️ SIGNUP
+   ✳️ SIGNUP — Email/Password
 ============================================================ */
 export async function signupWithEmailPassword(
   email: string,
@@ -146,7 +151,7 @@ export async function signupWithEmailPassword(
 }
 
 /* ============================================================
-   🔑 LOGIN
+   🔑 LOGIN — Email/Password
 ============================================================ */
 export async function loginWithEmailPassword(
   email: string,
@@ -318,5 +323,83 @@ export async function resendVerificationEmail(): Promise<AuthResult> {
     const msg = err?.message || "Something went wrong.";
     toastMessage(msg, { type: "error" });
     return { ok: false, message: msg };
+  }
+}
+
+/* ============================================================
+   🌐 GOOGLE SIGN-IN
+============================================================ */
+export async function loginWithGoogle(): Promise<AuthResult> {
+  try {
+    toast.dismiss();
+    toastMessage("Signing in with Google...", { type: "loading" });
+
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+
+    // 🔐 Firebase popup flow
+    const result = await signInWithPopup(auth, provider);
+    const idToken = await result.user.getIdToken();
+
+    // 🚀 Try backend login
+    const raw = await apiRequest("/auth/login-with-firebase", {
+      method: "POST",
+      credentials: "include",
+      body: { idToken },
+    });
+
+    const res = normalizeApi(raw);
+    toast.dismiss();
+
+    // ✅ Success
+    if (res.ok) {
+      toastMessage("Welcome back.", { type: "success" });
+      go("/dashboard", 600);
+      return { ok: true };
+    }
+
+    // ❌ No account in backend → redirect to signup
+    if (res.status === 404) {
+      toastMessage("No account found. Redirecting to signup...", {
+        type: "warning",
+      });
+      const email = encodeURIComponent(result.user.email || "");
+      go(`/signup?email=${email}`, 800);
+      return { ok: false, message: "No account found. Redirecting to signup." };
+    }
+
+    // ⚠️ Unverified (rare for Google, but just in case)
+    if (res.status === 403 || res.status === 401) {
+      toastMessage("Please verify your email before logging in.", {
+        type: "warning",
+      });
+      const email = encodeURIComponent(result.user.email || "");
+      go(`/verify-email?email=${email}`, 1000);
+      return { ok: false, message: "Verification required." };
+    }
+
+    // 🧠 Generic fallback
+    toastMessage(res.message || "Google sign-in failed.", { type: "error" });
+    return { ok: false, message: res.message || "Google sign-in failed." };
+  } catch (err: any) {
+    toast.dismiss();
+    const code = err?.code as string;
+
+    // Handle common Firebase popup issues
+    switch (code) {
+      case "auth/popup-closed-by-user":
+        toastMessage("Google sign-in cancelled.", { type: "info" });
+        return { ok: false, message: "Cancelled." };
+      case "auth/network-request-failed":
+        toastMessage("Network error. Please check your connection.", {
+          type: "error",
+        });
+        return { ok: false, message: "Network error." };
+      default:
+        const msg = err?.message || "Google sign-in failed.";
+        toastMessage(msg, { type: "error" });
+        console.error("Google sign-in error:", err);
+        return { ok: false, message: msg };
+    }
   }
 }
