@@ -9,12 +9,12 @@ import { toast, toastMessage } from "@/lib/toast";
 import { normalizeApi, go, actionCodeSettings, AuthResult } from "./helpers";
 
 /* ============================================================
-   ✳️ SIGNUP — Email + Password (Level 3.0 Final)
+   ✳️ SIGNUP — Email + Password (Level 3.1 Final)
    ------------------------------------------------------------
    • Creates Firebase user
    • Sends verification email
    • Exchanges ID token with backend for session cookie
-   • Handles 409 (exists), 403 (not verified), 202 (pending)
+   • Handles 409 (exists), 403/202/pending_verification (verify)
    • Safe redirects handled via go()
 ============================================================ */
 export async function signupWithEmailPassword(
@@ -48,6 +48,7 @@ export async function signupWithEmailPassword(
     /* ============================================================
        🔁 Handle Backend Responses
     ============================================================ */
+    // 🟡 Existing user
     if (res.status === 409) {
       toastMessage("Account already exists. Redirecting to login...", {
         type: "warning",
@@ -56,18 +57,27 @@ export async function signupWithEmailPassword(
       return { ok: false, message: "Account already exists." };
     }
 
-    if (res.status === 403 || res.status === 202) {
-      toastMessage("Verify your email before logging in.", { type: "info" });
+    // 🔵 Pending verification (email/password users)
+    if (
+      res.status === 403 ||
+      res.status === 202 ||
+      res.statusText === "pending_verification"
+    ) {
+      toastMessage("Account created. Please verify your email.", {
+        type: "info",
+      });
       go(`/verify-email?email=${encodeURIComponent(email)}`, 1200);
       return { ok: true, message: "Verification pending." };
     }
 
+    // 🟢 Verified or Google signup
     if (res.ok) {
       toastMessage("Account created successfully.", { type: "success" });
       go("/dashboard", 900);
       return { ok: true };
     }
 
+    // 🔴 Unexpected backend error
     toastMessage(res.message || "Unexpected error occurred.", {
       type: "error",
     });
