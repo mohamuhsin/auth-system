@@ -6,7 +6,13 @@ import { toast, toastMessage } from "@/lib/toast";
 import { normalizeApi, go, AuthResult } from "./helpers";
 
 /* ============================================================
-   🔑 LOGIN
+   🔑 LOGIN — Email + Password (Level 3.1 Final)
+   ------------------------------------------------------------
+   • Verifies Firebase credentials
+   • Checks email verification
+   • Exchanges ID token with backend for session cookie
+   • Handles 403 (unverified) / 404 (not found)
+   • Consistent toast + redirect flow
 ============================================================ */
 export async function loginWithEmailPassword(
   email: string,
@@ -16,18 +22,21 @@ export async function loginWithEmailPassword(
     toast.dismiss();
     toastMessage("Signing you in...", { type: "loading" });
 
+    // 🔐 Sign in via Firebase
     const cred = await signInWithEmailAndPassword(auth, email, password);
 
+    // 📩 Require verified email for password users
     if (!cred.user.emailVerified) {
       await signOut(auth);
       toast.dismiss();
       toastMessage("Please verify your email before signing in.", {
         type: "warning",
       });
-      go(`/verify-email?email=${encodeURIComponent(email)}`, 800);
+      go(`/verify-email?email=${encodeURIComponent(email)}`, 900);
       return { ok: false, message: "Email not verified." };
     }
 
+    // 🔑 Exchange ID token with backend
     const idToken = await cred.user.getIdToken(true);
     const raw = await apiRequest("/auth/login-with-firebase", {
       method: "POST",
@@ -38,11 +47,14 @@ export async function loginWithEmailPassword(
 
     toast.dismiss();
 
+    /* ============================================================
+       🔁 Backend Response Handling
+    ============================================================ */
     if (res.status === 403) {
       toastMessage("Please verify your email before logging in.", {
         type: "warning",
       });
-      go(`/verify-email?email=${encodeURIComponent(email)}`, 800);
+      go(`/verify-email?email=${encodeURIComponent(email)}`, 900);
       return { ok: false, message: "Email not verified." };
     }
 
@@ -59,12 +71,16 @@ export async function loginWithEmailPassword(
       return { ok: false, message: res.message || "Login failed." };
     }
 
+    // 🟢 Success
     toastMessage("Welcome back.", { type: "success" });
-    go("/dashboard", 600);
+    go("/dashboard", 700);
     return { ok: true };
   } catch (err: any) {
     toast.dismiss();
 
+    /* ============================================================
+       ⚠️ Firebase Client Errors
+    ============================================================ */
     const code = err?.code as string;
     let msg = "Login failed. Please try again.";
 
