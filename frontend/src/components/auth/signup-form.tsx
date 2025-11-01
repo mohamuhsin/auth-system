@@ -34,7 +34,7 @@ import { toast, toastMessage } from "@/lib/toast";
 import { signupWithEmailPassword } from "@/lib/auth";
 
 /* ============================================================
-   🧩 SignupForm — Email + Google Sign-up
+   🧩 SignupForm — Email + Google Signup
 ============================================================ */
 export function SignupForm({
   className,
@@ -55,9 +55,9 @@ export function SignupForm({
     mode: "onChange",
   });
 
-  /* ============================================================
-     📩 Email/Password Signup
-  ============================================================ */
+  /* ------------------------------------------------------------
+     📩 Email / Password Signup
+  ------------------------------------------------------------ */
   async function onSubmit(values: SignupFormValues) {
     if (values.password !== values.confirmPassword) {
       toast.dismiss();
@@ -75,14 +75,19 @@ export function SignupForm({
         values.name
       );
 
-      // ✅ Prevent false red error toasts for verification
       if (result?.ok) {
         form.reset();
+
+        // 📬 If verification required (pending)
         if (result.message?.toLowerCase().includes("verify")) {
           toast.dismiss();
           toastMessage(result.message, { type: "info" });
+          return;
         }
+
+        toastMessage("Account created successfully.", { type: "success" });
       } else {
+        // ⚠️ Error but not verification
         if (
           result?.message &&
           !result.message.toLowerCase().includes("verify")
@@ -98,9 +103,9 @@ export function SignupForm({
     }
   }
 
-  /* ============================================================
-     🔑 Google Signup (Firebase Popup)
-  ============================================================ */
+  /* ------------------------------------------------------------
+     🌐 Google Signup (Firebase Popup)
+  ------------------------------------------------------------ */
   async function handleGoogleSignup() {
     toast.dismiss();
     toastMessage("Connecting to Google...", { type: "loading" });
@@ -119,21 +124,41 @@ export function SignupForm({
 
       toast.dismiss();
 
-      if (!result || result.status !== "success") {
-        if ((result as any)?.statusCode === 409) {
-          toastMessage("Account already exists. Redirecting to login...", {
-            type: "warning",
-          });
-          window.location.replace("/login");
-          return;
-        }
-        throw new Error(result?.message || "Signup verification failed.");
+      // ⚠️ Existing account (HTTP 409)
+      if (result?.code === 409) {
+        toastMessage("Account already exists. Redirecting to login...", {
+          type: "warning",
+        });
+        setTimeout(() => window.location.replace("/login"), 1000);
+        return;
       }
 
-      toastMessage("Signed up successfully. Redirecting...", {
-        type: "success",
-      });
-      window.location.replace("/dashboard");
+      // 📨 Pending verification (HTTP 202)
+      if (result?.status === "pending_verification" || result?.code === 202) {
+        toastMessage(
+          "Account created. Please verify your email before logging in.",
+          { type: "info" }
+        );
+        setTimeout(
+          () =>
+            window.location.replace(
+              `/verify-email?email=${googleUser.email ?? ""}`
+            ),
+          1200
+        );
+        return;
+      }
+
+      // 🟢 Success
+      if (result?.status === "success") {
+        toastMessage("Signed up successfully. Redirecting...", {
+          type: "success",
+        });
+        setTimeout(() => window.location.replace("/dashboard"), 700);
+        return;
+      }
+
+      throw new Error(result?.message || "Google sign-up failed.");
     } catch (err: any) {
       toast.dismiss();
       toastMessage(err?.message || "Google sign-up failed. Please try again.", {
@@ -142,9 +167,9 @@ export function SignupForm({
     }
   }
 
-  /* ============================================================
+  /* ------------------------------------------------------------
      🎨 UI Layout
-  ============================================================ */
+  ------------------------------------------------------------ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -160,7 +185,7 @@ export function SignupForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* 🌐 Google Sign-up */}
+              {/* 🌐 Google Signup */}
               <Field>
                 <Button
                   variant="outline"

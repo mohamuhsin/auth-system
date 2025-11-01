@@ -6,11 +6,11 @@ import { toast, toastMessage } from "@/lib/toast";
 import { normalizeApi, go, AuthResult } from "./helpers";
 
 /* ============================================================
-   🔑 LOGIN — Email + Password (Final Polished)
+   🔑 LOGIN — Email + Password (Stable v3.5)
    ------------------------------------------------------------
-   • Firebase verifies credentials (user-not-found vs wrong-password)
-   • Backend issues session cookie if valid
-   • Consistent toasts and redirects
+   • Distinguishes Firebase client errors early
+   • Backend handles verified + session exchange
+   • Single consistent toast per outcome
 ============================================================ */
 export async function loginWithEmailPassword(
   email: string,
@@ -34,7 +34,7 @@ export async function loginWithEmailPassword(
       return { ok: false, message: "Email not verified." };
     }
 
-    // 🔑 Exchange ID token with backend
+    // 🔑 Exchange Firebase ID token → backend session
     const idToken = await cred.user.getIdToken(true);
     const raw = await apiRequest("/auth/login-with-firebase", {
       method: "POST",
@@ -77,15 +77,16 @@ export async function loginWithEmailPassword(
     toast.dismiss();
 
     /* ============================================================
-       ⚠️ Firebase Client Errors
+       ⚠️ Firebase Client-Side Errors
     ============================================================ */
     const code = err?.code as string;
-    let msg = "Login failed. Please try again.";
 
     switch (code) {
       case "auth/invalid-email":
-        msg = "Invalid email format. Please check and try again.";
-        break;
+        toastMessage("Invalid email format. Please check and try again.", {
+          type: "error",
+        });
+        return { ok: false, message: "Invalid email format." };
 
       case "auth/user-not-found":
         toastMessage("Account does not exist. Redirecting to signup...", {
@@ -96,25 +97,32 @@ export async function loginWithEmailPassword(
 
       case "auth/wrong-password":
       case "auth/invalid-credential":
-        msg = "Invalid email or password. Please try again.";
-        break;
+        toastMessage("Incorrect password. Please try again.", {
+          type: "error",
+        });
+        return { ok: false, message: "Wrong password." };
 
       case "auth/too-many-requests":
-        msg = "Too many failed attempts. Please wait and try again later.";
-        break;
+        toastMessage(
+          "Too many failed attempts. Please wait a moment and try again.",
+          { type: "warning" }
+        );
+        return { ok: false, message: "Too many attempts." };
 
       case "auth/network-request-failed":
-        msg = "Network error. Please check your connection.";
-        break;
+        toastMessage("Network error. Please check your connection.", {
+          type: "error",
+        });
+        return { ok: false, message: "Network error." };
 
-      default:
-        msg =
+      default: {
+        const msg =
           err?.data?.message ||
           err?.message ||
           "Unexpected error. Please try again.";
+        toastMessage(msg, { type: "error" });
+        return { ok: false, message: msg };
+      }
     }
-
-    toastMessage(msg, { type: "error" });
-    return { ok: false, message: msg };
   }
 }
