@@ -74,7 +74,22 @@ export function SignupForm({
         values.password,
         values.name
       );
-      if (result?.ok) form.reset();
+
+      // ✅ Prevent false red error toasts for verification
+      if (result?.ok) {
+        form.reset();
+        if (result.message?.toLowerCase().includes("verify")) {
+          toast.dismiss();
+          toastMessage(result.message, { type: "info" });
+        }
+      } else {
+        if (
+          result?.message &&
+          !result.message.toLowerCase().includes("verify")
+        ) {
+          toastMessage(result.message, { type: "error" });
+        }
+      }
     } catch (err: any) {
       toast.dismiss();
       toastMessage(err?.message || "Signup failed. Please try again.", {

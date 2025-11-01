@@ -12,7 +12,7 @@ export interface AuthResult {
    🧩 normalizeApi — Normalize backend responses
    ------------------------------------------------------------
    Handles Express JSON, Firebase errors, and custom codes.
-   Detects "pending_verification" + 202 as non-error states.
+   Treats 202 or "pending_verification" as OK (non-error).
 ============================================================ */
 export function normalizeApi(res: any): {
   ok: boolean;
@@ -22,7 +22,7 @@ export function normalizeApi(res: any): {
 } {
   if (!res || typeof res !== "object") return { ok: false };
 
-  // 🧭 Detect numeric code
+  // 🧭 Detect numeric status code
   const statusNum =
     typeof res.code === "number"
       ? res.code
@@ -38,14 +38,18 @@ export function normalizeApi(res: any): {
       ? res.status.toLowerCase()
       : res.statusText?.toLowerCase?.();
 
-  // ✅ Define success and verification conditions
+  // ✅ Define positive conditions
   const isSuccess =
     statusStr === "success" ||
     res.ok === true ||
     (typeof statusNum === "number" && statusNum >= 200 && statusNum < 300);
 
-  const isPending = statusStr === "pending_verification" || statusNum === 202;
+  const isPending =
+    statusStr === "pending_verification" ||
+    statusStr === "pending" ||
+    statusNum === 202;
 
+  // 🧠 Normalize unified response
   return {
     ok: isSuccess || isPending,
     status: statusNum,
@@ -60,6 +64,9 @@ export function normalizeApi(res: any): {
 
 /* ============================================================
    🧭 go — Safe redirect with fallback (Next.js-Safe)
+   ------------------------------------------------------------
+   Uses window.location.assign() for reliability across browsers.
+   Falls back gracefully to href if assign fails.
 ============================================================ */
 export function go(path: string, delay = 800) {
   if (typeof window === "undefined") return;
@@ -75,6 +82,8 @@ export function go(path: string, delay = 800) {
 
 /* ============================================================
    ✉️ actionCodeSettings — For verification email links
+   ------------------------------------------------------------
+   Used in Firebase sendEmailVerification and reset password flows.
 ============================================================ */
 export const actionCodeSettings =
   typeof window !== "undefined"
