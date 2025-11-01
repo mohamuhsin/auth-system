@@ -6,6 +6,7 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,12 +26,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/form-error";
 import { signupSchema, type SignupFormValues } from "@/lib/validators/auth";
+
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { useAuth } from "@/context/authContext";
 import { toast, toastMessage } from "@/lib/toast";
-import { signupWithEmailPassword } from "@/lib/auth-email";
+import { signupWithEmailPassword } from "@/lib/auth";
 
+/* ============================================================
+   🧩 SignupForm — Email + Google Sign-up
+============================================================ */
 export function SignupForm({
   className,
   ...props
@@ -50,6 +55,9 @@ export function SignupForm({
     mode: "onChange",
   });
 
+  /* ============================================================
+     📩 Email/Password Signup
+  ============================================================ */
   async function onSubmit(values: SignupFormValues) {
     if (values.password !== values.confirmPassword) {
       toast.dismiss();
@@ -75,6 +83,9 @@ export function SignupForm({
     }
   }
 
+  /* ============================================================
+     🔑 Google Signup (Firebase Popup)
+  ============================================================ */
   async function handleGoogleSignup() {
     toast.dismiss();
     toastMessage("Connecting to Google...", { type: "loading" });
@@ -116,6 +127,9 @@ export function SignupForm({
     }
   }
 
+  /* ============================================================
+     🎨 UI Layout
+  ============================================================ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -127,9 +141,11 @@ export function SignupForm({
             Sign up with Google or continue with email
           </CardDescription>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
+              {/* 🌐 Google Sign-up */}
               <Field>
                 <Button
                   variant="outline"
@@ -176,6 +192,7 @@ export function SignupForm({
                 Or continue with
               </FieldSeparator>
 
+              {/* 👤 Name */}
               <Controller
                 name="name"
                 control={form.control}
@@ -193,6 +210,7 @@ export function SignupForm({
                 )}
               />
 
+              {/* 📧 Email */}
               <Controller
                 name="email"
                 control={form.control}
@@ -211,6 +229,7 @@ export function SignupForm({
                 )}
               />
 
+              {/* 🔑 Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -245,6 +264,7 @@ export function SignupForm({
                 )}
               />
 
+              {/* 🔁 Confirm Password */}
               <Controller
                 name="confirmPassword"
                 control={form.control}
@@ -286,6 +306,7 @@ export function SignupForm({
                 uppercase letter.
               </FieldDescription>
 
+              {/* 🚀 Submit */}
               <Field>
                 <Button
                   type="submit"

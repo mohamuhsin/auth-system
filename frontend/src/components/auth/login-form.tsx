@@ -31,9 +31,12 @@ import { loginSchema, type LoginFormValues } from "@/lib/validators/auth";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { useAuth } from "@/context/authContext";
-import { toastAsync, toastMessage, toast } from "@/lib/toast";
-import { loginWithEmailPassword } from "@/lib/auth-email";
+import { toast, toastAsync, toastMessage } from "@/lib/toast";
+import { loginWithEmailPassword } from "@/lib/auth";
 
+/* ============================================================
+   🔑 LoginForm — Email + Google Login
+============================================================ */
 export function LoginForm({
   className,
   ...props
@@ -48,6 +51,9 @@ export function LoginForm({
     mode: "onChange",
   });
 
+  /* ============================================================
+     📢 Handle success after password reset
+  ============================================================ */
   useEffect(() => {
     if (searchParams.get("reset") === "success") {
       toast.dismiss();
@@ -55,6 +61,9 @@ export function LoginForm({
     }
   }, [searchParams]);
 
+  /* ============================================================
+     📩 Email/Password Login
+  ============================================================ */
   async function onSubmit(values: LoginFormValues) {
     if (!values.email || !values.password) {
       toast.dismiss();
@@ -77,6 +86,9 @@ export function LoginForm({
     }
   }
 
+  /* ============================================================
+     🌐 Google Login
+  ============================================================ */
   async function handleGoogleLogin() {
     await toastAsync(
       async () => {
@@ -87,9 +99,9 @@ export function LoginForm({
         const googleUser = userCred.user;
         const result = await loginWithFirebase(googleUser);
 
-        if (!result || result.status !== "success") {
-          toast.dismiss();
+        toast.dismiss();
 
+        if (!result || result.status !== "success") {
           if ((result as any)?.statusCode === 404) {
             toastMessage("No account found. Redirecting to signup...", {
               type: "warning",
@@ -115,7 +127,6 @@ export function LoginForm({
           throw new Error(result?.message || "Session creation failed.");
         }
 
-        toast.dismiss();
         toastMessage("Signed in successfully. Redirecting...", {
           type: "success",
         });
@@ -129,6 +140,9 @@ export function LoginForm({
     );
   }
 
+  /* ============================================================
+     🎨 UI Layout
+  ============================================================ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -142,6 +156,7 @@ export function LoginForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
+              {/* 🌐 Google Login */}
               <Field>
                 <Button
                   variant="outline"
@@ -187,6 +202,7 @@ export function LoginForm({
                 Or continue with
               </FieldSeparator>
 
+              {/* 📧 Email */}
               <Controller
                 name="email"
                 control={form.control}
@@ -205,6 +221,7 @@ export function LoginForm({
                 )}
               />
 
+              {/* 🔑 Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -247,6 +264,7 @@ export function LoginForm({
                 )}
               />
 
+              {/* 🚀 Submit */}
               <Field>
                 <Button
                   type="submit"
