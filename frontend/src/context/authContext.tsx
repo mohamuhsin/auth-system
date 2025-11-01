@@ -42,6 +42,9 @@ interface ApiResponse {
   user?: User;
 }
 
+/* ============================================================
+   🔐 Context Types
+============================================================ */
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
@@ -58,14 +61,14 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 /* ============================================================
-   🔐 AuthProvider — Global authentication context
+   🔐 AuthProvider — Global authentication provider
 ============================================================ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   /* ------------------------------------------------------------
-     Normalize API response → User object
+     🧩 Normalize API user → internal User type
   ------------------------------------------------------------ */
   const toUser = (src: ApiResponse): User | null => {
     const u = src.user ?? src;
@@ -84,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   /* ------------------------------------------------------------
-     waitForSession — Probe session after login/signup
+     🧭 waitForSession — Poll /users/me after login/signup
   ------------------------------------------------------------ */
   const waitForSession = useCallback(async (): Promise<ApiResponse | null> => {
     const maxRetries = 5;
@@ -102,31 +105,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /* ------------------------------------------------------------
-     fetchSession — Load user session on mount or refresh
+     🔄 fetchSession — Load active session
   ------------------------------------------------------------ */
   const fetchSession = useCallback(async () => {
     try {
       const res = await apiRequest<ApiResponse>("/users/me");
-
-      if (res && (res.status === "success" || res.code === 200)) {
+      if (res && (res.status === "success" || res.code === 200))
         setUser(toUser(res));
-      } else {
-        setUser(null);
-      }
+      else setUser(null);
     } catch (err: any) {
       const status = err?.status || err?.code;
-
-      if (status === 401 || status === 403) {
-        setUser(null);
-        return;
-      }
-
+      if (status === 401 || status === 403) return setUser(null);
       if (err?.isNetworkError || err?.message?.includes("Failed to fetch")) {
         console.warn("[AuthContext] Network/CORS issue during session check.");
-        setUser(null);
-        return;
+        return setUser(null);
       }
-
       toast.dismiss();
       console.error("[AuthContext] Unexpected error in fetchSession:", err);
       toastMessage(
@@ -139,23 +132,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  /* ------------------------------------------------------------
+     🚀 Mount — initial session probe
+  ------------------------------------------------------------ */
   useEffect(() => {
     toast.dismiss();
-    const timer = setTimeout(() => {
-      fetchSession();
-    }, 600);
+    const timer = setTimeout(fetchSession, 600);
     return () => clearTimeout(timer);
   }, [fetchSession]);
 
   /* ------------------------------------------------------------
-     🔑 loginWithFirebase — Handles Google or Firebase-based login
+     🔑 loginWithFirebase — Google / Email login
   ------------------------------------------------------------ */
   const loginWithFirebase = useCallback(
     async (firebaseUser: FirebaseUser): Promise<ApiResponse> => {
       try {
         toast.dismiss();
         const idToken = await getIdToken(firebaseUser, true);
-
         const res = await apiRequest<ApiResponse>("/auth/login-with-firebase", {
           method: "POST",
           body: {
@@ -167,37 +160,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         });
 
+        // ⚠️ Unverified email
         if (res.code === 403) {
           toastMessage("Please verify your email before logging in.", {
             type: "warning",
           });
           await signOut(auth).catch(() => {});
           setUser(null);
-          return res;
+          return { ...res, status: "unverified" };
         }
 
+        // 🔴 Account not found
         if (res.code === 404) {
           toastMessage("Account does not exist. Redirecting to signup...", {
             type: "warning",
           });
           await signOut(auth).catch(() => {});
           setUser(null);
-
           if (typeof window !== "undefined") {
-            setTimeout(() => {
-              window.location.replace("/signup");
-            }, 1000);
+            setTimeout(() => window.location.replace("/signup"), 1000);
           }
-
           return { ...res, status: "not_found" };
         }
 
+        // 🟢 Success
         const probe = await waitForSession();
         setUser(probe ? toUser(probe) : null);
         setLoading(false);
-        return { ...res, status: res.status ?? "success" };
+        return { ...res, status: "success" };
       } catch (err: any) {
         toast.dismiss();
+
+        // ⚡ Expected auth failures
+        if (err?.status === 404) {
+          toastMessage("Account does not exist. Redirecting to signup...", {
+            type: "warning",
+          });
+          await signOut(auth).catch(() => {});
+          setUser(null);
+          setTimeout(() => window.location.replace("/signup"), 1000);
+          return { status: "not_found", code: 404 };
+        }
+
+        // 🚫 Generic
         toastMessage(err?.message || "Login failed.", { type: "error" });
         setLoading(false);
         return { status: "error", code: 500, message: err?.message };
@@ -207,7 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   /* ------------------------------------------------------------
-     ✳️ signupWithFirebase — Google signup handler
+     ✳️ signupWithFirebase — Google signup
   ------------------------------------------------------------ */
   const signupWithFirebase = useCallback(
     async (
@@ -254,7 +259,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   /* ------------------------------------------------------------
-     🚪 logout — Clears session (client + backend)
+     🚪 logout — clear backend + firebase + local state
   ------------------------------------------------------------ */
   const logout = useCallback(async () => {
     await toastAsync(
@@ -265,12 +270,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await signOut(auth).catch(() => {});
           setUser(null);
           setLoading(false);
-
-          if (typeof window !== "undefined") {
-            setTimeout(() => {
-              window.location.replace("/login");
-            }, 200);
-          }
+          if (typeof window !== "undefined")
+            setTimeout(() => window.location.replace("/login"), 200);
         }
       },
       {
@@ -281,8 +282,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  /* ------------------------------------------------------------
+     ♻️ Refresh session manually
+  ------------------------------------------------------------ */
   const refreshSession = useCallback(fetchSession, [fetchSession]);
 
+  /* ------------------------------------------------------------
+     🧠 Context value
+  ------------------------------------------------------------ */
   const value = useMemo<AuthContextValue>(
     () => ({
       user,

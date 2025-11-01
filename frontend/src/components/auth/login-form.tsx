@@ -51,9 +51,9 @@ export function LoginForm({
     mode: "onChange",
   });
 
-  /* ============================================================
-     📢 Handle success after password reset
-  ============================================================ */
+  /* ------------------------------------------------------------
+     📢 Show toast after password reset redirect
+  ------------------------------------------------------------ */
   useEffect(() => {
     if (searchParams.get("reset") === "success") {
       toast.dismiss();
@@ -61,9 +61,9 @@ export function LoginForm({
     }
   }, [searchParams]);
 
-  /* ============================================================
-     📩 Email/Password Login
-  ============================================================ */
+  /* ------------------------------------------------------------
+     📩 Email / Password Login
+  ------------------------------------------------------------ */
   async function onSubmit(values: LoginFormValues) {
     if (!values.email || !values.password) {
       toast.dismiss();
@@ -77,6 +77,8 @@ export function LoginForm({
       toast.dismiss();
       const email = values.email.trim().toLowerCase();
       const result = await loginWithEmailPassword(email, values.password);
+
+      // Reset only on successful login
       if (result?.ok) form.reset();
     } catch (err: any) {
       toast.dismiss();
@@ -86,9 +88,9 @@ export function LoginForm({
     }
   }
 
-  /* ============================================================
-     🌐 Google Login
-  ============================================================ */
+  /* ------------------------------------------------------------
+     🌐 Google Login (same behavior as email login)
+  ------------------------------------------------------------ */
   async function handleGoogleLogin() {
     await toastAsync(
       async () => {
@@ -97,40 +99,44 @@ export function LoginForm({
 
         const userCred = await signInWithPopup(auth, provider);
         const googleUser = userCred.user;
-        const result = await loginWithFirebase(googleUser);
 
+        const result = await loginWithFirebase(googleUser);
         toast.dismiss();
 
-        if (!result || result.status !== "success") {
-          if ((result as any)?.statusCode === 404) {
-            toastMessage("No account found. Redirecting to signup...", {
-              type: "warning",
-            });
-            setTimeout(() => window.location.replace("/signup"), 1000);
-            return;
-          }
-
-          if ((result as any)?.code === 403) {
-            toastMessage("Please verify your email before logging in.", {
-              type: "warning",
-            });
-            setTimeout(
-              () =>
-                window.location.replace(
-                  `/verify-email?email=${googleUser.email}`
-                ),
-              1000
-            );
-            return;
-          }
-
-          throw new Error(result?.message || "Session creation failed.");
+        // 🔴 No account found → redirect to signup
+        if (result?.status === "not_found" || result?.code === 404) {
+          toastMessage("Account does not exist. Redirecting to signup...", {
+            type: "warning",
+          });
+          setTimeout(() => window.location.replace("/signup"), 1000);
+          return;
         }
 
-        toastMessage("Signed in successfully. Redirecting...", {
-          type: "success",
-        });
-        window.location.replace("/dashboard");
+        // ⚠️ Unverified email
+        if (result?.status === "unverified" || result?.code === 403) {
+          toastMessage("Please verify your email before logging in.", {
+            type: "warning",
+          });
+          setTimeout(
+            () =>
+              window.location.replace(
+                `/verify-email?email=${googleUser.email}`
+              ),
+            1000
+          );
+          return;
+        }
+
+        // 🟢 Success
+        if (result?.status === "success") {
+          toastMessage("Signed in successfully. Redirecting...", {
+            type: "success",
+          });
+          window.location.replace("/dashboard");
+          return;
+        }
+
+        throw new Error(result?.message || "Google login failed.");
       },
       {
         loading: "Connecting to Google...",
@@ -140,9 +146,9 @@ export function LoginForm({
     );
   }
 
-  /* ============================================================
+  /* ------------------------------------------------------------
      🎨 UI Layout
-  ============================================================ */
+  ------------------------------------------------------------ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
