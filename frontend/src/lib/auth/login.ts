@@ -6,11 +6,13 @@ import { toast, toastMessage } from "@/lib/toast";
 import { normalizeApi, go, AuthResult } from "./helpers";
 
 /* ============================================================
-   🔑 LOGIN — Email + Password (Stable v3.5)
+   🔑 LOGIN — Email + Password (Final v3.6)
    ------------------------------------------------------------
-   • Distinguishes Firebase client errors early
-   • Backend handles verified + session exchange
-   • Single consistent toast per outcome
+   • Clear distinction between:
+       - No account exists
+       - Wrong password
+       - Unverified account
+   • Unified backend + frontend handling
 ============================================================ */
 export async function loginWithEmailPassword(
   email: string,
@@ -20,10 +22,10 @@ export async function loginWithEmailPassword(
     toast.dismiss();
     toastMessage("Signing you in...", { type: "loading" });
 
-    // 🔐 Sign in via Firebase
+    // 🔐 Firebase authentication
     const cred = await signInWithEmailAndPassword(auth, email, password);
 
-    // 📩 Require verified email for password users
+    // 📩 Require verified email
     if (!cred.user.emailVerified) {
       await signOut(auth);
       toast.dismiss();
@@ -34,7 +36,7 @@ export async function loginWithEmailPassword(
       return { ok: false, message: "Email not verified." };
     }
 
-    // 🔑 Exchange Firebase ID token → backend session
+    // 🔑 Exchange ID token → backend
     const idToken = await cred.user.getIdToken(true);
     const raw = await apiRequest("/auth/login-with-firebase", {
       method: "POST",
@@ -46,7 +48,7 @@ export async function loginWithEmailPassword(
     toast.dismiss();
 
     /* ============================================================
-       🔁 Backend Response Handling
+       🔁 Backend Responses
     ============================================================ */
     if (res.status === 403) {
       toastMessage("Please verify your email before logging in.", {
@@ -69,18 +71,17 @@ export async function loginWithEmailPassword(
       return { ok: false, message: res.message || "Login failed." };
     }
 
-    // 🟢 Success
+    // ✅ Success
     toastMessage("Welcome back.", { type: "success" });
     go("/dashboard", 700);
     return { ok: true };
   } catch (err: any) {
     toast.dismiss();
-
-    /* ============================================================
-       ⚠️ Firebase Client-Side Errors
-    ============================================================ */
     const code = err?.code as string;
 
+    /* ============================================================
+       ⚠️ Firebase Client Error Mapping
+    ============================================================ */
     switch (code) {
       case "auth/invalid-email":
         toastMessage("Invalid email format. Please check and try again.", {
@@ -88,6 +89,7 @@ export async function loginWithEmailPassword(
         });
         return { ok: false, message: "Invalid email format." };
 
+      // 🔴 Email does not exist
       case "auth/user-not-found":
         toastMessage("Account does not exist. Redirecting to signup...", {
           type: "warning",
@@ -95,8 +97,31 @@ export async function loginWithEmailPassword(
         go("/signup", 1200);
         return { ok: false, message: "Account does not exist." };
 
+      // 🔴 Some Firebase tenants return invalid-credential even for non-existing users
+      case "auth/invalid-credential": {
+        const message =
+          password.length >= 6
+            ? "Invalid credentials. Please check your email or password."
+            : "Account does not exist. Redirecting to signup...";
+        const isLikelyMissingAccount = message
+          .toLowerCase()
+          .includes("does not exist");
+
+        if (isLikelyMissingAccount) {
+          toastMessage("Account does not exist. Redirecting to signup...", {
+            type: "warning",
+          });
+          go("/signup", 1200);
+          return { ok: false, message: "Account does not exist." };
+        } else {
+          toastMessage("Incorrect password. Please try again.", {
+            type: "error",
+          });
+          return { ok: false, message: "Wrong password." };
+        }
+      }
+
       case "auth/wrong-password":
-      case "auth/invalid-credential":
         toastMessage("Incorrect password. Please try again.", {
           type: "error",
         });
