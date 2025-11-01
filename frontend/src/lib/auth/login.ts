@@ -6,13 +6,11 @@ import { toast, toastMessage } from "@/lib/toast";
 import { normalizeApi, go, AuthResult } from "./helpers";
 
 /* ============================================================
-   🔑 LOGIN — Email + Password (Level 3.1 Final)
+   🔑 LOGIN — Email + Password (Final Polished)
    ------------------------------------------------------------
-   • Verifies Firebase credentials
-   • Checks email verification
-   • Exchanges ID token with backend for session cookie
-   • Handles 403 (unverified) / 404 (not found)
-   • Consistent toast + redirect flow
+   • Firebase verifies credentials (user-not-found vs wrong-password)
+   • Backend issues session cookie if valid
+   • Consistent toasts and redirects
 ============================================================ */
 export async function loginWithEmailPassword(
   email: string,
@@ -59,11 +57,11 @@ export async function loginWithEmailPassword(
     }
 
     if (res.status === 404) {
-      toastMessage("No account found. Redirecting to signup...", {
+      toastMessage("Account does not exist. Redirecting to signup...", {
         type: "warning",
       });
       go("/signup", 1200);
-      return { ok: false, message: "User not found." };
+      return { ok: false, message: "Account does not exist." };
     }
 
     if (!res.ok) {
@@ -88,17 +86,27 @@ export async function loginWithEmailPassword(
       case "auth/invalid-email":
         msg = "Invalid email format. Please check and try again.";
         break;
+
       case "auth/user-not-found":
+        toastMessage("Account does not exist. Redirecting to signup...", {
+          type: "warning",
+        });
+        go("/signup", 1200);
+        return { ok: false, message: "Account does not exist." };
+
       case "auth/wrong-password":
       case "auth/invalid-credential":
         msg = "Invalid email or password. Please try again.";
         break;
+
       case "auth/too-many-requests":
         msg = "Too many failed attempts. Please wait and try again later.";
         break;
+
       case "auth/network-request-failed":
         msg = "Network error. Please check your connection.";
         break;
+
       default:
         msg =
           err?.data?.message ||

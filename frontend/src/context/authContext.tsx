@@ -103,7 +103,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /* ------------------------------------------------------------
      fetchSession — Load user session on mount or refresh
-     Handles 401/403 silently (logged-out states)
   ------------------------------------------------------------ */
   const fetchSession = useCallback(async () => {
     try {
@@ -117,40 +116,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err: any) {
       const status = err?.status || err?.code;
 
-      // 🧭 Suppress expected "no session" cases
       if (status === 401 || status === 403) {
         setUser(null);
         return;
       }
 
-      // 🕸️ Handle network/CORS errors silently
       if (err?.isNetworkError || err?.message?.includes("Failed to fetch")) {
         console.warn("[AuthContext] Network/CORS issue during session check.");
         setUser(null);
         return;
       }
 
-      // ⚠️ Only show toast for unexpected errors
       toast.dismiss();
       console.error("[AuthContext] Unexpected error in fetchSession:", err);
       toastMessage(
         "An unexpected error occurred while verifying your session.",
-        {
-          type: "error",
-        }
+        { type: "error" }
       );
-
       setUser(null);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  /* ------------------------------------------------------------
-     Load session on mount (with small delay to prevent flicker)
-  ------------------------------------------------------------ */
   useEffect(() => {
-    toast.dismiss(); // clean old toasts
+    toast.dismiss();
     const timer = setTimeout(() => {
       fetchSession();
     }, 600);
@@ -158,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchSession]);
 
   /* ------------------------------------------------------------
-     🔑 loginWithFirebase — Google or email login handler
+     🔑 loginWithFirebase — Handles Google or Firebase-based login
   ------------------------------------------------------------ */
   const loginWithFirebase = useCallback(
     async (firebaseUser: FirebaseUser): Promise<ApiResponse> => {
@@ -187,11 +177,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (res.code === 404) {
-          toastMessage("No account found. Redirecting to signup...", {
+          toastMessage("Account does not exist. Redirecting to signup...", {
             type: "warning",
           });
+          await signOut(auth).catch(() => {});
           setUser(null);
-          return res;
+
+          if (typeof window !== "undefined") {
+            setTimeout(() => {
+              window.location.replace("/signup");
+            }, 1000);
+          }
+
+          return { ...res, status: "not_found" };
         }
 
         const probe = await waitForSession();
@@ -265,8 +263,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await apiRequest("/auth/logout", { method: "POST" });
         } finally {
           await signOut(auth).catch(() => {});
-
-          // ⚡ Clear session state instantly
           setUser(null);
           setLoading(false);
 
@@ -285,14 +281,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  /* ------------------------------------------------------------
-     Refresh session manually
-  ------------------------------------------------------------ */
   const refreshSession = useCallback(fetchSession, [fetchSession]);
 
-  /* ------------------------------------------------------------
-     Memoized context value
-  ------------------------------------------------------------ */
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
