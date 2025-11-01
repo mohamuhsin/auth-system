@@ -140,7 +140,7 @@ export function LoginForm({
       },
       {
         loading: "Connecting to Google...",
-        success: "Connected.",
+        // success: "Connected.",
         error: "Google sign-in failed. Please try again.",
       }
     );
