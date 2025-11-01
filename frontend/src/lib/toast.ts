@@ -10,6 +10,12 @@ export interface ToastOptions {
   onAction?: () => void;
 }
 
+/* ============================================================
+   🌈 toastMessage — Unified, Sonner-Compatible
+   ------------------------------------------------------------
+   • Supports success, error, info, warning, loading
+   • Info + warning are simulated via neutral icons
+============================================================ */
 export function toastMessage(
   message: string,
   {
@@ -34,10 +40,18 @@ export function toastMessage(
         toast.error(message, opts);
         break;
       case "warning":
-        toast.warning(message, opts);
+        toast(message, {
+          ...opts,
+          icon: "⚠️",
+          className: "text-amber-600 dark:text-amber-400",
+        });
         break;
       case "info":
-        toast.info(message, opts);
+        toast(message, {
+          ...opts,
+          icon: "ℹ️",
+          className: "text-blue-600 dark:text-blue-400",
+        });
         break;
       case "loading":
         toast.loading(message, opts);
@@ -51,6 +65,9 @@ export function toastMessage(
   }
 }
 
+/* ============================================================
+   ⏳ toastAsync — Async wrapper for loading/success/error
+============================================================ */
 export async function toastAsync<T>(
   fn: () => Promise<T>,
   messages?: {

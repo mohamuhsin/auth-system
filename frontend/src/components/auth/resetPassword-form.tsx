@@ -40,7 +40,7 @@ import {
 
 import { confirmPasswordReset } from "firebase/auth";
 import { auth } from "@/services/firebase";
-import { toastAsync, toastMessage, toast } from "@/lib/toast";
+import { toast, toastAsync, toastMessage } from "@/lib/toast";
 
 /* ============================================================
    🧩 Component
@@ -144,6 +144,9 @@ export function ResetPasswordForm({
     });
   }
 
+  /* ============================================================
+     🎨 UI Layout
+  ============================================================ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -157,7 +160,7 @@ export function ResetPasswordForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* New Password */}
+              {/* 🔐 New Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -192,7 +195,7 @@ export function ResetPasswordForm({
                 )}
               />
 
-              {/* Confirm Password */}
+              {/* ✅ Confirm Password */}
               <Controller
                 name="confirmPassword"
                 control={form.control}
@@ -234,7 +237,7 @@ export function ResetPasswordForm({
                 uppercase letter.
               </FieldDescription>
 
-              {/* Submit */}
+              {/* 🚀 Submit */}
               <Field>
                 <Button
                   type="submit"

@@ -22,13 +22,18 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/form-error";
+
 import {
   forgotPasswordSchema,
   type ForgotPasswordValues,
 } from "@/lib/validators/auth";
-import { toastAsync, toastMessage, toast } from "@/lib/toast";
-import { requestPasswordReset } from "@/lib/auth-email";
 
+import { toast, toastAsync, toastMessage } from "@/lib/toast";
+import { requestPasswordReset } from "@/lib/auth"; // ✅ updated import path
+
+/* ============================================================
+   🔁 ForgotPasswordForm — Sends password reset email
+============================================================ */
 export function ForgotPasswordForm({
   className,
   ...props
@@ -41,6 +46,9 @@ export function ForgotPasswordForm({
     mode: "onChange",
   });
 
+  /* ============================================================
+     📩 Handle password reset submission
+  ============================================================ */
   async function onSubmit(values: ForgotPasswordValues) {
     const email = values.email.trim().toLowerCase();
 
@@ -56,7 +64,10 @@ export function ForgotPasswordForm({
       async () => {
         const result = await requestPasswordReset(email);
 
-        if (!result?.ok) throw new Error("Failed to send password reset link.");
+        if (!result?.ok)
+          throw new Error(
+            result?.message || "Failed to send password reset link."
+          );
 
         toast.dismiss();
         toastMessage("Password reset link sent. Check your inbox.", {
@@ -73,6 +84,9 @@ export function ForgotPasswordForm({
     );
   }
 
+  /* ============================================================
+     🎨 UI Layout
+  ============================================================ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -88,7 +102,7 @@ export function ForgotPasswordForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* Email */}
+              {/* 📧 Email Field */}
               <Controller
                 name="email"
                 control={form.control}
@@ -107,7 +121,7 @@ export function ForgotPasswordForm({
                 )}
               />
 
-              {/* Submit */}
+              {/* 🚀 Submit Button */}
               <Field>
                 <Button
                   type="submit"
