@@ -57,12 +57,16 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-let isLoggingOut = false;
-
+/* ============================================================
+   🔐 AuthProvider — Global authentication context
+============================================================ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  /* ------------------------------------------------------------
+     Normalize API response → User object
+  ------------------------------------------------------------ */
   const toUser = (src: ApiResponse): User | null => {
     const u = src.user ?? src;
     if (!u?.id || !u?.email) return null;
@@ -79,6 +83,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
+  /* ------------------------------------------------------------
+     waitForSession — Probe session after login/signup
+  ------------------------------------------------------------ */
   const waitForSession = useCallback(async (): Promise<ApiResponse | null> => {
     const maxRetries = 5;
     for (let i = 0; i < maxRetries; i++) {
@@ -86,48 +93,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const res = await apiRequest<ApiResponse>("/users/me");
         if (res && (res.status === "success" || res.code === 200) && res.email)
           return res;
-      } catch {}
+      } catch {
+        /* silent retry */
+      }
       await new Promise((r) => setTimeout(r, 200 * (i + 1)));
     }
     return null;
   }, []);
 
+  /* ------------------------------------------------------------
+     fetchSession — Load user session on mount or refresh
+     Handles 401/403 silently (logged-out states)
+  ------------------------------------------------------------ */
   const fetchSession = useCallback(async () => {
     try {
       const res = await apiRequest<ApiResponse>("/users/me");
+
       if (res && (res.status === "success" || res.code === 200)) {
         setUser(toUser(res));
       } else {
         setUser(null);
       }
     } catch (err: any) {
-      if (err.status === 401 && user) {
-        await signOut(auth).catch(() => {});
-        toast.dismiss();
-        if (!isLoggingOut) {
-          toastMessage("Your session has expired. Please sign in again.", {
-            type: "warning",
-          });
-        }
+      const status = err?.status || err?.code;
+
+      // 🧭 Suppress expected "no session" cases
+      if (status === 401 || status === 403) {
+        setUser(null);
+        return;
       }
+
+      // 🕸️ Handle network/CORS errors silently
+      if (err?.isNetworkError || err?.message?.includes("Failed to fetch")) {
+        console.warn("[AuthContext] Network/CORS issue during session check.");
+        setUser(null);
+        return;
+      }
+
+      // ⚠️ Only show toast for unexpected errors
+      toast.dismiss();
+      console.error("[AuthContext] Unexpected error in fetchSession:", err);
+      toastMessage(
+        "An unexpected error occurred while verifying your session.",
+        {
+          type: "error",
+        }
+      );
+
       setUser(null);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
+  /* ------------------------------------------------------------
+     Load session on mount (with small delay to prevent flicker)
+  ------------------------------------------------------------ */
   useEffect(() => {
+    toast.dismiss(); // clean old toasts
     const timer = setTimeout(() => {
       fetchSession();
     }, 600);
     return () => clearTimeout(timer);
   }, [fetchSession]);
 
+  /* ------------------------------------------------------------
+     🔑 loginWithFirebase — Google or email login handler
+  ------------------------------------------------------------ */
   const loginWithFirebase = useCallback(
     async (firebaseUser: FirebaseUser): Promise<ApiResponse> => {
       try {
         toast.dismiss();
         const idToken = await getIdToken(firebaseUser, true);
+
         const res = await apiRequest<ApiResponse>("/auth/login-with-firebase", {
           method: "POST",
           body: {
@@ -147,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
           return res;
         }
+
         if (res.code === 404) {
           toastMessage("No account found. Redirecting to signup...", {
             type: "warning",
@@ -169,6 +208,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [waitForSession]
   );
 
+  /* ------------------------------------------------------------
+     ✳️ signupWithFirebase — Google signup handler
+  ------------------------------------------------------------ */
   const signupWithFirebase = useCallback(
     async (
       firebaseUser: FirebaseUser,
@@ -213,8 +255,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [waitForSession]
   );
 
+  /* ------------------------------------------------------------
+     🚪 logout — Clears session (client + backend)
+  ------------------------------------------------------------ */
   const logout = useCallback(async () => {
-    isLoggingOut = true;
     await toastAsync(
       async () => {
         try {
@@ -222,7 +266,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } finally {
           await signOut(auth).catch(() => {});
 
-          // 👇 Immediately clear session state so UI updates instantly
+          // ⚡ Clear session state instantly
           setUser(null);
           setLoading(false);
 
@@ -239,13 +283,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: "Logout failed. Please try again.",
       }
     );
-    setTimeout(() => {
-      isLoggingOut = false;
-    }, 1200);
   }, []);
 
+  /* ------------------------------------------------------------
+     Refresh session manually
+  ------------------------------------------------------------ */
   const refreshSession = useCallback(fetchSession, [fetchSession]);
 
+  /* ------------------------------------------------------------
+     Memoized context value
+  ------------------------------------------------------------ */
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -270,6 +317,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+/* ============================================================
+   🪶 useAuth — Hook accessor
+============================================================ */
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
