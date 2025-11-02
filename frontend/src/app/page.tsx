@@ -82,7 +82,7 @@ export default function Home() {
 
             <Separator
               orientation="vertical"
-              className="h-5 mx-4 bg-border/60"
+              className="h-5 mx-4 bg-border/100"
             />
 
             <ModeToggle />
