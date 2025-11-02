@@ -82,7 +82,7 @@ export default function Home() {
 
             <Separator
               orientation="vertical"
-              className="h-5 mx-4 bg-border/60"
+              className="h-5 mx-4 bg-border/100"
             />
 
             <ModeToggle />
@@ -327,3 +327,148 @@ export default function Home() {
     </main>
   );
 }
+
+// @plugin "tailwindcss-animate";
+
+// @import "tailwindcss";
+
+// @custom-variant dark (&:is(.dark *));
+
+// @theme inline {
+//   --font-sans: var(--font-inter-sans);
+//   --font-mono: var(--font-inter-tight);
+
+//   --color-background: var(--background);
+//   --color-foreground: var(--foreground);
+//   --color-border: var(--border);
+//   --color-input: var(--input);
+//   --color-ring: var(--ring);
+
+//   --color-primary: var(--primary);
+//   --color-primary-foreground: var(--primary-foreground);
+//   --color-accent: var(--accent);
+//   --color-accent-foreground: var(--accent-foreground);
+//   --color-secondary: var(--secondary);
+//   --color-secondary-foreground: var(--secondary-foreground);
+//   --color-muted: var(--muted);
+//   --color-muted-foreground: var(--muted-foreground);
+//   --color-destructive: var(--destructive);
+//   --color-destructive-foreground: var(--destructive-foreground);
+
+//   --color-card: var(--card);
+//   --color-card-foreground: var(--card-foreground);
+//   --color-popover: var(--popover);
+//   --color-popover-foreground: var(--popover-foreground);
+
+//   --color-sidebar: var(--sidebar);
+//   --color-sidebar-foreground: var(--sidebar-foreground);
+//   --color-sidebar-border: var(--sidebar-border);
+//   --color-sidebar-primary: var(--sidebar-primary);
+//   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+//   --color-sidebar-accent: var(--sidebar-accent);
+//   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+//   --color-sidebar-ring: var(--sidebar-ring);
+
+//   --radius-sm: calc(var(--radius) - 4px);
+//   --radius-md: calc(var(--radius) - 2px);
+//   --radius-lg: var(--radius);
+//   --radius-xl: calc(var(--radius) + 4px);
+// }
+
+// :root {
+//   --radius: 0.625rem;
+
+//   --background: #f9fafb;
+//   --foreground: #0f172a;
+
+//   --card: #ffffff;
+//   --card-foreground: #0f172a;
+//   --popover: #ffffff;
+//   --popover-foreground: #0f172a;
+
+//   --primary: #375dfb;
+//   --primary-foreground: #ffffff;
+
+//   --accent: #eef2ff;
+//   --accent-foreground: #1e293b;
+//   --secondary: #f3f4f6;
+//   --secondary-foreground: #0f172a;
+
+//   --muted: #f4f4f5;
+//   --muted-foreground: #6b7280;
+//   --border: #e5e7eb;
+//   --input: #e5e7eb;
+//   --ring: #375dfb;
+
+//   --destructive: #ef4444;
+//   --destructive-foreground: #ffffff;
+
+//   --sidebar: #f9fafb;
+//   --sidebar-foreground: #0f172a;
+//   --sidebar-border: #e5e7eb;
+//   --sidebar-primary: #375dfb;
+//   --sidebar-primary-foreground: #ffffff;
+//   --sidebar-accent: #eef2ff;
+//   --sidebar-accent-foreground: #0f172a;
+//   --sidebar-ring: #375dfb;
+// }
+
+// .dark {
+//   --background: #0d1017;
+//   --foreground: #f3f4f6;
+
+//   --card: #161a22;
+//   --card-foreground: #f9fafb;
+//   --popover: #161a22;
+//   --popover-foreground: #f9fafb;
+
+//   --primary: #375dfb;
+//   --primary-foreground: #ffffff;
+
+//   --accent: #2a3040;
+//   --accent-foreground: #f3f4f6;
+//   --secondary: #1c2029;
+//   --secondary-foreground: #f9fafb;
+
+//   --muted: #1a1e27;
+//   --muted-foreground: #9ca3af;
+//   --border: #2a2f3c;
+//   --input: #2a2f3c;
+//   --ring: #4f6cff;
+
+//   --destructive: #ef4444;
+//   --destructive-foreground: #ffffff;
+
+//   --sidebar: #151922;
+//   --sidebar-foreground: #f3f4f6;
+//   --sidebar-border: #20242e;
+//   --sidebar-primary: #375dfb;
+//   --sidebar-primary-foreground: #ffffff;
+//   --sidebar-accent: #222738;
+//   --sidebar-accent-foreground: #f3f4f6;
+//   --sidebar-ring: #4f6cff;
+// }
+
+// @layer base {
+//   * {
+//     @apply border-border outline-ring/50;
+//   }
+
+//   body {
+//     @apply bg-background text-foreground font-sans antialiased;
+//   }
+// }
+
+// @layer base {
+//   [data-orientation="horizontal"] {
+//     height: 1px;
+//     width: 100%;
+//     background-color: hsl(var(--border));
+//   }
+
+//   [data-orientation="vertical"] {
+//     width: 1.5px;
+//     height: 100%;
+//     background-color: hsl(var(--border));
+//   }
+// }
