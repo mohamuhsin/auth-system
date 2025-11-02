@@ -22,17 +22,19 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/form-error";
-
 import {
   forgotPasswordSchema,
   type ForgotPasswordValues,
 } from "@/lib/validators/auth";
 
 import { toast, toastAsync, toastMessage } from "@/lib/toast";
-import { requestPasswordReset } from "@/lib/auth"; // ✅ updated import path
+import { requestPasswordReset } from "@/lib/auth";
 
 /* ============================================================
-   🔁 ForgotPasswordForm — Sends password reset email
+   🔁 ForgotPasswordForm — Sends password reset email (Final)
+   ------------------------------------------------------------
+   • Exactly one loading toast and one success toast
+   • No duplicate toasts or “Password updated” toast
 ============================================================ */
 export function ForgotPasswordForm({
   className,
@@ -46,9 +48,9 @@ export function ForgotPasswordForm({
     mode: "onChange",
   });
 
-  /* ============================================================
-     📩 Handle password reset submission
-  ============================================================ */
+  /* ------------------------------------------------------------
+     📩 Handle password reset
+  ------------------------------------------------------------ */
   async function onSubmit(values: ForgotPasswordValues) {
     const email = values.email.trim().toLowerCase();
 
@@ -65,28 +67,22 @@ export function ForgotPasswordForm({
         const result = await requestPasswordReset(email);
 
         if (!result?.ok)
-          throw new Error(
-            result?.message || "Failed to send password reset link."
-          );
+          throw new Error(result?.message || "Failed to send reset link.");
 
-        toast.dismiss();
-        toastMessage("Password reset link sent. Check your inbox.", {
-          type: "success",
-        });
-
-        setTimeout(() => router.replace("/login?reset=success"), 2000);
+        // ✅ Single success toast handled by toastAsync
+        setTimeout(() => router.replace("/login?reset=success"), 1500);
       },
       {
         loading: "Sending password reset link...",
-        success: "Password reset email sent.",
+        success: "Password reset email sent. Check your inbox.",
         error: "Failed to send reset link. Please try again.",
       }
     );
   }
 
-  /* ============================================================
+  /* ------------------------------------------------------------
      🎨 UI Layout
-  ============================================================ */
+  ------------------------------------------------------------ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>

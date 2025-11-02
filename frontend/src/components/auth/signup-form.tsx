@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -30,11 +29,11 @@ import { signupSchema, type SignupFormValues } from "@/lib/validators/auth";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { useAuth } from "@/context/authContext";
-import { toast, toastMessage } from "@/lib/toast";
+import { toast, toastAsync, toastMessage } from "@/lib/toast";
 import { signupWithEmailPassword } from "@/lib/auth";
 
 /* ============================================================
-   🧩 SignupForm — Email + Google Signup
+   🧩 SignupForm — Email + Google Signup (Clean Toast Flow)
 ============================================================ */
 export function SignupForm({
   className,
@@ -67,104 +66,70 @@ export function SignupForm({
       return;
     }
 
-    try {
-      toast.dismiss();
-      const result = await signupWithEmailPassword(
-        values.email,
-        values.password,
-        values.name
-      );
+    // 🧩 Toasts are now handled inside signupWithEmailPassword
+    await signupWithEmailPassword(values.email, values.password, values.name);
 
-      if (result?.ok) {
-        form.reset();
-
-        // 📬 If verification required (pending)
-        if (result.message?.toLowerCase().includes("verify")) {
-          toast.dismiss();
-          toastMessage(result.message, { type: "info" });
-          return;
-        }
-
-        toastMessage("Account created successfully.", { type: "success" });
-      } else {
-        // ⚠️ Error but not verification
-        if (
-          result?.message &&
-          !result.message.toLowerCase().includes("verify")
-        ) {
-          toastMessage(result.message, { type: "error" });
-        }
-      }
-    } catch (err: any) {
-      toast.dismiss();
-      toastMessage(err?.message || "Signup failed. Please try again.", {
-        type: "error",
-      });
-    }
+    // Reset only after successful signup
+    form.reset();
   }
 
   /* ------------------------------------------------------------
      🌐 Google Signup (Firebase Popup)
   ------------------------------------------------------------ */
   async function handleGoogleSignup() {
-    toast.dismiss();
-    toastMessage("Connecting to Google...", { type: "loading" });
+    await toastAsync(
+      async () => {
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: "select_account" });
 
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: "select_account" });
+        const userCred = await signInWithPopup(auth, provider);
+        const googleUser = userCred.user;
 
-      const userCred = await signInWithPopup(auth, provider);
-      const googleUser = userCred.user;
-
-      const result = await signupWithFirebase(googleUser, {
-        name: googleUser.displayName ?? undefined,
-        avatarUrl: googleUser.photoURL ?? undefined,
-      });
-
-      toast.dismiss();
-
-      // ⚠️ Existing account (HTTP 409)
-      if (result?.code === 409) {
-        toastMessage("Account already exists. Redirecting to login...", {
-          type: "warning",
+        const result = await signupWithFirebase(googleUser, {
+          name: googleUser.displayName ?? undefined,
+          avatarUrl: googleUser.photoURL ?? undefined,
         });
-        setTimeout(() => window.location.replace("/login"), 1000);
-        return;
-      }
 
-      // 📨 Pending verification (HTTP 202)
-      if (result?.status === "pending_verification" || result?.code === 202) {
-        toastMessage(
-          "Account created. Please verify your email before logging in.",
-          { type: "info" }
-        );
-        setTimeout(
-          () =>
-            window.location.replace(
-              `/verify-email?email=${googleUser.email ?? ""}`
-            ),
-          1200
-        );
-        return;
-      }
+        toast.dismiss();
 
-      // 🟢 Success
-      if (result?.status === "success") {
-        toastMessage("Signed up successfully. Redirecting...", {
-          type: "success",
-        });
-        setTimeout(() => window.location.replace("/dashboard"), 700);
-        return;
-      }
+        if (result?.code === 409) {
+          toastMessage("Account already exists. Redirecting to login...", {
+            type: "warning",
+          });
+          setTimeout(() => window.location.replace("/login"), 1000);
+          return;
+        }
 
-      throw new Error(result?.message || "Google sign-up failed.");
-    } catch (err: any) {
-      toast.dismiss();
-      toastMessage(err?.message || "Google sign-up failed. Please try again.", {
-        type: "error",
-      });
-    }
+        if (result?.status === "pending_verification" || result?.code === 202) {
+          toastMessage(
+            "Account created. Please verify your email before logging in.",
+            { type: "info" }
+          );
+          setTimeout(
+            () =>
+              window.location.replace(
+                `/verify-email?email=${googleUser.email ?? ""}`
+              ),
+            1200
+          );
+          return;
+        }
+
+        if (result?.status === "success") {
+          toastMessage("Signed up successfully. Redirecting...", {
+            type: "success",
+          });
+          setTimeout(() => window.location.replace("/dashboard"), 700);
+          return;
+        }
+
+        throw new Error(result?.message || "Google sign-up failed.");
+      },
+      {
+        loading: "Connecting to Google...",
+        error: "Google sign-up failed. Please try again.",
+      }
+    );
   }
 
   /* ------------------------------------------------------------

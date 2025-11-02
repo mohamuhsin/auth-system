@@ -9,13 +9,11 @@ import { toast, toastMessage } from "@/lib/toast";
 import { normalizeApi, go, actionCodeSettings, AuthResult } from "./helpers";
 
 /* ============================================================
-   ✳️ SIGNUP — Email + Password (Level 3.1 Final)
+   ✳️ SIGNUP — Email + Password (Final v3.2)
    ------------------------------------------------------------
-   • Creates Firebase user
-   • Sends verification email
-   • Exchanges ID token with backend for session cookie
-   • Handles 409 (exists), 403/202/pending_verification (verify)
-   • Safe redirects handled via go()
+   • One loading toast + one final toast (no duplicates)
+   • Handles 409 (exists), 403/202 (verify), 200 (success)
+   • Centralized toast logic (form remains silent)
 ============================================================ */
 export async function signupWithEmailPassword(
   email: string,
@@ -48,7 +46,6 @@ export async function signupWithEmailPassword(
     /* ============================================================
        🔁 Handle Backend Responses
     ============================================================ */
-    // 🟡 Existing user
     if (res.status === 409) {
       toastMessage("Account already exists. Redirecting to login...", {
         type: "warning",
@@ -57,7 +54,6 @@ export async function signupWithEmailPassword(
       return { ok: false, message: "Account already exists." };
     }
 
-    // 🔵 Pending verification (email/password users)
     if (
       res.status === 403 ||
       res.status === 202 ||
@@ -70,14 +66,12 @@ export async function signupWithEmailPassword(
       return { ok: true, message: "Verification pending." };
     }
 
-    // 🟢 Verified or Google signup
     if (res.ok) {
       toastMessage("Account created successfully.", { type: "success" });
       go("/dashboard", 900);
       return { ok: true };
     }
 
-    // 🔴 Unexpected backend error
     toastMessage(res.message || "Unexpected error occurred.", {
       type: "error",
     });
@@ -86,7 +80,7 @@ export async function signupWithEmailPassword(
     toast.dismiss();
 
     /* ============================================================
-       ⚠️ Handle Firebase Client Errors
+       ⚠️ Firebase Client Errors
     ============================================================ */
     const code = err?.code as string;
 

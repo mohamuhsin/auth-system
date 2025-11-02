@@ -1,12 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -35,7 +34,7 @@ import { toast, toastAsync, toastMessage } from "@/lib/toast";
 import { loginWithEmailPassword } from "@/lib/auth";
 
 /* ============================================================
-   🔑 LoginForm — Email + Google Login
+   🔑 LoginForm — Email + Google Login (Final Clean)
 ============================================================ */
 export function LoginForm({
   className,
@@ -43,23 +42,12 @@ export function LoginForm({
 }: React.ComponentProps<"div">) {
   const [showPassword, setShowPassword] = useState(false);
   const { loginWithFirebase } = useAuth();
-  const searchParams = useSearchParams();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
     mode: "onChange",
   });
-
-  /* ------------------------------------------------------------
-     📢 Show toast after password reset redirect
-  ------------------------------------------------------------ */
-  useEffect(() => {
-    if (searchParams.get("reset") === "success") {
-      toast.dismiss();
-      toastMessage("Password updated. Please sign in.", { type: "success" });
-    }
-  }, [searchParams]);
 
   /* ------------------------------------------------------------
      📩 Email / Password Login
@@ -74,11 +62,8 @@ export function LoginForm({
     }
 
     try {
-      toast.dismiss();
       const email = values.email.trim().toLowerCase();
       const result = await loginWithEmailPassword(email, values.password);
-
-      // Reset only on successful login
       if (result?.ok) form.reset();
     } catch (err: any) {
       toast.dismiss();
@@ -89,7 +74,7 @@ export function LoginForm({
   }
 
   /* ------------------------------------------------------------
-     🌐 Google Login (same behavior as email login)
+     🌐 Google Login
   ------------------------------------------------------------ */
   async function handleGoogleLogin() {
     await toastAsync(
@@ -103,11 +88,8 @@ export function LoginForm({
         const result = await loginWithFirebase(googleUser);
         toast.dismiss();
 
-        // 🔴 No account found → redirect to signup
+        // 🔴 No account found → redirect
         if (result?.status === "not_found" || result?.code === 404) {
-          toastMessage("Account does not exist. Redirecting to signup...", {
-            type: "warning",
-          });
           setTimeout(() => window.location.replace("/signup"), 1000);
           return;
         }
@@ -140,7 +122,6 @@ export function LoginForm({
       },
       {
         loading: "Connecting to Google...",
-        // success: "Connected.",
         error: "Google sign-in failed. Please try again.",
       }
     );

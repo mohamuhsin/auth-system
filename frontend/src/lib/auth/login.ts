@@ -1,18 +1,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  fetchSignInMethodsForEmail,
+} from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { apiRequest } from "@/lib/api";
 import { toast, toastMessage } from "@/lib/toast";
 import { normalizeApi, go, AuthResult } from "./helpers";
 
 /* ============================================================
-   🔑 LOGIN — Email + Password (Final v3.6)
+   🔑 LOGIN — Email + Password (Final v3.8)
    ------------------------------------------------------------
-   • Clear distinction between:
-       - No account exists
+   • Distinguishes:
+       - No account
        - Wrong password
-       - Unverified account
-   • Unified backend + frontend handling
+       - Unverified email
+   • Single toast flow (deduplicated)
 ============================================================ */
 export async function loginWithEmailPassword(
   email: string,
@@ -89,7 +93,6 @@ export async function loginWithEmailPassword(
         });
         return { ok: false, message: "Invalid email format." };
 
-      // 🔴 Email does not exist
       case "auth/user-not-found":
         toastMessage("Account does not exist. Redirecting to signup...", {
           type: "warning",
@@ -97,29 +100,27 @@ export async function loginWithEmailPassword(
         go("/signup", 1200);
         return { ok: false, message: "Account does not exist." };
 
-      // 🔴 Some Firebase tenants return invalid-credential even for non-existing users
-      case "auth/invalid-credential": {
-        const message =
-          password.length >= 6
-            ? "Invalid credentials. Please check your email or password."
-            : "Account does not exist. Redirecting to signup...";
-        const isLikelyMissingAccount = message
-          .toLowerCase()
-          .includes("does not exist");
-
-        if (isLikelyMissingAccount) {
-          toastMessage("Account does not exist. Redirecting to signup...", {
-            type: "warning",
-          });
-          go("/signup", 1200);
-          return { ok: false, message: "Account does not exist." };
-        } else {
-          toastMessage("Incorrect password. Please try again.", {
+      case "auth/invalid-credential":
+        try {
+          const methods = await fetchSignInMethodsForEmail(auth, email);
+          if (!methods || methods.length === 0) {
+            toastMessage("Account does not exist. Redirecting to signup...", {
+              type: "warning",
+            });
+            go("/signup", 1200);
+            return { ok: false, message: "Account does not exist." };
+          } else {
+            toastMessage("Incorrect password. Please try again.", {
+              type: "error",
+            });
+            return { ok: false, message: "Wrong password." };
+          }
+        } catch {
+          toastMessage("Incorrect email or password. Please try again.", {
             type: "error",
           });
-          return { ok: false, message: "Wrong password." };
+          return { ok: false, message: "Invalid credentials." };
         }
-      }
 
       case "auth/wrong-password":
         toastMessage("Incorrect password. Please try again.", {
