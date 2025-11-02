@@ -1,22 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  signInWithEmailAndPassword,
-  signOut,
-  fetchSignInMethodsForEmail,
-} from "firebase/auth";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { apiRequest } from "@/lib/api";
 import { toast, toastMessage } from "@/lib/toast";
 import { normalizeApi, go, AuthResult } from "./helpers";
 
 /* ============================================================
-   🔑 LOGIN — Email + Password (Final v3.8)
+   🔑 LOGIN — Email + Password (Final v3.9.1 — Firebase Default)
    ------------------------------------------------------------
-   • Distinguishes:
-       - No account
-       - Wrong password
-       - Unverified email
-   • Single toast flow (deduplicated)
+   • Uses Firebase’s built-in error codes only
+   • Removes manual account-existence checks
+   • Unified single-toast flow (no duplication)
+   • Safe redirects after toast (no flicker)
 ============================================================ */
 export async function loginWithEmailPassword(
   email: string,
@@ -26,21 +21,24 @@ export async function loginWithEmailPassword(
     toast.dismiss();
     toastMessage("Signing you in...", { type: "loading" });
 
-    // 🔐 Firebase authentication
+    // 🔐 Firebase handles all user existence & password validation
     const cred = await signInWithEmailAndPassword(auth, email, password);
 
-    // 📩 Require verified email
+    // 📩 Require verified email (optional policy)
     if (!cred.user.emailVerified) {
       await signOut(auth);
       toast.dismiss();
       toastMessage("Please verify your email before signing in.", {
         type: "warning",
       });
-      go(`/verify-email?email=${encodeURIComponent(email)}`, 900);
+      setTimeout(
+        () => go(`/verify-email?email=${encodeURIComponent(email)}`),
+        900
+      );
       return { ok: false, message: "Email not verified." };
     }
 
-    // 🔑 Exchange ID token → backend
+    // 🔑 Exchange Firebase ID token → backend session
     const idToken = await cred.user.getIdToken(true);
     const raw = await apiRequest("/auth/login-with-firebase", {
       method: "POST",
@@ -52,24 +50,8 @@ export async function loginWithEmailPassword(
     toast.dismiss();
 
     /* ============================================================
-       🔁 Backend Responses
+       🔁 Backend responses
     ============================================================ */
-    if (res.status === 403) {
-      toastMessage("Please verify your email before logging in.", {
-        type: "warning",
-      });
-      go(`/verify-email?email=${encodeURIComponent(email)}`, 900);
-      return { ok: false, message: "Email not verified." };
-    }
-
-    if (res.status === 404) {
-      toastMessage("Account does not exist. Redirecting to signup...", {
-        type: "warning",
-      });
-      go("/signup", 1200);
-      return { ok: false, message: "Account does not exist." };
-    }
-
     if (!res.ok) {
       toastMessage(res.message || "Login failed.", { type: "error" });
       return { ok: false, message: res.message || "Login failed." };
@@ -77,14 +59,14 @@ export async function loginWithEmailPassword(
 
     // ✅ Success
     toastMessage("Welcome back.", { type: "success" });
-    go("/dashboard", 700);
+    setTimeout(() => go("/dashboard"), 700);
     return { ok: true };
   } catch (err: any) {
     toast.dismiss();
     const code = err?.code as string;
 
     /* ============================================================
-       ⚠️ Firebase Client Error Mapping
+       ⚠️ Firebase Error Handling (Default)
     ============================================================ */
     switch (code) {
       case "auth/invalid-email":
@@ -94,35 +76,14 @@ export async function loginWithEmailPassword(
         return { ok: false, message: "Invalid email format." };
 
       case "auth/user-not-found":
-        toastMessage("Account does not exist. Redirecting to signup...", {
+        toastMessage("No account found. Please sign up first.", {
           type: "warning",
         });
-        go("/signup", 1200);
-        return { ok: false, message: "Account does not exist." };
-
-      case "auth/invalid-credential":
-        try {
-          const methods = await fetchSignInMethodsForEmail(auth, email);
-          if (!methods || methods.length === 0) {
-            toastMessage("Account does not exist. Redirecting to signup...", {
-              type: "warning",
-            });
-            go("/signup", 1200);
-            return { ok: false, message: "Account does not exist." };
-          } else {
-            toastMessage("Incorrect password. Please try again.", {
-              type: "error",
-            });
-            return { ok: false, message: "Wrong password." };
-          }
-        } catch {
-          toastMessage("Incorrect email or password. Please try again.", {
-            type: "error",
-          });
-          return { ok: false, message: "Invalid credentials." };
-        }
+        setTimeout(() => go("/signup"), 1200);
+        return { ok: false, message: "Account not found." };
 
       case "auth/wrong-password":
+      case "auth/invalid-credential":
         toastMessage("Incorrect password. Please try again.", {
           type: "error",
         });
