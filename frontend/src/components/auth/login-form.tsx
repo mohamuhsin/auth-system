@@ -34,7 +34,7 @@ import { toast, toastAsync, toastMessage } from "@/lib/toast";
 import { loginWithEmailPassword } from "@/lib/auth";
 
 /* ============================================================
-   🔑 LoginForm — Email + Google Login (Final Clean)
+   🔑 LoginForm — Email + Google Login (Final Clean v3.9)
 ============================================================ */
 export function LoginForm({
   className,
@@ -74,9 +74,10 @@ export function LoginForm({
   }
 
   /* ------------------------------------------------------------
-     🌐 Google Login
+     🌐 Google Login — Single Toast Flow
   ------------------------------------------------------------ */
   async function handleGoogleLogin() {
+    toast.dismiss();
     await toastAsync(
       async () => {
         const provider = new GoogleAuthProvider();
@@ -88,8 +89,11 @@ export function LoginForm({
         const result = await loginWithFirebase(googleUser);
         toast.dismiss();
 
-        // 🔴 No account found → redirect
+        // 🔴 Account not found → redirect to signup (single toast)
         if (result?.status === "not_found" || result?.code === 404) {
+          toastMessage("No account found. Please sign up with Google first.", {
+            type: "warning",
+          });
           setTimeout(() => window.location.replace("/signup"), 1000);
           return;
         }
@@ -110,15 +114,8 @@ export function LoginForm({
         }
 
         // 🟢 Success
-        if (result?.status === "success") {
-          toastMessage("Signed in successfully. Redirecting...", {
-            type: "success",
-          });
-          window.location.replace("/dashboard");
-          return;
-        }
-
-        throw new Error(result?.message || "Google login failed.");
+        toastMessage("Welcome back.", { type: "success" });
+        setTimeout(() => window.location.replace("/dashboard"), 700);
       },
       {
         loading: "Connecting to Google...",
