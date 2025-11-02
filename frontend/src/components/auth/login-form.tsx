@@ -34,7 +34,7 @@ import { toast, toastAsync, toastMessage } from "@/lib/toast";
 import { loginWithEmailPassword } from "@/lib/auth";
 
 /* ============================================================
-   🔑 LoginForm — Email + Google Login (Final Clean v3.9.2)
+   🔑 LoginForm — Email + Google Login (Final Clean v4.1)
 ============================================================ */
 export function LoginForm({
   className,
@@ -74,10 +74,11 @@ export function LoginForm({
   }
 
   /* ------------------------------------------------------------
-     🌐 Google Login — Single Toast Flow (no duplicates)
+     🌐 Google Login — Uses AuthContext handling (no duplication)
   ------------------------------------------------------------ */
   async function handleGoogleLogin() {
     toast.dismiss();
+
     await toastAsync(
       async () => {
         const provider = new GoogleAuthProvider();
@@ -86,44 +87,32 @@ export function LoginForm({
         const userCred = await signInWithPopup(auth, provider);
         const googleUser = userCred.user;
 
-        // ⚙️ Verify with backend
+        // 🔍 Let context handle account status + redirection
         const result = await loginWithFirebase(googleUser);
 
-        // Ensure no leftover loaders
         toast.dismiss();
 
-        // 🔴 Account not found
-        if (result?.status === "not_found" || result?.code === 404) {
-          // Prevent Firebase auto reauth noise
-          await signOut(auth).catch(() => {});
-          toast.dismiss();
-          toastMessage("No account found. Please sign up with Google first.", {
-            type: "warning",
-          });
-          setTimeout(() => window.location.replace("/signup"), 900);
-          return;
-        }
-
-        // ⚠️ Unverified email
+        // ⚠️ Unverified email handled below for clarity
         if (result?.status === "unverified" || result?.code === 403) {
           await signOut(auth).catch(() => {});
-          toast.dismiss();
           toastMessage("Please verify your email before logging in.", {
             type: "warning",
           });
           setTimeout(
             () =>
               window.location.replace(
-                `/verify-email?email=${googleUser.email}`
+                `/verify-email?email=${googleUser.email ?? ""}`
               ),
             900
           );
           return;
         }
 
-        // 🟢 Success
-        toastMessage("Welcome back.", { type: "success" });
-        setTimeout(() => window.location.replace("/dashboard"), 700);
+        // ✅ Success (context already handled sessions)
+        if (result?.status === "success") {
+          toastMessage("Welcome back.", { type: "success" });
+          setTimeout(() => window.location.replace("/dashboard"), 700);
+        }
       },
       {
         loading: "Connecting to Google...",
