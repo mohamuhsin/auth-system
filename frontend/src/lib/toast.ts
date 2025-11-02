@@ -58,10 +58,7 @@ export function toastMessage(
 }
 
 /* ============================================================
-   ⏳ toastAsync — Async wrapper (no default “completed successfully”)
-   ------------------------------------------------------------
-   • Shows loading + error automatically
-   • Only shows success toast if explicitly provided
+   ⏳ toastAsync — Async wrapper for loading/success/error
 ============================================================ */
 export async function toastAsync<T>(
   fn: () => Promise<T>,
@@ -73,15 +70,16 @@ export async function toastAsync<T>(
   duration = 4000
 ): Promise<T | undefined> {
   const { loading, success, error } = {
-    loading: messages?.loading ?? "Processing...",
-    success: messages?.success, // 🧹 no default success message
-    error: messages?.error ?? "An error occurred.",
+    loading: "Processing...",
+    success: "Completed successfully.",
+    error: "An error occurred.",
+    ...messages,
   };
 
   try {
     const result = (await toast.promise(fn(), {
       loading,
-      success: success || undefined, // only show success toast if defined
+      success,
       error,
       duration,
     })) as T;
@@ -103,16 +101,19 @@ export async function toastAsync<T>(
 ============================================================ */
 export function toastClear(): void {
   try {
-    toast.dismiss();
+    toast.dismiss(); // clears all when no ID provided
   } catch (err) {
     console.error("toastClear error:", err);
   }
 }
 
 /* ============================================================
-   ♻️ toastSafe — Deduplicated message handler
+   ♻️ toastSafe — Prevents duplicate stacking (deduplicated)
+   ------------------------------------------------------------
+   • Shows only one instance of a message at a time
+   • Reuses toast ID safely (supports string | number)
 ============================================================ */
-const activeToasts = new Map<string, string | number>();
+const activeToasts = new Map<string, string | number>(); // message → toastId
 
 export function toastSafe(message: string, options: ToastOptions = {}): void {
   try {
@@ -120,6 +121,7 @@ export function toastSafe(message: string, options: ToastOptions = {}): void {
     const existingId = activeToasts.get(message);
 
     if (existingId !== undefined) {
+      // Dismiss previous one safely
       toast.dismiss(existingId);
       activeToasts.delete(message);
     }
@@ -138,6 +140,7 @@ export function toastSafe(message: string, options: ToastOptions = {}): void {
 
     activeToasts.set(message, id);
 
+    // Cleanup after toast closes
     setTimeout(() => activeToasts.delete(message), duration + 500);
   } catch (err) {
     console.error("toastSafe error:", err);
