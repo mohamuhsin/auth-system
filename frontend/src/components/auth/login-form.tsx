@@ -27,14 +27,14 @@ import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/form-error";
 import { loginSchema, type LoginFormValues } from "@/lib/validators/auth";
 
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { useAuth } from "@/context/authContext";
 import { toast, toastAsync, toastMessage } from "@/lib/toast";
 import { loginWithEmailPassword } from "@/lib/auth";
 
 /* ============================================================
-   🔑 LoginForm — Email + Google Login (Final Clean v3.9)
+   🔑 LoginForm — Email + Google Login (Final Clean v3.9.2)
 ============================================================ */
 export function LoginForm({
   className,
@@ -74,7 +74,7 @@ export function LoginForm({
   }
 
   /* ------------------------------------------------------------
-     🌐 Google Login — Single Toast Flow
+     🌐 Google Login — Single Toast Flow (no duplicates)
   ------------------------------------------------------------ */
   async function handleGoogleLogin() {
     toast.dismiss();
@@ -86,20 +86,28 @@ export function LoginForm({
         const userCred = await signInWithPopup(auth, provider);
         const googleUser = userCred.user;
 
+        // ⚙️ Verify with backend
         const result = await loginWithFirebase(googleUser);
+
+        // Ensure no leftover loaders
         toast.dismiss();
 
-        // 🔴 Account not found → redirect to signup (single toast)
+        // 🔴 Account not found
         if (result?.status === "not_found" || result?.code === 404) {
+          // Prevent Firebase auto reauth noise
+          await signOut(auth).catch(() => {});
+          toast.dismiss();
           toastMessage("No account found. Please sign up with Google first.", {
             type: "warning",
           });
-          setTimeout(() => window.location.replace("/signup"), 1000);
+          setTimeout(() => window.location.replace("/signup"), 900);
           return;
         }
 
         // ⚠️ Unverified email
         if (result?.status === "unverified" || result?.code === 403) {
+          await signOut(auth).catch(() => {});
+          toast.dismiss();
           toastMessage("Please verify your email before logging in.", {
             type: "warning",
           });
@@ -108,7 +116,7 @@ export function LoginForm({
               window.location.replace(
                 `/verify-email?email=${googleUser.email}`
               ),
-            1000
+            900
           );
           return;
         }
