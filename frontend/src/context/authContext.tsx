@@ -108,6 +108,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
      🔄 fetchSession — Load active session
   ------------------------------------------------------------ */
   const fetchSession = useCallback(async () => {
+    // 🧤 Skip fetch during signup redirect to avoid duplicate toasts
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname === "/signup"
+    ) {
+      return;
+    }
+
     try {
       const res = await apiRequest<ApiResponse>("/users/me");
       if (res && (res.status === "success" || res.code === 200))
@@ -170,16 +178,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { ...res, status: "unverified" };
         }
 
-        // 🔴 Account not found
+        // 🔴 Account not found (cleaned version)
         if (res.code === 404) {
+          toast.dismiss();
           toastMessage("Account does not exist. Redirecting to signup...", {
             type: "warning",
           });
+          setLoading(true);
           await signOut(auth).catch(() => {});
           setUser(null);
+
           if (typeof window !== "undefined") {
-            setTimeout(() => window.location.replace("/signup"), 1000);
+            setTimeout(() => {
+              toast.dismiss();
+              window.location.replace("/signup");
+            }, 900);
           }
+
           return { ...res, status: "not_found" };
         }
 
@@ -193,12 +208,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // ⚡ Expected auth failures
         if (err?.status === 404) {
+          toast.dismiss();
           toastMessage("Account does not exist. Redirecting to signup...", {
             type: "warning",
           });
+          setLoading(true);
           await signOut(auth).catch(() => {});
           setUser(null);
-          setTimeout(() => window.location.replace("/signup"), 1000);
+          setTimeout(() => {
+            toast.dismiss();
+            window.location.replace("/signup");
+          }, 900);
           return { status: "not_found", code: 404 };
         }
 

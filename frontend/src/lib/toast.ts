@@ -11,16 +11,16 @@ export interface ToastOptions {
 }
 
 /* ============================================================
-   🌈 toastMessage — Unified, Sonner-Compatible
+   🌈 toastMessage — Unified, shadcn/Sonner Pure
    ------------------------------------------------------------
    • Supports success, error, info, warning, loading
-   • Info + warning are simulated via neutral icons
+   • Pure Sonner styling — no emojis or custom overrides
 ============================================================ */
 export function toastMessage(
   message: string,
   {
     type = "success",
-    duration = 4000,
+    duration = 6000,
     actionLabel,
     onAction,
   }: ToastOptions = {}
@@ -40,18 +40,10 @@ export function toastMessage(
         toast.error(message, opts);
         break;
       case "warning":
-        toast(message, {
-          ...opts,
-          icon: "⚠️",
-          className: "text-amber-600 dark:text-amber-400",
-        });
+        toast.warning(message, opts);
         break;
       case "info":
-        toast(message, {
-          ...opts,
-          icon: "ℹ️",
-          className: "text-blue-600 dark:text-blue-400",
-        });
+        toast.info(message, opts);
         break;
       case "loading":
         toast.loading(message, opts);
@@ -101,6 +93,57 @@ export async function toastAsync<T>(
       "Unexpected error occurred.";
     toast.error(msg, { duration });
     return undefined;
+  }
+}
+
+/* ============================================================
+   🧹 toastClear — Clears all active toasts
+============================================================ */
+export function toastClear(): void {
+  try {
+    toast.dismiss(); // clears all when no ID provided
+  } catch (err) {
+    console.error("toastClear error:", err);
+  }
+}
+
+/* ============================================================
+   ♻️ toastSafe — Prevents duplicate stacking (deduplicated)
+   ------------------------------------------------------------
+   • Shows only one instance of a message at a time
+   • Reuses toast ID safely (supports string | number)
+============================================================ */
+const activeToasts = new Map<string, string | number>(); // message → toastId
+
+export function toastSafe(message: string, options: ToastOptions = {}): void {
+  try {
+    const { type = "info", duration = 6000 } = options;
+    const existingId = activeToasts.get(message);
+
+    if (existingId !== undefined) {
+      // Dismiss previous one safely
+      toast.dismiss(existingId);
+      activeToasts.delete(message);
+    }
+
+    const id = toast(message, {
+      duration,
+      description:
+        type === "loading"
+          ? "Please wait..."
+          : type === "success"
+          ? "Done"
+          : type === "error"
+          ? "Something went wrong"
+          : undefined,
+    });
+
+    activeToasts.set(message, id);
+
+    // Cleanup after toast closes
+    setTimeout(() => activeToasts.delete(message), duration + 500);
+  } catch (err) {
+    console.error("toastSafe error:", err);
   }
 }
 
