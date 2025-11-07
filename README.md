@@ -1,1 +1,1 @@
-aksnnslama
+aksn
