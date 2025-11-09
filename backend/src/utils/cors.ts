@@ -3,53 +3,33 @@ import { logger } from "./logger";
 import { logAudit } from "./audit";
 import { AuditAction } from "@prisma/client";
 
-/**
- * 🌍 CORS Middleware — Level 2.8 (Final Production)
- * ------------------------------------------------------------
- * ✅ Supports `.iventics.com` cross-domain cookies
- * ✅ Auto-allows Vercel preview subdomains (`*.vercel.app`)
- * ✅ Allows localhost in dev
- * ✅ Allows x-request-id, cache-control, pragma headers
- * ✅ Logs and audits blocked origins
- * ✅ Handles preflight OPTIONS safely
- */
-
 const allowedOrigins = (process.env.AUTH_ALLOWED_ORIGINS || "")
   .split(",")
   .map((s) => s.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
-// 🧩 Always allow localhost in non-production
 if (process.env.NODE_ENV !== "production") {
   if (!allowedOrigins.includes("http://localhost:3000")) {
     allowedOrigins.push("http://localhost:3000");
   }
 }
 
-// 🧩 Auto-add .vercel.app wildcard for preview deployments
 if (!allowedOrigins.some((o) => o.includes("vercel.app"))) {
   allowedOrigins.push("vercel.app");
 }
 
-// 🧩 Safety warning when nothing configured
 if (!allowedOrigins.length) {
   logger.warn(
     "⚠️  No AUTH_ALLOWED_ORIGINS defined — all origins will be blocked in production."
   );
 }
 
-/* ============================================================
-   ⚙️ CORS Configuration
-============================================================ */
 const corsConfig: CorsOptions = {
   origin(origin, callback) {
-    // ✅ Allow Postman, SSR, or server-to-server requests
     if (!origin) return callback(null, true);
 
-    // ✅ Exact match
     if (allowedOrigins.includes(origin)) return callback(null, true);
 
-    // ✅ Wildcard subdomain or suffix match
     const allowed = allowedOrigins.find((allowed) => {
       const base = allowed.replace(/^https?:\/\//, "");
       return (
@@ -61,8 +41,7 @@ const corsConfig: CorsOptions = {
 
     if (allowed) return callback(null, true);
 
-    // 🚫 Block unauthorized origin
-    logger.warn({ origin }, "🚫 Blocked by CORS policy");
+    logger.warn({ origin }, "Blocked by CORS policy");
     void logAudit(AuditAction.RATE_LIMIT_HIT, null, null, null, {
       reason: "CORS_ORIGIN_BLOCKED",
       origin,
@@ -72,7 +51,7 @@ const corsConfig: CorsOptions = {
     return callback(new Error(`CORS: Origin not allowed → ${origin}`));
   },
 
-  credentials: true, // ✅ Required for secure cookie auth
+  credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
@@ -81,14 +60,11 @@ const corsConfig: CorsOptions = {
     "Accept",
     "Origin",
     "x-request-id",
-    "cache-control", // ✅ Fix for some preflights
-    "pragma", // ✅ Legacy fallback header
+    "cache-control",
+    "pragma",
   ],
   exposedHeaders: ["Set-Cookie"],
   optionsSuccessStatus: 204,
 };
 
-/* ============================================================
-   🧩 Export Middleware
-============================================================ */
 export const corsMiddleware = cors(corsConfig);

@@ -1,18 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 
-/**
- * 🧩 Prisma Client — Safe Singleton (Level 2.5)
- * ------------------------------------------------------------
- * • Prevents duplicate Prisma instances in hot reloads
- * • Adds connection diagnostics and safe logging
- * • Exits early if DATABASE_URL misconfigured
- */
-
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
-// ✅ Create or reuse client (singleton pattern)
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
@@ -22,7 +13,6 @@ export const prisma =
         : ["error"],
   });
 
-// 🚦 Verify DB connection on startup
 async function verifyPrismaConnection(): Promise<void> {
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
@@ -41,7 +31,6 @@ async function verifyPrismaConnection(): Promise<void> {
 }
 void verifyPrismaConnection();
 
-// ♻️ Reuse same client in dev mode to prevent connection leaks
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }

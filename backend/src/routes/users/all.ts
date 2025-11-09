@@ -9,22 +9,12 @@ import { logger } from "../../utils/logger";
 
 const router = Router();
 
-/**
- * 🔐 POST /api/auth/session
- * ------------------------------------------------------------
- * Exchanges Firebase ID token → Secure HttpOnly session cookie.
- * Creates new user if not found.
- * First registered user becomes ADMIN automatically.
- *
- * Used by frontend on login or session refresh.
- */
 router.post("/", async (req: Request, res: Response) => {
   try {
     const { idToken, userAgent } = req.body;
 
-    // 🧩 Validate input
     if (!idToken || typeof idToken !== "string") {
-      logger.warn("🚫 Missing idToken in /auth/session");
+      logger.warn("Missing idToken in /auth/session");
       return res.status(400).json({
         status: "error",
         code: 400,
@@ -32,7 +22,6 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
-    // 🔍 Verify Firebase ID token
     const decoded = await admin.auth().verifyIdToken(idToken, true);
     const email = decoded.email ?? null;
     const name = decoded.name ?? null;
@@ -53,7 +42,6 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
-    // 🚫 Block unverified password-based sign-ins
     if (
       !decoded.email_verified &&
       decoded.firebase?.sign_in_provider === "password"
@@ -72,11 +60,7 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
-    /* ============================================================
-       👤 Find or create user record
-    ============================================================ */
     let user = await prisma.user.findUnique({ where: { uid: decoded.uid } });
-
     const userCount = await prisma.user.count();
     const isFirstUser = userCount === 0;
 
@@ -101,7 +85,7 @@ router.post("/", async (req: Request, res: Response) => {
         { reason: "NEW_USER_AUTO_CREATED" }
       );
 
-      logger.info(`🆕 New user created: ${user.email}`);
+      logger.info(`New user created: ${user.email}`);
     } else {
       await logAudit(
         AuditAction.USER_LOGIN,
@@ -112,14 +96,10 @@ router.post("/", async (req: Request, res: Response) => {
       );
     }
 
-    /* ============================================================
-       🍪 Create secure Firebase session cookie
-    ============================================================ */
     const { cookieHeader, rawToken, expiresAt } = await makeSessionCookie(
       idToken
     );
 
-    // Normalize user agent + IP
     const ua =
       (Array.isArray(userAgent) ? userAgent.join("; ") : userAgent) ??
       req.headers["user-agent"] ??
@@ -130,7 +110,6 @@ router.post("/", async (req: Request, res: Response) => {
       req.socket?.remoteAddress ||
       null;
 
-    // 💾 Save session (hashed token)
     await prisma.session.create({
       data: {
         tokenHash: crypto.createHash("sha256").update(rawToken).digest("hex"),
@@ -141,13 +120,9 @@ router.post("/", async (req: Request, res: Response) => {
       },
     });
 
-    // ✅ Attach cookie to response
     res.setHeader("Set-Cookie", cookieHeader);
+    logger.info(`Session created for ${email}`);
 
-    /* ============================================================
-       ✅ Success
-    ============================================================ */
-    logger.info(`✅ Session created for ${email}`);
     return res.status(200).json({
       status: "success",
       code: 200,

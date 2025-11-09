@@ -1,18 +1,10 @@
-// ============================================================
-// 🧩 PRISMA CONFIGURATION
-// ============================================================
 generator client {
   provider = "prisma-client-js"
 }
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
-// ============================================================
-// 👤 USER MODEL — Core User Identity
-// ============================================================
 model User {
   id              String       @id @default(cuid())
   uid             String       @unique                     
@@ -31,20 +23,14 @@ model User {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  // 🔗 Relations
   sessions  Session[]
   auditLogs AuditLog[]        @relation("UserAuditLogs")
 
-  // 📈 Indexes
   @@index([uid])
   @@index([email])
   @@index([role])
   @@index([status])
 }
-
-// ============================================================
-// 🔐 SESSION MODEL — Secure Backend Sessions
-// ============================================================
 model Session {
   id          String    @id @default(cuid())
   tokenHash   String    @unique
@@ -58,15 +44,10 @@ model Session {
   revokedAt   DateTime?
   expiresAt   DateTime
 
-  // 📈 Indexes
   @@index([userId, expiresAt])
   @@index([expiresAt])
   @@index([tokenHash])
 }
-
-// ============================================================
-// 🧾 AUDIT LOG MODEL — System Event Tracking
-// ============================================================
 model AuditLog {
   id        String      @id @default(cuid())
   userId    String?
@@ -81,14 +62,10 @@ model AuditLog {
   userAgent String?
   createdAt DateTime    @default(now())
 
-  // 📈 Indexes
   @@index([userId, createdAt])
   @@index([action, createdAt])
 }
 
-// ============================================================
-// 🧩 ENUMS — Type-Safe States & Roles
-// ============================================================
 enum Role {
   USER
   ADMIN

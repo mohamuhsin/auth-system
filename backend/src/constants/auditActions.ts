@@ -1,16 +1,5 @@
 import { AuditAction } from "@prisma/client";
 
-/**
- * 🧾 AUDIT ACTION METADATA — Level 2.5 Hardened (Auth by Iventics)
- * ------------------------------------------------------------
- * Provides human-readable labels, descriptions, and categories
- * for all AuditAction enums.
- *
- * Used by:
- *  • Admin dashboards
- *  • Analytics / Audit reports
- *  • Developer logs and monitoring
- */
 export const AUDIT_ACTIONS: Record<
   AuditAction,
   {
@@ -20,9 +9,6 @@ export const AUDIT_ACTIONS: Record<
     severity?: "INFO" | "WARN" | "ERROR" | "SECURITY";
   }
 > = {
-  // ============================================================
-  // 🧍 USER LIFECYCLE
-  // ============================================================
   USER_SIGNUP: {
     label: "User Signup",
     description: "A new user account was created.",
@@ -60,9 +46,6 @@ export const AUDIT_ACTIONS: Record<
     severity: "ERROR",
   },
 
-  // ============================================================
-  // 🔑 SESSIONS
-  // ============================================================
   SESSION_REFRESH: {
     label: "Session Refreshed",
     description: "A session token was refreshed successfully.",
@@ -76,9 +59,6 @@ export const AUDIT_ACTIONS: Record<
     severity: "SECURITY",
   },
 
-  // ============================================================
-  // 👤 ACCOUNT MANAGEMENT
-  // ============================================================
   USER_UPDATE: {
     label: "User Updated",
     description: "User profile or settings were updated.",
@@ -104,9 +84,6 @@ export const AUDIT_ACTIONS: Record<
     severity: "ERROR",
   },
 
-  // ============================================================
-  // 🔐 PASSWORD & EMAIL EVENTS
-  // ============================================================
   PASSWORD_RESET: {
     label: "Password Reset",
     description: "User requested a password reset email.",
@@ -126,9 +103,6 @@ export const AUDIT_ACTIONS: Record<
     severity: "INFO",
   },
 
-  // ============================================================
-  // ⚙️ SYSTEM
-  // ============================================================
   RATE_LIMIT_HIT: {
     label: "Rate Limit Hit",
     description: "Rate limit was triggered for an IP or route.",
@@ -137,12 +111,6 @@ export const AUDIT_ACTIONS: Record<
   },
 };
 
-/**
- * 🧠 getAuditActionInfo
- * ------------------------------------------------------------
- * Safely returns metadata for any AuditAction.
- * Falls back to a default object if unrecognized.
- */
 export function getAuditActionInfo(action: AuditAction) {
   return (
     AUDIT_ACTIONS[action] ?? {

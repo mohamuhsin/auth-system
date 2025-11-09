@@ -7,16 +7,6 @@ import { hashToken } from "../../utils/crypto";
 
 const router = Router();
 
-/**
- * 🔐 POST /api/auth/session
- * ------------------------------------------------------------
- * Exchanges a Firebase ID Token → Secure session cookie.
- * Used by frontend on page reload or new browser start.
- * - Verifies Firebase ID token
- * - Enforces email verification for password users
- * - Creates/updates User record
- * - Issues secure HttpOnly cookie + saves Session
- */
 router.post("/", async (req: Request, res: Response) => {
   try {
     const { idToken } = req.body;
@@ -27,7 +17,7 @@ router.post("/", async (req: Request, res: Response) => {
         .json({ status: "error", message: "Missing idToken" });
     }
 
-    console.log("🟢 Verifying Firebase ID token...");
+    console.log("Verifying Firebase ID token...");
     const decoded = await admin.auth().verifyIdToken(idToken, true);
 
     const provider = decoded.firebase?.sign_in_provider ?? "password";
@@ -35,9 +25,8 @@ router.post("/", async (req: Request, res: Response) => {
     const name = decoded.name ?? null;
     const avatarUrl = decoded.picture ?? null;
 
-    // 🚫 Enforce verified email for password logins
     if (provider === "password" && !decoded.email_verified) {
-      console.warn(`⛔ Unverified email attempt: ${email}`);
+      console.warn(`Unverified email attempt: ${email}`);
       await logAudit("USER_LOGIN", null, req.ip, req.headers["user-agent"], {
         reason: "UNVERIFIED_EMAIL",
       });
@@ -47,14 +36,12 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
-    // 🧩 Find existing user (by uid or email)
     let user = await prisma.user.findFirst({
       where: { OR: [{ uid: decoded.uid }, { email }] },
     });
 
     const isFirstUser = (await prisma.user.count()) === 0;
 
-    // 🆕 Create user if not found
     if (!user) {
       console.log("🆕 Creating new user record...");
       user = await prisma.user.create({
@@ -75,7 +62,6 @@ router.post("/", async (req: Request, res: Response) => {
 
       await logAudit("USER_SIGNUP", user.id, req.ip, req.headers["user-agent"]);
     } else {
-      // ✅ Update metadata for returning user
       user = await prisma.user.update({
         where: { id: user.id },
         data: {
@@ -89,12 +75,10 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
-    // 🍪 Create secure session cookie
     const { cookieHeader, rawToken, expiresAt } = await makeSessionCookie(
       idToken
     );
 
-    // 💾 Save session (store only hashed token)
     await prisma.session.create({
       data: {
         userId: user.id,
@@ -105,9 +89,8 @@ router.post("/", async (req: Request, res: Response) => {
       },
     });
 
-    // ✅ Return cookie + response
     res.setHeader("Set-Cookie", cookieHeader);
-    console.log(`✅ Session cookie set for ${user.email}`);
+    console.log(`Session cookie set for ${user.email}`);
 
     await logAudit("USER_LOGIN", user.id, req.ip, req.headers["user-agent"]);
 
@@ -126,9 +109,8 @@ router.post("/", async (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
-    console.error("🚨 AUTH SESSION ERROR:", err);
+    console.error("AUTH SESSION ERROR:", err);
 
-    // 🔁 Prisma duplicate email constraint
     if (err.code === "P2002") {
       await logAudit("USER_SIGNUP", null, req.ip, req.headers["user-agent"], {
         reason: "DUPLICATE_EMAIL",

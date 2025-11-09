@@ -9,13 +9,6 @@ import { logger } from "../../utils/logger";
 
 const router = Router();
 
-/**
- * 🔐 POST /api/auth/login-with-firebase
- * ------------------------------------------------------------
- * Verifies Firebase ID token → issues secure session cookie.
- * Updates verification status, records session & audit log.
- * Supports both Google and Email/Password sign-ins.
- */
 router.post("/", async (req: Request, res: Response) => {
   try {
     const { idToken, userAgent } = req.body;
@@ -28,9 +21,6 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
-    /* ============================================================
-       🔍 Verify Firebase token
-    ============================================================ */
     let decoded;
     try {
       decoded = await admin.auth().verifyIdToken(idToken, true);
@@ -71,14 +61,37 @@ router.post("/", async (req: Request, res: Response) => {
 
     const provider = decoded.firebase?.sign_in_provider ?? "password";
 
-    /* ============================================================
-       👤 Find user in DB
-    ============================================================ */
     let user = await prisma.user.findUnique({ where: { email } });
 
-    // 🔸 No existing user → instruct frontend to sign up
+    if (!user && provider === "google.com") {
+      logger.info(`🆕 Creating new Google user: ${email}`);
+      user = await prisma.user.create({
+        data: {
+          email,
+          name: decoded.name || email.split("@")[0],
+          avatarUrl: decoded.picture || null,
+          uid: decoded.uid,
+          emailVerified: decoded.email_verified,
+          emailVerifiedAt: decoded.email_verified ? new Date() : null,
+          primaryProvider: "GOOGLE",
+          role: "USER",
+          isApproved: true,
+          status: "ACTIVE",
+        },
+      });
+      await logAudit(
+        AuditAction.USER_SIGNUP,
+        user.id,
+        req.ip,
+        req.headers["user-agent"],
+        {
+          method: "GOOGLE_AUTO_CREATE",
+        }
+      );
+    }
+
     if (!user) {
-      logger.warn(`❌ Login failed — no user found for ${email}`);
+      logger.warn(`Login failed — no user found for ${email}`);
       await logAudit(
         AuditAction.USER_LOGIN,
         null,
@@ -95,9 +108,6 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
-    /* ============================================================
-       📧 Enforce email verification for password logins
-    ============================================================ */
     if (
       provider === "password" &&
       !decoded.email_verified &&
@@ -119,12 +129,9 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
-    /* ============================================================
-       🔄 Sync verification + metadata
-    ============================================================ */
     const updates: any = {
       lastLoginAt: new Date(),
-      emailVerified: decoded.email_verified,
+      emailVerified: decoded.email_verified || user.emailVerified,
       emailVerifiedAt: decoded.email_verified
         ? new Date()
         : user.emailVerifiedAt,
@@ -133,9 +140,6 @@ router.post("/", async (req: Request, res: Response) => {
     };
     user = await prisma.user.update({ where: { id: user.id }, data: updates });
 
-    /* ============================================================
-       🍪 Create secure session cookie
-    ============================================================ */
     const { cookieHeader, rawToken, expiresAt } = await makeSessionCookie(
       idToken
     );
@@ -150,9 +154,6 @@ router.post("/", async (req: Request, res: Response) => {
       req.socket?.remoteAddress ||
       null;
 
-    /* ============================================================
-       🧾 Save new session record (hashed token)
-    ============================================================ */
     const session = await prisma.session.create({
       data: {
         userId: user.id,
@@ -163,9 +164,6 @@ router.post("/", async (req: Request, res: Response) => {
       },
     });
 
-    /* ============================================================
-       📤 Send cookie + response
-    ============================================================ */
     res.setHeader("Set-Cookie", cookieHeader);
     res.status(200).json({
       status: "success",
@@ -184,9 +182,6 @@ router.post("/", async (req: Request, res: Response) => {
       expiresAt,
     });
 
-    /* ============================================================
-       🧾 Async audit log
-    ============================================================ */
     await logAudit(
       AuditAction.USER_LOGIN,
       user.id,
@@ -198,9 +193,9 @@ router.post("/", async (req: Request, res: Response) => {
       }
     );
 
-    logger.info(`✅ User ${user.email} logged in successfully`);
+    logger.info(`User ${user.email} logged in successfully`);
   } catch (err: any) {
-    logger.error("🔥 login-with-firebase failed:", err);
+    logger.error("login-with-firebase failed:", err);
     await logAudit(
       AuditAction.USER_LOGIN,
       null,

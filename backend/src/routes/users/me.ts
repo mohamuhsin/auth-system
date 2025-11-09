@@ -6,17 +6,10 @@ import { logger } from "../../utils/logger";
 
 const router = Router();
 
-/**
- * 👤 GET /api/users/me
- * ------------------------------------------------------------
- * Returns the authenticated user's profile from the verified session.
- * Relies on `authGuard()` to attach merged Firebase + DB user data.
- */
 router.get("/", authGuard(), async (req: AuthenticatedRequest, res) => {
   try {
     const user = req.authUser;
 
-    // 🚫 No valid user context found
     if (!user) {
       logger.warn("No authenticated user found for /users/me");
 
@@ -35,7 +28,6 @@ router.get("/", authGuard(), async (req: AuthenticatedRequest, res) => {
       });
     }
 
-    // 🧾 Record audit log for profile access (treated as safe read)
     await logAudit(
       AuditAction.USER_UPDATE,
       user.id,
@@ -47,7 +39,6 @@ router.get("/", authGuard(), async (req: AuthenticatedRequest, res) => {
       }
     );
 
-    // ✅ Respond with unified profile structure (matches frontend AuthContext)
     return res.status(200).json({
       status: "success",
       code: 200,
@@ -61,7 +52,7 @@ router.get("/", authGuard(), async (req: AuthenticatedRequest, res) => {
     });
   } catch (err: any) {
     logger.error({
-      msg: "❌ /users/me error",
+      msg: "/users/me error",
       error: err.message,
       stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
     });

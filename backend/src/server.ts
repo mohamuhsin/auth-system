@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import "dotenv/config";
 import express from "express";
 import helmet from "helmet";
@@ -10,23 +9,10 @@ import userRoutes from "./routes/users";
 import { errorHandler } from "./middleware/errorHandler";
 import prisma from "./prisma/client";
 
-/**
- * 🚀 Iventics Auth API — Level 2.5 Hardened
- * ------------------------------------------------------------
- *  ✅ Secure headers (Helmet)
- *  ✅ CORS + cookie-based session support
- *  ✅ Pino structured logging + request tracing
- *  ✅ Health check with DB ping
- *  ✅ Graceful shutdown for Railway/Vercel
- */
-
 const app = express();
 
-/* ============================================================
-   🧱 Core Middleware
-============================================================ */
 app.disable("x-powered-by");
-app.set("trust proxy", 1); // Required for secure cookies behind reverse proxies
+app.set("trust proxy", 1);
 
 app.use(
   helmet({
@@ -35,13 +21,10 @@ app.use(
 );
 
 app.use(cookieParser());
-app.use(express.json({ limit: "1mb" })); // Prevent body bloat attacks
+app.use(express.json({ limit: "1mb" }));
 app.use(corsMiddleware);
 app.use(httpLogger);
 
-/* ============================================================
-   🩺 Health Check Endpoint
-============================================================ */
 app.get("/api/health", async (_req, res) => {
   const start = Date.now();
   try {
@@ -57,7 +40,7 @@ app.get("/api/health", async (_req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
-    logger.error({ err }, "❌ Health check failed");
+    logger.error({ err }, "Health check failed");
     res.status(500).json({
       ok: false,
       message: "Health check failed",
@@ -67,41 +50,29 @@ app.get("/api/health", async (_req, res) => {
   }
 });
 
-/* ============================================================
-   🔐 Main API Routes
-============================================================ */
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 
-/* ============================================================
-   ⚠️ Global Error Handler
-============================================================ */
 app.use(errorHandler);
 
-/* ============================================================
-   🚀 Startup
-============================================================ */
 const PORT = Number(process.env.PORT || 4000);
 const HOST = "0.0.0.0";
 
 const server = app.listen(PORT, HOST, () => {
-  logger.info(`🚀 Auth API running on http://${HOST}:${PORT}`);
-  logger.info(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+  logger.info(`Auth API running on http://${HOST}:${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || "development"}`);
 });
 
-/* ============================================================
-   🧹 Graceful Shutdown & Fatal Safety
-============================================================ */
 async function shutdown(signal: string) {
   logger.warn(`⚠️ Received ${signal} — shutting down gracefully...`);
   try {
     await prisma.$disconnect();
     server.close(() => {
-      logger.info("✅ Server closed cleanly");
+      logger.info("Server closed cleanly");
       process.exit(0);
     });
   } catch (err: any) {
-    logger.error({ err }, "🔥 Error during shutdown");
+    logger.error({ err }, "Error during shutdown");
     process.exit(1);
   }
 }

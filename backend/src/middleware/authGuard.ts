@@ -5,9 +5,6 @@ import { logger } from "../utils/logger";
 import { logAudit } from "../utils/audit";
 import { AuditAction, Role } from "@prisma/client";
 
-/**
- * 👤 Authenticated User structure (merged Firebase + DB)
- */
 export interface AuthenticatedUser {
   id: string;
   uid: string;
@@ -19,21 +16,10 @@ export interface AuthenticatedUser {
   photoURL?: string | null;
 }
 
-/**
- * ✅ Extended Express Request to include authenticated user
- */
 export interface AuthenticatedRequest extends Request {
   authUser?: AuthenticatedUser;
 }
 
-/**
- * 🛡️ authGuard(requiredRole?)
- * ------------------------------------------------------------
- * • Validates Firebase session cookie (.iventics.com shared)
- * • Syncs Firebase user data with Prisma user record
- * • Enforces role-based access if `requiredRole` is provided
- * • Logs audit events for transparency & monitoring
- */
 export function authGuard(requiredRole?: Role) {
   return async (
     req: AuthenticatedRequest,
@@ -44,7 +30,6 @@ export function authGuard(requiredRole?: Role) {
       process.env.SESSION_COOKIE_NAME || "__Secure-iventics_session";
 
     try {
-      // 🍪 Extract session cookie (supports signed / raw / forwarded)
       const sessionCookie =
         req.cookies?.[cookieName] ||
         req.signedCookies?.[cookieName] ||
@@ -54,10 +39,7 @@ export function authGuard(requiredRole?: Role) {
           ?.split("=")[1];
 
       if (!sessionCookie) {
-        logger.warn(
-          { path: req.path, ip: req.ip },
-          "🚫 No session cookie found"
-        );
+        logger.warn({ path: req.path, ip: req.ip }, "No session cookie found");
 
         await logAudit(
           AuditAction.USER_LOGOUT_NO_COOKIE,
@@ -74,12 +56,10 @@ export function authGuard(requiredRole?: Role) {
         });
       }
 
-      // ✅ Verify Firebase session cookie (revocation-aware)
       const decoded = await admin
         .auth()
         .verifySessionCookie(sessionCookie, true);
 
-      // 🔍 Find user in database
       const dbUser = await prisma.user.findUnique({
         where: { uid: decoded.uid },
       });
@@ -87,7 +67,7 @@ export function authGuard(requiredRole?: Role) {
       if (!dbUser) {
         logger.warn(
           { uid: decoded.uid, email: decoded.email },
-          "❌ User not found in database"
+          "User not found in database"
         );
 
         await logAudit(
@@ -105,11 +85,10 @@ export function authGuard(requiredRole?: Role) {
         });
       }
 
-      // 🚫 Suspended or inactive account
       if (dbUser.status !== "ACTIVE") {
         logger.warn(
           { id: dbUser.id, status: dbUser.status },
-          "🚫 Inactive or suspended account"
+          "Inactive or suspended account"
         );
 
         await logAudit(
@@ -127,7 +106,6 @@ export function authGuard(requiredRole?: Role) {
         });
       }
 
-      // 🧩 Attach merged user context
       req.authUser = {
         id: dbUser.id,
         uid: dbUser.uid,
@@ -139,7 +117,6 @@ export function authGuard(requiredRole?: Role) {
         photoURL: (decoded as any).picture ?? null,
       };
 
-      // 🔒 Role enforcement (if required)
       if (requiredRole && dbUser.role !== requiredRole) {
         logger.warn(
           {
@@ -169,7 +146,6 @@ export function authGuard(requiredRole?: Role) {
         });
       }
 
-      // ✅ Passed authentication & authorization
       next();
     } catch (err: any) {
       logger.error({
