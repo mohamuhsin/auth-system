@@ -3,12 +3,6 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { AuthResult } from "./helpers";
 
-/* ============================================================
-   🔁 PASSWORD RESET (Final v3.2)
-   ------------------------------------------------------------
-   • Single responsibility: only send email, no UI toasts here
-   • Toasts handled by ForgotPasswordForm for one unified flow
-============================================================ */
 export async function requestPasswordReset(email: string): Promise<AuthResult> {
   try {
     await sendPasswordResetEmail(auth, email);

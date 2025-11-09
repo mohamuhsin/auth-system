@@ -1,19 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-/* ============================================================
-   🧩 Shared Types
-============================================================ */
 export interface AuthResult {
   ok: boolean;
   message?: string;
 }
 
-/* ============================================================
-   🧩 normalizeApi — Normalize backend responses
-   ------------------------------------------------------------
-   Handles Express JSON, Firebase errors, and custom codes.
-   Treats 202 or "pending_verification" as OK (non-error).
-============================================================ */
 export function normalizeApi(res: any): {
   ok: boolean;
   status?: number;
@@ -22,7 +13,6 @@ export function normalizeApi(res: any): {
 } {
   if (!res || typeof res !== "object") return { ok: false };
 
-  // 🧭 Detect numeric status code
   const statusNum =
     typeof res.code === "number"
       ? res.code
@@ -32,13 +22,11 @@ export function normalizeApi(res: any): {
       ? res.status
       : undefined;
 
-  // 🧭 Detect textual status
   const statusStr =
     typeof res.status === "string"
       ? res.status.toLowerCase()
       : res.statusText?.toLowerCase?.();
 
-  // ✅ Define positive conditions
   const isSuccess =
     statusStr === "success" ||
     res.ok === true ||
@@ -49,7 +37,6 @@ export function normalizeApi(res: any): {
     statusStr === "pending" ||
     statusNum === 202;
 
-  // 🧠 Normalize unified response
   return {
     ok: isSuccess || isPending,
     status: statusNum,
@@ -62,12 +49,6 @@ export function normalizeApi(res: any): {
   };
 }
 
-/* ============================================================
-   🧭 go — Safe redirect with fallback (Next.js-Safe)
-   ------------------------------------------------------------
-   Uses window.location.assign() for reliability across browsers.
-   Falls back gracefully to href if assign fails.
-============================================================ */
 export function go(path: string, delay = 800) {
   if (typeof window === "undefined") return;
 
@@ -80,11 +61,6 @@ export function go(path: string, delay = 800) {
   }, delay);
 }
 
-/* ============================================================
-   ✉️ actionCodeSettings — For verification email links
-   ------------------------------------------------------------
-   Used in Firebase sendEmailVerification and reset password flows.
-============================================================ */
 export const actionCodeSettings =
   typeof window !== "undefined"
     ? {

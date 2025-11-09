@@ -38,7 +38,7 @@ if (typeof window !== "undefined") {
     .catch(() => null);
 
   if (process.env.NODE_ENV === "development")
-    console.log("🔥 Firebase initialized (client)");
+    console.log("Firebase initialized (client)");
 } else {
   app = {} as FirebaseApp;
   auth = {} as Auth;

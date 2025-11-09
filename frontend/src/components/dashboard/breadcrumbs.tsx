@@ -29,7 +29,6 @@ export function PageBreadcrumb() {
 
   return (
     <Breadcrumb>
-      {/* Full breadcrumb (desktop) */}
       <BreadcrumbList className="hidden md:flex">
         {crumbs.map((crumb, index) => {
           const isLast = index === crumbs.length - 1;
@@ -55,8 +54,6 @@ export function PageBreadcrumb() {
           );
         })}
       </BreadcrumbList>
-
-      {/* Condensed version (mobile) */}
       <div className="block md:hidden font-medium text-foreground">
         {currentPage}
       </div>

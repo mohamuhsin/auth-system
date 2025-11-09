@@ -31,13 +31,6 @@ import { toast, toastMessage } from "@/lib/toast";
 import { signupWithEmailPassword, continueWithGoogle } from "@/lib/auth";
 import { useAuth } from "@/context/authContext";
 
-/* ============================================================
-   🧩 SignupForm — Email + Google Signup (Final v4.3)
-   ------------------------------------------------------------
-   • Unified Google handler (auto-login/signup)
-   • Clean Sonner toasts (no duplicates)
-   • Seamless session sync after signup
-============================================================ */
 export function SignupForm({
   className,
   ...props
@@ -57,9 +50,6 @@ export function SignupForm({
     mode: "onChange",
   });
 
-  /* ------------------------------------------------------------
-     📩 Email / Password Signup
-  ------------------------------------------------------------ */
   async function onSubmit(values: SignupFormValues) {
     if (values.password !== values.confirmPassword) {
       toast.dismiss();
@@ -73,22 +63,15 @@ export function SignupForm({
     form.reset();
   }
 
-  /* ------------------------------------------------------------
-     🌐 Google Signup — Unified login/signup flow
-  ------------------------------------------------------------ */
   async function handleGoogleSignup() {
     const result = await continueWithGoogle();
 
     if (result?.ok) {
-      // Wait until backend cookie & AuthContext are ready
       await waitForSession();
       setTimeout(() => window.location.replace("/dashboard"), 700);
     }
   }
 
-  /* ------------------------------------------------------------
-     🎨 UI Layout
-  ------------------------------------------------------------ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -104,7 +87,6 @@ export function SignupForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* 🌐 Google Signup */}
               <Field>
                 <Button
                   variant="outline"
@@ -151,7 +133,6 @@ export function SignupForm({
                 Or continue with
               </FieldSeparator>
 
-              {/* 👤 Name */}
               <Controller
                 name="name"
                 control={form.control}
@@ -169,7 +150,6 @@ export function SignupForm({
                 )}
               />
 
-              {/* 📧 Email */}
               <Controller
                 name="email"
                 control={form.control}
@@ -188,7 +168,6 @@ export function SignupForm({
                 )}
               />
 
-              {/* 🔑 Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -223,7 +202,6 @@ export function SignupForm({
                 )}
               />
 
-              {/* 🔁 Confirm Password */}
               <Controller
                 name="confirmPassword"
                 control={form.control}
@@ -259,13 +237,10 @@ export function SignupForm({
                   </Field>
                 )}
               />
-
               <FieldDescription>
                 Must be at least 8 characters and include a number and an
                 uppercase letter.
               </FieldDescription>
-
-              {/* 🚀 Submit */}
               <Field>
                 <Button
                   type="submit"

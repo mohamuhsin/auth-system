@@ -11,10 +11,7 @@ export async function logAudit(
 ): Promise<void> {
   try {
     if (!Object.values(AuditAction).includes(action)) {
-      logger.warn(
-        { action },
-        "⚠️ Invalid AuditAction provided — skipping log."
-      );
+      logger.warn({ action }, "Invalid AuditAction provided — skipping log.");
       return;
     }
 

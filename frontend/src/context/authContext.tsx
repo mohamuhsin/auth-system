@@ -41,10 +41,6 @@ interface ApiResponse {
   isApproved?: boolean;
   user?: User;
 }
-
-/* ============================================================
-   🔐 Context Types
-============================================================ */
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
@@ -60,16 +56,10 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-/* ============================================================
-   🔐 AuthProvider — Global authentication provider
-============================================================ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  /* ------------------------------------------------------------
-     🧩 Normalize API user → internal User type
-  ------------------------------------------------------------ */
   const toUser = (src: ApiResponse): User | null => {
     const u = src.user ?? src;
     if (!u?.id || !u?.email) return null;
@@ -86,9 +76,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  /* ------------------------------------------------------------
-     🧭 waitForSession — Poll /users/me after login/signup
-  ------------------------------------------------------------ */
   const waitForSession = useCallback(async (): Promise<ApiResponse | null> => {
     const maxRetries = 5;
     for (let i = 0; i < maxRetries; i++) {
@@ -96,17 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const res = await apiRequest<ApiResponse>("/users/me");
         if (res && (res.status === "success" || res.code === 200) && res.email)
           return res;
-      } catch {
-        /* silent retry */
-      }
+      } catch {}
       await new Promise((r) => setTimeout(r, 200 * (i + 1)));
     }
     return null;
   }, []);
 
-  /* ------------------------------------------------------------
-     🔄 fetchSession — Load active session
-  ------------------------------------------------------------ */
   const fetchSession = useCallback(async () => {
     if (typeof window !== "undefined" && window.location.pathname === "/signup")
       return;
@@ -135,18 +117,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  /* ------------------------------------------------------------
-     🚀 Mount — initial session probe
-  ------------------------------------------------------------ */
   useEffect(() => {
     toast.dismiss();
     const timer = setTimeout(fetchSession, 600);
     return () => clearTimeout(timer);
   }, [fetchSession]);
 
-  /* ------------------------------------------------------------
-     🔑 loginWithFirebase — Handles both Google & Email
-  ------------------------------------------------------------ */
   const loginWithFirebase = useCallback(
     async (firebaseUser: FirebaseUser): Promise<ApiResponse> => {
       try {
@@ -164,7 +140,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         });
 
-        // ⚠️ Unverified email (email/password only)
         if (res.code === 403) {
           toastMessage("Please verify your email before logging in.", {
             type: "warning",
@@ -174,7 +149,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { ...res, status: "unverified" };
         }
 
-        // 🟢 Success — including auto-created Google users
         const probe = await waitForSession();
         setUser(probe ? toUser(probe) : null);
         setLoading(false);
@@ -189,9 +163,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [waitForSession]
   );
 
-  /* ------------------------------------------------------------
-     ✳️ signupWithFirebase — Explicit Email signup
-  ------------------------------------------------------------ */
   const signupWithFirebase = useCallback(
     async (
       firebaseUser: FirebaseUser,
@@ -236,9 +207,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [waitForSession]
   );
 
-  /* ------------------------------------------------------------
-     🚪 logout — clear backend + firebase + local state
-  ------------------------------------------------------------ */
   const logout = useCallback(async () => {
     await toastAsync(
       async () => {
@@ -260,14 +228,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  /* ------------------------------------------------------------
-     ♻️ Refresh session manually
-  ------------------------------------------------------------ */
   const refreshSession = useCallback(fetchSession, [fetchSession]);
 
-  /* ------------------------------------------------------------
-     🧠 Context value
-  ------------------------------------------------------------ */
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -292,9 +254,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-/* ============================================================
-   🪶 useAuth — Hook accessor
-============================================================ */
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");

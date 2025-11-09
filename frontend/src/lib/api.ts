@@ -3,15 +3,6 @@
 import { auth } from "@/services/firebase";
 import { toast, toastMessage } from "@/lib/toast";
 
-/* ============================================================
-   🌐 API Client — Hardened (Auth by Iventics)
-   ------------------------------------------------------------
-   • Cross-domain requests (cookies + CORS)
-   • Handles 401 auto-refresh with Firebase ID token
-   • Silently ignores verification-related 403s
-   • Graceful retries, timeouts, and unified error toasts
-============================================================ */
-
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
   "https://auth-api.iventics.com/api";
@@ -30,9 +21,6 @@ export interface ApiRequestOptions extends RequestInit {
   retryCount?: number;
 }
 
-/* ------------------------------------------------------------
-   Safe JSON Parser
------------------------------------------------------------- */
 async function parseJsonSafe(res: Response) {
   const text = await res.text();
   if (!text) return {};
@@ -43,9 +31,6 @@ async function parseJsonSafe(res: Response) {
   }
 }
 
-/* ------------------------------------------------------------
-   UUID Generator (for request tracing)
------------------------------------------------------------- */
 function uuidv4() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = crypto.getRandomValues(new Uint8Array(1))[0] & 0x0f;
@@ -54,9 +39,6 @@ function uuidv4() {
   });
 }
 
-/* ------------------------------------------------------------
-   Core API Request
------------------------------------------------------------- */
 export async function apiRequest<T = any>(
   path: string,
   options: ApiRequestOptions = {}
@@ -90,9 +72,6 @@ export async function apiRequest<T = any>(
           : (options.body as BodyInit),
     });
 
-    /* ------------------------------------------------------------
-       ❌ Handle Non-OK Responses
-    ------------------------------------------------------------ */
     if (!res.ok) {
       const data = await parseJsonSafe(res);
       const message =
@@ -107,7 +86,6 @@ export async function apiRequest<T = any>(
         requestUrl: url,
       });
 
-      /* 🟠 401 → Try refresh Firebase token once */
       if (
         res.status === 401 &&
         !options.skipAuthCheck &&
@@ -133,7 +111,6 @@ export async function apiRequest<T = any>(
         }
       }
 
-      /* 🟡 403 → Skip toast for pending verification */
       if (
         res.status === 403 &&
         (message?.toLowerCase()?.includes("verify your email") ||
@@ -149,7 +126,6 @@ export async function apiRequest<T = any>(
         });
       }
 
-      /* 🟢 Silent 401 during session probe */
       if (
         res.status === 401 &&
         (path.includes("/users/me") || path.includes("/auth/session"))
@@ -158,7 +134,6 @@ export async function apiRequest<T = any>(
         throw Object.assign(error, { silent: true });
       }
 
-      /* 🚫 Ignore 404 for Google login auto-create */
       if (
         res.status === 404 &&
         (path.includes("/auth/login-with-firebase") ||
@@ -170,7 +145,6 @@ export async function apiRequest<T = any>(
         throw Object.assign(error, { silent: true });
       }
 
-      /* 🔴 Generic error toasts */
       toast.dismiss();
       if (res.status === 401) {
         toastMessage("Your session has expired. Please sign in again.", {
@@ -189,15 +163,10 @@ export async function apiRequest<T = any>(
       throw error;
     }
 
-    /* ✅ No content */
     if (res.status === 204) return {} as T;
 
-    /* ✅ Return JSON */
     return (await parseJsonSafe(res)) as T;
   } catch (err: any) {
-    /* ------------------------------------------------------------
-       ⚠️ Timeout
-    ------------------------------------------------------------ */
     if (err.name === "AbortError") {
       toast.dismiss();
       toastMessage("Request timed out after 15 seconds.", { type: "warning" });
@@ -207,9 +176,6 @@ export async function apiRequest<T = any>(
       }) as ApiError;
     }
 
-    /* ------------------------------------------------------------
-       🌐 Network Error / CORS
-    ------------------------------------------------------------ */
     if (err instanceof TypeError && err.message === "Failed to fetch") {
       const retry = options.retryCount ?? 0;
       if (retry < 2) {
@@ -230,9 +196,6 @@ export async function apiRequest<T = any>(
       ) as ApiError;
     }
 
-    /* ------------------------------------------------------------
-       🧭 Unexpected Errors (unless silent)
-    ------------------------------------------------------------ */
     if (!err?.silent) {
       console.error("API request failed:", err);
       toast.dismiss();

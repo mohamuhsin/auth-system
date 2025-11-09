@@ -8,13 +8,6 @@ import { apiRequest } from "@/lib/api";
 import { toast, toastMessage } from "@/lib/toast";
 import { normalizeApi, go, actionCodeSettings, AuthResult } from "./helpers";
 
-/* ============================================================
-   ✳️ SIGNUP — Email + Password (Final v3.2)
-   ------------------------------------------------------------
-   • One loading toast + one final toast (no duplicates)
-   • Handles 409 (exists), 403/202 (verify), 200 (success)
-   • Centralized toast logic (form remains silent)
-============================================================ */
 export async function signupWithEmailPassword(
   email: string,
   password: string,
@@ -24,16 +17,12 @@ export async function signupWithEmailPassword(
     toast.dismiss();
     toastMessage("Creating your account...", { type: "loading" });
 
-    // 🔐 Create Firebase account
     const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-    // ✉️ Send verification email
     await sendEmailVerification(cred.user, actionCodeSettings);
 
-    // 🔑 Get Firebase ID token
     const idToken = await cred.user.getIdToken(true);
 
-    // 🌐 Exchange token with backend
     const raw = await apiRequest("/auth/signup-with-firebase", {
       method: "POST",
       credentials: "include",
@@ -43,9 +32,6 @@ export async function signupWithEmailPassword(
     const res = normalizeApi(raw);
     toast.dismiss();
 
-    /* ============================================================
-       🔁 Handle Backend Responses
-    ============================================================ */
     if (res.status === 409) {
       toastMessage("Account already exists. Redirecting to login...", {
         type: "warning",
@@ -79,9 +65,6 @@ export async function signupWithEmailPassword(
   } catch (err: any) {
     toast.dismiss();
 
-    /* ============================================================
-       ⚠️ Firebase Client Errors
-    ============================================================ */
     const code = err?.code as string;
 
     switch (code) {

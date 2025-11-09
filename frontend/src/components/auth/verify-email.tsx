@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/services/firebase";
-import { resendVerificationEmail } from "@/lib/auth"; // ✅ updated import path
+import { resendVerificationEmail } from "@/lib/auth";
 import { toastMessage } from "@/lib/toast";
 import { useAuth } from "@/context/authContext";
 
@@ -20,9 +20,6 @@ import {
 } from "@/components/ui/card";
 import { Loader2, MailCheck, MailWarning } from "lucide-react";
 
-/* ============================================================
-   ✉️ VerifyEmailNotice — User email verification notice
-============================================================ */
 export function VerifyEmailNotice() {
   const [resending, setResending] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -40,9 +37,6 @@ export function VerifyEmailNotice() {
     }
   };
 
-  /* ============================================================
-     👁️ Watch for Firebase user verification changes
-  ============================================================ */
   useEffect(() => {
     const emailParam = searchParams.get("email");
     if (emailParam) setUserEmail(emailParam);
@@ -68,7 +62,6 @@ export function VerifyEmailNotice() {
         return;
       }
 
-      // Poll every 5s for verification change
       pollRef.current = setInterval(async () => {
         const current = auth.currentUser;
         if (!current) {
@@ -100,9 +93,6 @@ export function VerifyEmailNotice() {
     };
   }, [router, waitForSession]);
 
-  /* ============================================================
-     📩 Resend verification link
-  ============================================================ */
   const handleResend = async () => {
     const current = auth.currentUser;
     if (!current) {
@@ -114,7 +104,7 @@ export function VerifyEmailNotice() {
 
     try {
       setResending(true);
-      await resendVerificationEmail(); // ✅ handles its own toasts internally
+      await resendVerificationEmail();
     } catch {
       toastMessage("Failed to resend verification email.", { type: "error" });
     } finally {
@@ -122,9 +112,6 @@ export function VerifyEmailNotice() {
     }
   };
 
-  /* ============================================================
-     🌀 Loading state
-  ============================================================ */
   if (checking) {
     return (
       <div className="flex h-40 items-center justify-center text-muted-foreground">
@@ -133,9 +120,6 @@ export function VerifyEmailNotice() {
     );
   }
 
-  /* ============================================================
-     🎨 UI Layout
-  ============================================================ */
   return (
     <div className="flex flex-col gap-6">
       <Card>

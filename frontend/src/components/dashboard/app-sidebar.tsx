@@ -28,15 +28,9 @@ import {
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-provider/theme-toggle";
 
-/* ============================================================
-   🌐 API Base
-============================================================ */
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "https://auth-api.iventics.com/api";
 
-/* ============================================================
-   🧭 Navigation Configuration
-============================================================ */
 const navData = [
   {
     title: "General",
@@ -73,9 +67,6 @@ const navData = [
   },
 ];
 
-/* ============================================================
-   🧩 Sidebar Component — with Smart Health Status
-============================================================ */
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
 
@@ -106,9 +97,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return () => clearInterval(interval);
   }, []);
 
-  /* ============================================================
-     🎨 Status Mapping
-  ============================================================ */
   const statusMap = {
     ok: { color: "#006ef5", label: "System Healthy" },
     degraded: { color: "#FACC15", label: "System Degraded" },
@@ -119,12 +107,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const { color, label } = statusMap[health];
 
-  /* ============================================================
-     🌟 Sidebar UI
-  ============================================================ */
   return (
     <Sidebar collapsible="offcanvas" {...props}>
-      {/* 🌐 Brand Header */}
       <SidebarHeader className="px-5 pt-6 pb-4">
         <Link
           href="/dashboard"
@@ -157,7 +141,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <div className="mt-4 h-[1px] w-full bg-gradient-to-r from-transparent via-border/70 to-transparent rounded-full" />
       </SidebarHeader>
 
-      {/* 🧭 Navigation Sections */}
       <SidebarContent className="px-3 pt-4 pb-6">
         {navData.map((section, i) => (
           <div key={i} className={cn("relative", i > 0 && "mt-6 pt-6")}>
@@ -238,8 +221,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               {label}
             </span>
           </Link>
-
-          {/* 🌗 Theme Toggle */}
           <div className="scale-[0.9] opacity-90 hover:opacity-100 transition-opacity duration-150">
             <ThemeToggle />
           </div>

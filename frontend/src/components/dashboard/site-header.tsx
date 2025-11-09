@@ -7,9 +7,6 @@ import { Bell, CheckSquare2 } from "lucide-react";
 import { NavUser } from "@/components/dashboard/nav-user";
 import { PageBreadcrumb } from "./breadcrumbs";
 
-/* ============================================================
-   🌐 SiteHeader — ShadCN-Aligned + Visible Separator
-============================================================ */
 export function SiteHeader() {
   return (
     <header
@@ -18,11 +15,7 @@ export function SiteHeader() {
       px-4 lg:px-6 transition-all duration-200"
     >
       <div className="flex w-full items-center justify-between">
-        {/* ============================================================
-           🔹 LEFT — Sidebar trigger + Separator + Breadcrumb
-        ============================================================ */}
         <div className="flex items-center gap-2.5">
-          {/* Sidebar Trigger */}
           <SidebarTrigger
             className="flex size-[38px] items-center justify-center rounded-full 
             border border-border bg-background/50 hover:bg-accent/50 
@@ -30,7 +23,6 @@ export function SiteHeader() {
             active:scale-[0.97] shadow-sm transition-all duration-150"
           />
 
-          {/* 🌟 Clearly Visible Separator */}
           <Separator
             orientation="vertical"
             className="mx-2 data-[orientation=vertical]:h-4"
@@ -39,11 +31,7 @@ export function SiteHeader() {
           <PageBreadcrumb />
         </div>
 
-        {/* ============================================================
-           🔸 RIGHT — Notifications / Tasks / User
-        ============================================================ */}
         <div className="ml-auto flex items-center gap-3.5 sm:gap-4">
-          {/* 🔔 Notifications */}
           <Button
             variant="ghost"
             size="icon"
@@ -56,7 +44,6 @@ export function SiteHeader() {
             <Bell className="size-[18px] text-foreground/90 stroke-[1.6]" />
           </Button>
 
-          {/* ✅ Tasks */}
           <Button
             variant="ghost"
             size="icon"
@@ -69,7 +56,6 @@ export function SiteHeader() {
             <CheckSquare2 className="size-[18px] text-foreground/90 stroke-[1.6]" />
           </Button>
 
-          {/* 👤 User */}
           <div className="flex items-center justify-center">
             <NavUser />
           </div>

@@ -30,12 +30,6 @@ import {
 import { toast, toastAsync, toastMessage } from "@/lib/toast";
 import { requestPasswordReset } from "@/lib/auth";
 
-/* ============================================================
-   🔁 ForgotPasswordForm — Sends password reset email (Final)
-   ------------------------------------------------------------
-   • Exactly one loading toast and one success toast
-   • No duplicate toasts or “Password updated” toast
-============================================================ */
 export function ForgotPasswordForm({
   className,
   ...props
@@ -48,9 +42,6 @@ export function ForgotPasswordForm({
     mode: "onChange",
   });
 
-  /* ------------------------------------------------------------
-     📩 Handle password reset
-  ------------------------------------------------------------ */
   async function onSubmit(values: ForgotPasswordValues) {
     const email = values.email.trim().toLowerCase();
 
@@ -68,8 +59,6 @@ export function ForgotPasswordForm({
 
         if (!result?.ok)
           throw new Error(result?.message || "Failed to send reset link.");
-
-        // ✅ Single success toast handled by toastAsync
         setTimeout(() => router.replace("/login?reset=success"), 1500);
       },
       {
@@ -80,9 +69,6 @@ export function ForgotPasswordForm({
     );
   }
 
-  /* ------------------------------------------------------------
-     🎨 UI Layout
-  ------------------------------------------------------------ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -116,8 +102,6 @@ export function ForgotPasswordForm({
                   </Field>
                 )}
               />
-
-              {/* 🚀 Submit Button */}
               <Field>
                 <Button
                   type="submit"

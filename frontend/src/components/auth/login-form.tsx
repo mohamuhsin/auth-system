@@ -31,13 +31,6 @@ import { toast, toastMessage } from "@/lib/toast";
 import { loginWithEmailPassword, continueWithGoogle } from "@/lib/auth";
 import { useAuth } from "@/context/authContext";
 
-/* ============================================================
-   🔑 LoginForm — Email + Google Login (Final v4.3)
-   ------------------------------------------------------------
-   • Hook-safe Google login with session sync
-   • Unified clean toast flow (no double “Welcome”)
-   • Smooth redirect after session ready
-============================================================ */
 export function LoginForm({
   className,
   ...props
@@ -51,9 +44,6 @@ export function LoginForm({
     mode: "onChange",
   });
 
-  /* ------------------------------------------------------------
-     📩 Email / Password Login
-  ------------------------------------------------------------ */
   async function onSubmit(values: LoginFormValues) {
     if (!values.email || !values.password) {
       toast.dismiss();
@@ -75,22 +65,15 @@ export function LoginForm({
     }
   }
 
-  /* ------------------------------------------------------------
-     🌐 Google Login — Unified handler (auto signup if new)
-  ------------------------------------------------------------ */
   async function handleGoogleLogin() {
     const result = await continueWithGoogle();
 
     if (result?.ok) {
-      // Wait until backend cookie & context are synced
       await waitForSession();
       setTimeout(() => window.location.replace("/dashboard"), 700);
     }
   }
 
-  /* ------------------------------------------------------------
-     🎨 UI Layout
-  ------------------------------------------------------------ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -104,7 +87,6 @@ export function LoginForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* 🌐 Google Login */}
               <Field>
                 <Button
                   variant="outline"
@@ -150,7 +132,6 @@ export function LoginForm({
                 Or continue with
               </FieldSeparator>
 
-              {/* 📧 Email */}
               <Controller
                 name="email"
                 control={form.control}
@@ -168,8 +149,6 @@ export function LoginForm({
                   </Field>
                 )}
               />
-
-              {/* 🔑 Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -211,8 +190,6 @@ export function LoginForm({
                   </Field>
                 )}
               />
-
-              {/* 🚀 Submit */}
               <Field>
                 <Button
                   type="submit"

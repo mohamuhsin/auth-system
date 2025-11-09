@@ -1,12 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-
-/* ============================================================
-   🔑 ResetPasswordForm — Level 3.0 (Final Production)
-   ------------------------------------------------------------
-   • Auto-redirects if token missing or invalid
-   • Verifies + updates password via Firebase
-   • Clean, dismiss-safe toasts with unified messaging
 ============================================================ */
 
 import { useState, useEffect } from "react";
@@ -42,9 +35,6 @@ import { confirmPasswordReset } from "firebase/auth";
 import { auth } from "@/services/firebase";
 import { toast, toastAsync, toastMessage } from "@/lib/toast";
 
-/* ============================================================
-   🧩 Component
-============================================================ */
 export function ResetPasswordForm({
   className,
   ...props
@@ -62,9 +52,6 @@ export function ResetPasswordForm({
     mode: "onChange",
   });
 
-  /* ------------------------------------------------------------
-     Detect and validate oobCode
-  ------------------------------------------------------------ */
   useEffect(() => {
     const code = searchParams.get("oobCode");
     if (!code) {
@@ -78,9 +65,6 @@ export function ResetPasswordForm({
     }
   }, [searchParams, router]);
 
-  /* ------------------------------------------------------------
-     Handle Password Reset
-  ------------------------------------------------------------ */
   async function onSubmit(values: ResetPasswordValues) {
     if (!oobCode) return;
 
@@ -144,9 +128,6 @@ export function ResetPasswordForm({
     });
   }
 
-  /* ============================================================
-     🎨 UI Layout
-  ============================================================ */
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -160,7 +141,6 @@ export function ResetPasswordForm({
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <FieldGroup>
-              {/* 🔐 New Password */}
               <Controller
                 name="password"
                 control={form.control}
@@ -195,7 +175,6 @@ export function ResetPasswordForm({
                 )}
               />
 
-              {/* ✅ Confirm Password */}
               <Controller
                 name="confirmPassword"
                 control={form.control}
@@ -237,7 +216,6 @@ export function ResetPasswordForm({
                 uppercase letter.
               </FieldDescription>
 
-              {/* 🚀 Submit */}
               <Field>
                 <Button
                   type="submit"

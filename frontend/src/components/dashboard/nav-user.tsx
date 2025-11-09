@@ -46,7 +46,6 @@ export function NavUser() {
       </Button>
     );
 
-  // 🧩 Initials + Role color
   const initials =
     user.name
       ?.split(" ")
@@ -105,7 +104,6 @@ export function NavUser() {
           "animate-in fade-in-0 zoom-in-95"
         )}
       >
-        {/* Header */}
         <DropdownMenuLabel className="p-0 font-normal">
           <div className="flex items-center gap-3 px-3 py-2.5">
             <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40 shrink-0">
@@ -131,7 +129,6 @@ export function NavUser() {
 
         <DropdownMenuSeparator className="my-1 h-[1px] bg-border/80" />
 
-        {/* Menu Items */}
         <DropdownMenuGroup>
           {[
             {
@@ -168,7 +165,6 @@ export function NavUser() {
 
         <DropdownMenuSeparator className="my-1 h-[1px] bg-border/80" />
 
-        {/* Logout */}
         <DropdownMenuItem
           onClick={handleLogout}
           className={cn(

@@ -34,25 +34,16 @@ export default function DashboardPage() {
           } as React.CSSProperties
         }
       >
-        {/* Sidebar */}
         <AppSidebar variant="inset" />
-
-        {/* Main Dashboard Area */}
         <SidebarInset>
           <SiteHeader />
-
           <div className="flex flex-1 flex-col overflow-y-auto scroll-smooth">
             <div className="@container/main flex flex-1 flex-col gap-2">
               <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-                {/* Summary cards */}
                 <SectionCards />
-
-                {/* Analytics */}
                 <div className="px-4 lg:px-6">
                   <ChartAreaInteractive />
                 </div>
-
-                {/* Data Table */}
                 <DataTable data={data} />
               </div>
             </div>

@@ -4,9 +4,6 @@ import { auth } from "@/services/firebase";
 import { toast, toastMessage } from "@/lib/toast";
 import { go, actionCodeSettings, AuthResult } from "./helpers";
 
-/* ============================================================
-   ✉️ RESEND VERIFICATION
-============================================================ */
 export async function resendVerificationEmail(): Promise<AuthResult> {
   const user = auth.currentUser;
 
