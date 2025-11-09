@@ -145,7 +145,7 @@ export async function apiRequest<T = any>(
           status: res.status,
           data,
           requestUrl: url,
-          silent: true, // prevents “Unexpected error” toast
+          silent: true,
         });
       }
 
@@ -155,6 +155,18 @@ export async function apiRequest<T = any>(
         (path.includes("/users/me") || path.includes("/auth/session"))
       ) {
         console.info(`[auth] Silent 401 during session probe: ${path}`);
+        throw Object.assign(error, { silent: true });
+      }
+
+      /* 🚫 Ignore 404 for Google login auto-create */
+      if (
+        res.status === 404 &&
+        (path.includes("/auth/login-with-firebase") ||
+          path.includes("/auth/signup-with-firebase"))
+      ) {
+        console.info(
+          `[auth] Ignoring 404 (handled via Google auto-create): ${path}`
+        );
         throw Object.assign(error, { silent: true });
       }
 
@@ -200,7 +212,6 @@ export async function apiRequest<T = any>(
     ------------------------------------------------------------ */
     if (err instanceof TypeError && err.message === "Failed to fetch") {
       const retry = options.retryCount ?? 0;
-
       if (retry < 2) {
         const delay = Math.pow(2, retry) * 500;
         console.warn(`Retry #${retry + 1} after ${delay} ms → ${url}`);

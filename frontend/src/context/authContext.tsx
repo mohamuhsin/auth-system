@@ -108,13 +108,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
      🔄 fetchSession — Load active session
   ------------------------------------------------------------ */
   const fetchSession = useCallback(async () => {
-    // 🧤 Skip fetch during signup redirect to avoid duplicate toasts
-    if (
-      typeof window !== "undefined" &&
-      window.location.pathname === "/signup"
-    ) {
+    if (typeof window !== "undefined" && window.location.pathname === "/signup")
       return;
-    }
 
     try {
       const res = await apiRequest<ApiResponse>("/users/me");
@@ -150,13 +145,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchSession]);
 
   /* ------------------------------------------------------------
-     🔑 loginWithFirebase — Google / Email login
+     🔑 loginWithFirebase — Handles both Google & Email
   ------------------------------------------------------------ */
   const loginWithFirebase = useCallback(
     async (firebaseUser: FirebaseUser): Promise<ApiResponse> => {
       try {
         toast.dismiss();
         const idToken = await getIdToken(firebaseUser, true);
+
         const res = await apiRequest<ApiResponse>("/auth/login-with-firebase", {
           method: "POST",
           body: {
@@ -168,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         });
 
-        // ⚠️ Unverified email
+        // ⚠️ Unverified email (email/password only)
         if (res.code === 403) {
           toastMessage("Please verify your email before logging in.", {
             type: "warning",
@@ -178,51 +174,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { ...res, status: "unverified" };
         }
 
-        // 🔴 Account not found (cleaned version)
-        if (res.code === 404) {
-          toast.dismiss();
-          toastMessage("Account does not exist. Redirecting to signup...", {
-            type: "warning",
-          });
-          setLoading(true);
-          await signOut(auth).catch(() => {});
-          setUser(null);
-
-          if (typeof window !== "undefined") {
-            setTimeout(() => {
-              toast.dismiss();
-              window.location.replace("/signup");
-            }, 900);
-          }
-
-          return { ...res, status: "not_found" };
-        }
-
-        // 🟢 Success
+        // 🟢 Success — including auto-created Google users
         const probe = await waitForSession();
         setUser(probe ? toUser(probe) : null);
         setLoading(false);
         return { ...res, status: "success" };
       } catch (err: any) {
         toast.dismiss();
-
-        // ⚡ Expected auth failures
-        if (err?.status === 404) {
-          toast.dismiss();
-          toastMessage("Account does not exist. Redirecting to signup...", {
-            type: "warning",
-          });
-          setLoading(true);
-          await signOut(auth).catch(() => {});
-          setUser(null);
-          setTimeout(() => {
-            toast.dismiss();
-            window.location.replace("/signup");
-          }, 900);
-          return { status: "not_found", code: 404 };
-        }
-
-        // 🚫 Generic
         toastMessage(err?.message || "Login failed.", { type: "error" });
         setLoading(false);
         return { status: "error", code: 500, message: err?.message };
@@ -232,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   /* ------------------------------------------------------------
-     ✳️ signupWithFirebase — Google signup
+     ✳️ signupWithFirebase — Explicit Email signup
   ------------------------------------------------------------ */
   const signupWithFirebase = useCallback(
     async (

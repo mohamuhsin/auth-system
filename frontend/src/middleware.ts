@@ -23,7 +23,7 @@ const PROTECTED_PATHS = [
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Allow static files and API routes
+  // 🧱 Skip static, API, and asset routes
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
@@ -36,21 +36,30 @@ export function middleware(req: NextRequest) {
   const cookieHeader = req.headers.get("cookie") || "";
   const hasSession = cookieHeader.includes(`${SESSION_COOKIE}=`);
 
-  // 🟢 Authenticated → Redirect away from auth pages
+  /* ============================================================
+     🟢 Authenticated — Redirect away from auth pages
+     ------------------------------------------------------------
+     e.g. user already logged in → visiting /login → go to /dashboard
+  ============================================================ */
   if (hasSession && AUTH_PAGES.includes(path)) {
-    const url = new URL("/dashboard", req.url);
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  // 🔒 Unauthenticated → Block protected pages
+  /* ============================================================
+     🔒 Unauthenticated — Block protected pages
+     ------------------------------------------------------------
+     e.g. no cookie → visiting /dashboard → redirect to /login
+  ============================================================ */
   if (!hasSession && PROTECTED_PATHS.some((p) => path.startsWith(p))) {
-    const url = new URL("/login", req.url);
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL("/login", req.url));
   }
 
   return NextResponse.next();
 }
 
+/* ============================================================
+   ⚙️ Matcher — Exclude static assets from middleware
+============================================================ */
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|css|js)$).*)",
