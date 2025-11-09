@@ -8,43 +8,62 @@ import { toast, toastMessage } from "@/lib/toast";
 import { normalizeApi, go, AuthResult } from "./helpers";
 
 /* ============================================================
-   🌐 continueWithGoogle — Sign in OR Sign up (Hook-safe v4.1)
+   🌐 continueWithGoogle — Sign in OR Sign up (Hook-safe v4.3)
    ------------------------------------------------------------
-   • Single unified Google flow (no separate signup)
-   • Firebase auto-creates account if user doesn’t exist
-   • Exchanges ID token with backend for secure cookie
+   • Single unified Google flow (login → signup fallback)
+   • Firebase authenticates user + returns ID token
+   • Backend auto-creates if user not found (404)
+   • Adds success toast for consistent UX
    • Leaves waitForSession + redirect to caller (React-safe)
-   • Clean Sonner toast UX — one message at a time
 ============================================================ */
 export async function continueWithGoogle(): Promise<AuthResult> {
   try {
     toast.dismiss();
     toastMessage("Connecting to Google...", { type: "loading" });
 
-    // 🔐 1. Open Google popup and authenticate with Firebase
+    // 🔐 1. Authenticate via Firebase popup
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 
     const result = await signInWithPopup(auth, provider);
     const idToken = await result.user.getIdToken(true);
 
-    // 🌍 2. Exchange Firebase ID token → backend session cookie
-    const raw = await apiRequest("/auth/login-with-firebase", {
+    // 🌍 2. Try backend login first
+    let raw = await apiRequest("/auth/login-with-firebase", {
       method: "POST",
       credentials: "include",
       body: { idToken },
     });
+    let res = normalizeApi(raw);
 
-    const res = normalizeApi(raw);
+    // 🧩 3. If account not found → fallback to signup
+    if (
+      res.status === 404 ||
+      res.message?.toLowerCase().includes("not found")
+    ) {
+      console.info("🆕 Google user not found → auto-signing up...");
+      raw = await apiRequest("/auth/signup-with-firebase", {
+        method: "POST",
+        credentials: "include",
+        body: {
+          idToken,
+          name: result.user.displayName,
+          avatarUrl: result.user.photoURL,
+        },
+      });
+      res = normalizeApi(raw);
+    }
+
     toast.dismiss();
 
-    // ⚠️ 3. Backend failure
+    // ⚠️ 4. Backend failure
     if (!res.ok) {
       toastMessage(res.message || "Google sign-in failed.", { type: "error" });
       return { ok: false, message: res.message || "Google sign-in failed." };
     }
 
-    // ✅ 4. Success (waitForSession + redirect handled by caller)
+    // ✅ 5. Success (waitForSession + redirect handled by caller)
+    toastMessage("Welcome!", { type: "success" });
     return { ok: true };
   } catch (err: any) {
     toast.dismiss();

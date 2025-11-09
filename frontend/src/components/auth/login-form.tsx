@@ -32,11 +32,11 @@ import { loginWithEmailPassword, continueWithGoogle } from "@/lib/auth";
 import { useAuth } from "@/context/authContext";
 
 /* ============================================================
-   🔑 LoginForm — Email + Google Login (Final v4.1)
+   🔑 LoginForm — Email + Google Login (Final v4.3)
    ------------------------------------------------------------
    • Hook-safe Google login with session sync
-   • Unified clean toast flow
-   • No redundant redirects
+   • Unified clean toast flow (no double “Welcome”)
+   • Smooth redirect after session ready
 ============================================================ */
 export function LoginForm({
   className,
@@ -76,7 +76,7 @@ export function LoginForm({
   }
 
   /* ------------------------------------------------------------
-     🌐 Google Login — Unified handler
+     🌐 Google Login — Unified handler (auto signup if new)
   ------------------------------------------------------------ */
   async function handleGoogleLogin() {
     const result = await continueWithGoogle();
@@ -84,8 +84,6 @@ export function LoginForm({
     if (result?.ok) {
       // Wait until backend cookie & context are synced
       await waitForSession();
-
-      toastMessage("Welcome back!", { type: "success" });
       setTimeout(() => window.location.replace("/dashboard"), 700);
     }
   }

@@ -32,11 +32,11 @@ import { signupWithEmailPassword, continueWithGoogle } from "@/lib/auth";
 import { useAuth } from "@/context/authContext";
 
 /* ============================================================
-   🧩 SignupForm — Email + Google Signup (Final v4.1)
+   🧩 SignupForm — Email + Google Signup (Final v4.3)
    ------------------------------------------------------------
-   • Unified Google handler with secure session sync
-   • No inline popups or redirects duplication
-   • Consistent flow with LoginForm
+   • Unified Google handler (auto-login/signup)
+   • Clean Sonner toasts (no duplicates)
+   • Seamless session sync after signup
 ============================================================ */
 export function SignupForm({
   className,
@@ -82,8 +82,6 @@ export function SignupForm({
     if (result?.ok) {
       // Wait until backend cookie & AuthContext are ready
       await waitForSession();
-
-      toastMessage("Welcome!", { type: "success" });
       setTimeout(() => window.location.replace("/dashboard"), 700);
     }
   }
