@@ -27,21 +27,17 @@ import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/form-error";
 import { loginSchema, type LoginFormValues } from "@/lib/validators/auth";
 
-import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { auth } from "@/services/firebase";
-import { useAuth } from "@/context/authContext";
-import { toast, toastAsync, toastMessage } from "@/lib/toast";
-import { loginWithEmailPassword } from "@/lib/auth";
+import { toast, toastMessage } from "@/lib/toast";
+import { loginWithEmailPassword, continueWithGoogle } from "@/lib/auth";
 
 /* ============================================================
-   🔑 LoginForm — Email + Google Login (Final Clean v3.9.2)
+   🔑 LoginForm — Email + Google Login (Final Clean v4.0)
 ============================================================ */
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const [showPassword, setShowPassword] = useState(false);
-  const { loginWithFirebase } = useAuth();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -74,62 +70,10 @@ export function LoginForm({
   }
 
   /* ------------------------------------------------------------
-     🌐 Google Login — Single Toast Flow (no duplicates)
+     🌐 Google Login — Unified handler (no duplication)
   ------------------------------------------------------------ */
   async function handleGoogleLogin() {
-    toast.dismiss();
-    await toastAsync(
-      async () => {
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: "select_account" });
-
-        const userCred = await signInWithPopup(auth, provider);
-        const googleUser = userCred.user;
-
-        // ⚙️ Verify with backend
-        const result = await loginWithFirebase(googleUser);
-
-        // Ensure no leftover loaders
-        toast.dismiss();
-
-        // 🔴 Account not found
-        if (result?.status === "not_found" || result?.code === 404) {
-          // Prevent Firebase auto reauth noise
-          await signOut(auth).catch(() => {});
-          toast.dismiss();
-          toastMessage("No account found. Please sign up with Google first.", {
-            type: "warning",
-          });
-          setTimeout(() => window.location.replace("/signup"), 900);
-          return;
-        }
-
-        // ⚠️ Unverified email
-        if (result?.status === "unverified" || result?.code === 403) {
-          await signOut(auth).catch(() => {});
-          toast.dismiss();
-          toastMessage("Please verify your email before logging in.", {
-            type: "warning",
-          });
-          setTimeout(
-            () =>
-              window.location.replace(
-                `/verify-email?email=${googleUser.email}`
-              ),
-            900
-          );
-          return;
-        }
-
-        // 🟢 Success
-        toastMessage("Welcome back.", { type: "success" });
-        setTimeout(() => window.location.replace("/dashboard"), 700);
-      },
-      {
-        loading: "Connecting to Google...",
-        error: "Google sign-in failed. Please try again.",
-      }
-    );
+    await continueWithGoogle();
   }
 
   /* ------------------------------------------------------------

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -26,14 +27,15 @@ import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/ui/form-error";
 import { signupSchema, type SignupFormValues } from "@/lib/validators/auth";
 
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { auth } from "@/services/firebase";
-import { useAuth } from "@/context/authContext";
-import { toast, toastAsync, toastMessage } from "@/lib/toast";
-import { signupWithEmailPassword } from "@/lib/auth";
+import { toast, toastMessage } from "@/lib/toast";
+import { signupWithEmailPassword, continueWithGoogle } from "@/lib/auth";
 
 /* ============================================================
-   🧩 SignupForm — Email + Google Signup (Clean Toast Flow)
+   🧩 SignupForm — Email + Google Signup (Final Clean v4.0)
+   ------------------------------------------------------------
+   • Unified Google handler (no inline popup)
+   • Shared toasts + backend exchange
+   • Consistent with LoginForm
 ============================================================ */
 export function SignupForm({
   className,
@@ -41,7 +43,6 @@ export function SignupForm({
 }: React.ComponentProps<"div">) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const { signupWithFirebase } = useAuth();
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -66,70 +67,15 @@ export function SignupForm({
       return;
     }
 
-    // 🧩 Toasts are now handled inside signupWithEmailPassword
     await signupWithEmailPassword(values.email, values.password, values.name);
-
-    // Reset only after successful signup
     form.reset();
   }
 
   /* ------------------------------------------------------------
-     🌐 Google Signup (Firebase Popup)
+     🌐 Google Signup — Unified flow (auto creates or logs in)
   ------------------------------------------------------------ */
   async function handleGoogleSignup() {
-    await toastAsync(
-      async () => {
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: "select_account" });
-
-        const userCred = await signInWithPopup(auth, provider);
-        const googleUser = userCred.user;
-
-        const result = await signupWithFirebase(googleUser, {
-          name: googleUser.displayName ?? undefined,
-          avatarUrl: googleUser.photoURL ?? undefined,
-        });
-
-        toast.dismiss();
-
-        if (result?.code === 409) {
-          toastMessage("Account already exists. Redirecting to login...", {
-            type: "warning",
-          });
-          setTimeout(() => window.location.replace("/login"), 1000);
-          return;
-        }
-
-        if (result?.status === "pending_verification" || result?.code === 202) {
-          toastMessage(
-            "Account created. Please verify your email before logging in.",
-            { type: "info" }
-          );
-          setTimeout(
-            () =>
-              window.location.replace(
-                `/verify-email?email=${googleUser.email ?? ""}`
-              ),
-            1200
-          );
-          return;
-        }
-
-        if (result?.status === "success") {
-          toastMessage("Signed up successfully. Redirecting...", {
-            type: "success",
-          });
-          setTimeout(() => window.location.replace("/dashboard"), 700);
-          return;
-        }
-
-        throw new Error(result?.message || "Google sign-up failed.");
-      },
-      {
-        loading: "Connecting to Google...",
-        error: "Google sign-up failed. Please try again.",
-      }
-    );
+    await continueWithGoogle();
   }
 
   /* ------------------------------------------------------------
