@@ -6,15 +6,14 @@ import { auth } from "@/services/firebase";
 import { apiRequest } from "@/lib/api";
 import { toast, toastMessage } from "@/lib/toast";
 import { normalizeApi, go, AuthResult } from "./helpers";
-import { useAuth } from "@/context/authContext";
 
 /* ============================================================
-   🌐 continueWithGoogle — Sign in OR Sign up (Final v4.0)
+   🌐 continueWithGoogle — Sign in OR Sign up (Hook-safe v4.1)
    ------------------------------------------------------------
    • Single unified Google flow (no separate signup)
-   • Firebase auto-creates if user doesn’t exist
+   • Firebase auto-creates account if user doesn’t exist
    • Exchanges ID token with backend for secure cookie
-   • Waits for AuthContext session sync before redirect
+   • Leaves waitForSession + redirect to caller (React-safe)
    • Clean Sonner toast UX — one message at a time
 ============================================================ */
 export async function continueWithGoogle(): Promise<AuthResult> {
@@ -24,6 +23,8 @@ export async function continueWithGoogle(): Promise<AuthResult> {
 
     // 🔐 1. Open Google popup and authenticate with Firebase
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+
     const result = await signInWithPopup(auth, provider);
     const idToken = await result.user.getIdToken(true);
 
@@ -43,17 +44,7 @@ export async function continueWithGoogle(): Promise<AuthResult> {
       return { ok: false, message: res.message || "Google sign-in failed." };
     }
 
-    // 🕐 4. Ensure secure session cookie is ready (avoid 'stuck verifying')
-    try {
-      const { waitForSession } = useAuth();
-      await waitForSession();
-    } catch {
-      // Silent ignore if called outside provider
-    }
-
-    // ✅ 5. Success toast + redirect
-    toastMessage("Welcome!", { type: "success" });
-    setTimeout(() => go("/dashboard"), 700);
+    // ✅ 4. Success (waitForSession + redirect handled by caller)
     return { ok: true };
   } catch (err: any) {
     toast.dismiss();

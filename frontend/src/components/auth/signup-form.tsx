@@ -29,13 +29,14 @@ import { signupSchema, type SignupFormValues } from "@/lib/validators/auth";
 
 import { toast, toastMessage } from "@/lib/toast";
 import { signupWithEmailPassword, continueWithGoogle } from "@/lib/auth";
+import { useAuth } from "@/context/authContext";
 
 /* ============================================================
-   🧩 SignupForm — Email + Google Signup (Final Clean v4.0)
+   🧩 SignupForm — Email + Google Signup (Final v4.1)
    ------------------------------------------------------------
-   • Unified Google handler (no inline popup)
-   • Shared toasts + backend exchange
-   • Consistent with LoginForm
+   • Unified Google handler with secure session sync
+   • No inline popups or redirects duplication
+   • Consistent flow with LoginForm
 ============================================================ */
 export function SignupForm({
   className,
@@ -43,6 +44,7 @@ export function SignupForm({
 }: React.ComponentProps<"div">) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const { waitForSession } = useAuth();
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -72,10 +74,18 @@ export function SignupForm({
   }
 
   /* ------------------------------------------------------------
-     🌐 Google Signup — Unified flow (auto creates or logs in)
+     🌐 Google Signup — Unified login/signup flow
   ------------------------------------------------------------ */
   async function handleGoogleSignup() {
-    await continueWithGoogle();
+    const result = await continueWithGoogle();
+
+    if (result?.ok) {
+      // Wait until backend cookie & AuthContext are ready
+      await waitForSession();
+
+      toastMessage("Welcome!", { type: "success" });
+      setTimeout(() => window.location.replace("/dashboard"), 700);
+    }
   }
 
   /* ------------------------------------------------------------

@@ -29,15 +29,21 @@ import { loginSchema, type LoginFormValues } from "@/lib/validators/auth";
 
 import { toast, toastMessage } from "@/lib/toast";
 import { loginWithEmailPassword, continueWithGoogle } from "@/lib/auth";
+import { useAuth } from "@/context/authContext";
 
 /* ============================================================
-   🔑 LoginForm — Email + Google Login (Final Clean v4.0)
+   🔑 LoginForm — Email + Google Login (Final v4.1)
+   ------------------------------------------------------------
+   • Hook-safe Google login with session sync
+   • Unified clean toast flow
+   • No redundant redirects
 ============================================================ */
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const [showPassword, setShowPassword] = useState(false);
+  const { waitForSession } = useAuth();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -70,10 +76,18 @@ export function LoginForm({
   }
 
   /* ------------------------------------------------------------
-     🌐 Google Login — Unified handler (no duplication)
+     🌐 Google Login — Unified handler
   ------------------------------------------------------------ */
   async function handleGoogleLogin() {
-    await continueWithGoogle();
+    const result = await continueWithGoogle();
+
+    if (result?.ok) {
+      // Wait until backend cookie & context are synced
+      await waitForSession();
+
+      toastMessage("Welcome back!", { type: "success" });
+      setTimeout(() => window.location.replace("/dashboard"), 700);
+    }
   }
 
   /* ------------------------------------------------------------
